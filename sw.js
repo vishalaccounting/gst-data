@@ -1,11 +1,11 @@
 /* Service worker: offline shell + auto-update + (optional) Firebase push.
    Network-first: whenever the phone is online it loads the newest files from GitHub Pages,
    so every push to GitHub reaches all clients automatically. Bump CACHE on each release. */
-var CACHE = 'vas-gst-1.0.0';
+var CACHE = 'vas-gst-1.0.1';
 var SHELL = ['./', 'index.html', 'core.js', 'api.js', 'config.js', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', function (e) {
-  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));
+  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL.map(function (u) { return new Request(u, { cache: 'reload' }); })); }).then(function () { return self.skipWaiting(); }));
 });
 self.addEventListener('activate', function (e) {
   e.waitUntil(caches.keys().then(function (keys) {
@@ -15,7 +15,8 @@ self.addEventListener('activate', function (e) {
 self.addEventListener('fetch', function (e) {
   var req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
-  e.respondWith(fetch(req).then(function (res) {
+  // cache:'no-cache' = always ask GitHub if the file changed (Pages sets max-age=600)
+  e.respondWith(fetch(new Request(req.url, { cache: 'no-cache', credentials: 'same-origin' })).then(function (res) {
     var copy = res.clone();
     caches.open(CACHE).then(function (c) { c.put(req, copy); });
     return res;
