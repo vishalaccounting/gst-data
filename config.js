@@ -4,7 +4,7 @@
    FIREBASE : optional – for real push notifications (see SETUP.md).          */
 var CONFIG = {
   APP_NAME: 'Vishal Accounting Services',
-  API_URL: '',
+  API_URL: 'https://script.google.com/macros/s/AKfycbxG-EroqmWhgSYwifkUZ7JPHCe49GQzHmQSqxnVOj5g-IwcxzEKfl7R8YWD2fbRsDcz/exec',
   FIREBASE: null,
   /* FIREBASE example:
   FIREBASE: {
