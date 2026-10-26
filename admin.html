@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<link rel="icon" href="icon-192.png">
+<title>VAS Master Dashboard</title>
+<style>
+:root{--bg:#f3f5f9;--card:#fff;--ink:#14213d;--mute:#6b7280;--line:#e5e7eb;--pri:#0d3b66;--pri2:#1d5c96;--ok:#16a34a;--okbg:#e8f7ee;--warn:#d97706;--warnbg:#fff4e0;--bad:#dc2626;--badbg:#fdecec;--nil:#7c3aed;--nilbg:#f1eafe;--blue:#0369a1;--bluebg:#e0f2fe;color-scheme:light}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Devanagari",sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+header{background:var(--pri);color:#fff;padding:0 18px;display:flex;align-items:center;gap:18px;height:56px;position:sticky;top:0;z-index:10}
+header b{font-size:16px;white-space:nowrap}
+nav{display:flex;gap:4px;flex:1;overflow-x:auto}
+nav button{background:none;border:0;color:#cfe0f2;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;white-space:nowrap;position:relative}
+nav button.on{background:rgba(255,255,255,.15);color:#fff}
+.badge{background:#f43f5e;color:#fff;font-size:11px;border-radius:10px;padding:0 6px;margin-left:4px}
+main{padding:16px 18px 60px;max-width:1500px;margin:0 auto}
+.card{background:var(--card);border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:14px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.tile{background:#fff;border-radius:12px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer;border:2px solid transparent}
+.tile.on{border-color:var(--pri2)}
+.tile .n{font-size:26px;font-weight:800}.tile .l{font-size:12.5px;color:var(--mute)}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.grow{flex:1}
+input.i,select.i,textarea.i{padding:8px 10px;border:1.5px solid var(--line);border-radius:9px;background:#fff;outline:none}
+input.i:focus,select.i:focus,textarea.i:focus{border-color:var(--pri2)}
+.btn{border:0;border-radius:9px;padding:8px 14px;font-weight:600;cursor:pointer;background:var(--pri);color:#fff;white-space:nowrap}
+.btn.sec{background:#e8eef6;color:var(--pri)}.btn.ok{background:var(--ok)}.btn.bad{background:var(--bad)}.btn.wa{background:#25d366}
+.btn.sm{padding:5px 10px;font-size:12.5px;border-radius:8px}.btn:disabled{opacity:.5}
+table{width:100%;border-collapse:collapse;background:#fff}
+th{text-align:left;font-size:12px;color:var(--mute);font-weight:600;padding:9px 10px;border-bottom:1px solid var(--line);background:#fafbfc}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr.rowc{cursor:pointer}tr.rowc:hover td{background:#f8fafc}
+.tw{overflow-x:auto;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.pill{display:inline-block;font-size:11.5px;font-weight:700;border-radius:20px;padding:2px 9px;white-space:nowrap}
+.NONE{background:var(--badbg);color:var(--bad)}.PARTIAL{background:var(--warnbg);color:var(--warn)}.COMPLETE,.SUBMITTED,.PAID{background:var(--okbg);color:var(--ok)}.NIL{background:var(--nilbg);color:var(--nil)}.FILED{background:var(--bluebg);color:var(--blue)}.PROCESS{background:#fef9c3;color:#854d0e}.DUE{background:var(--badbg);color:var(--bad)}.CLAIM{background:#fef3c7;color:#92400e}
+.plat{display:inline-block;font-size:10.5px;font-weight:700;color:#fff;border-radius:5px;padding:1px 5px;margin:1px}
+.mute{color:var(--mute);font-size:12.5px}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(720px,100%);background:#fff;box-shadow:-4px 0 20px rgba(0,0,0,.15);z-index:30;transform:translateX(105%);transition:.2s;display:flex;flex-direction:column}
+.drawer.on{transform:none}
+.drawer .dh{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center}
+.drawer .db{padding:14px 18px;overflow:auto;flex:1}
+.shade{position:fixed;inset:0;background:rgba(15,23,42,.3);z-index:25;display:none}.shade.on{display:block}
+.per{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.per h3{margin:0;font-size:15px}
+.slots{display:grid;grid-template-columns:1fr;gap:4px;margin:10px 0}
+.sl{display:flex;gap:8px;align-items:flex-start;font-size:13px;padding:5px 8px;border-radius:8px;background:#f8fafc}
+.sl .nm{width:230px;flex:none;font-weight:600}
+.sl a,.sl button.lnk{color:var(--pri2);text-decoration:none;background:none;border:0;cursor:pointer;padding:0;font-size:12.5px;text-align:left}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px 12px}
+.grid2 label{font-size:12px;font-weight:600;color:#374151;display:block}
+.grid2 .i{width:100%;margin-top:3px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sep{border:0;border-top:1px solid var(--line);margin:12px 0}
+.note{padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;gap:10px}
+.note.unread{background:#f0f7ff}
+.note .k{flex:none;width:90px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 16px;border-radius:10px;z-index:60;display:none}
+#login{max-width:360px;margin:12vh auto;text-align:center}
+.hide{display:none!important}
+.pk{display:flex;flex-wrap:wrap;gap:6px}.pk label{border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-weight:500;display:flex;gap:5px;align-items:center}
+</style>
+</head>
+<body>
+<div id="login" class="card">
+  <img src="icon-192.png" width="64" style="border-radius:14px">
+  <h2>Master Dashboard</h2>
+  <p class="mute" id="demoHint"></p>
+  <input class="i" id="key" type="password" placeholder="Admin Key" style="width:100%" onkeydown="if(event.key==='Enter')login()">
+  <button class="btn" style="width:100%;margin-top:10px" onclick="login()">खोलें</button>
+</div>
+
+<div id="app" class="hide">
+<header>
+  <b>VAS • GST Data</b>
+  <nav>
+    <button data-v="dash" class="on" onclick="view('dash')">डैशबोर्ड</button>
+    <button data-v="pay" onclick="view('pay')">पेमेंट</button>
+    <button data-v="clients" onclick="view('clients')">क्लाइंट्स</button>
+    <button data-v="inbox" onclick="view('inbox')">सूचनाएँ<span id="nBadge" class="badge hide"></span></button>
+    <button data-v="settings" onclick="view('settings')">सेटिंग्स</button>
+  </nav>
+  <button class="btn sec sm" onclick="refresh()">⟳ रिफ्रेश</button>
+</header>
+<main>
+  <!-- DASHBOARD -->
+  <section id="v-dash">
+    <div class="bar">
+      <label>महीना: <input type="month" class="i" id="month" onchange="refresh()"></label>
+      <span class="mute" id="monthNote"></span>
+      <span class="grow"></span>
+      <input class="i" id="q" placeholder="🔍 नाम / GSTIN / मोबाइल" oninput="renderDash()" style="width:240px">
+      <select class="i" id="fFreq" onchange="renderDash()"><option value="">सभी</option><option value="M">Monthly</option><option value="Q">Quarterly</option></select>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <div class="bar">
+      <button class="btn sm sec" onclick="selAll(true)">सब चुनें</button>
+      <button class="btn sm sec" onclick="selAll(false)">हटाएँ</button>
+      <span class="mute" id="selCount"></span>
+      <span class="grow"></span>
+      <button class="btn sm" onclick="bulkRemind('data')">🔔 चुने हुए को डेटा रिमाइंडर</button>
+      <button class="btn sm sec" onclick="exportCsv()">⬇ CSV</button>
+    </div>
+    <div class="tw"><table><thead><tr><th style="width:28px"></th><th>#</th><th>क्लाइंट</th><th>रिटर्न</th><th>प्लेटफॉर्म</th><th>डेटा</th><th>आखिरी अपलोड</th><th>फाइलिंग</th><th>फीस</th><th></th></tr></thead><tbody id="dashBody"></tbody></table></div>
+  </section>
+
+  <!-- PAYMENTS -->
+  <section id="v-pay" class="hide">
+    <div class="tiles" id="payTiles"></div>
+    <div class="bar">
+      <select class="i" id="payF" onchange="renderPay()"><option value="due">सिर्फ बाकी</option><option value="claim">क्लाइंट ने कहा "पे कर दिया"</option><option value="all">सब</option></select>
+      <input class="i" id="payQ" placeholder="🔍 खोजें" oninput="renderPay()" style="width:220px">
+      <span class="grow"></span>
+      <button class="btn sm" onclick="bulkRemind('pay')">🔔 सभी बाकी वालों को पेमेंट रिमाइंडर</button>
+    </div>
+    <div class="tw"><table><thead><tr><th>क्लाइंट</th><th>अवधि</th><th>फाइलिंग</th><th>फीस</th><th>मिला</th><th>बाकी</th><th>स्थिति</th><th></th></tr></thead><tbody id="payBody"></tbody></table></div>
+  </section>
+
+  <!-- CLIENTS -->
+  <section id="v-clients" class="hide">
+    <div class="bar">
+      <select class="i" id="cF" onchange="renderClients()"><option value="">सभी क्लाइंट</option><option value="new">नए (verify बाकी)</option><option value="blocked">Blocked</option></select>
+      <input class="i" id="cQ" placeholder="🔍 खोजें" oninput="renderClients()" style="width:240px">
+      <span class="grow"></span><span class="mute" id="cCount"></span>
+    </div>
+    <div class="tw"><table><thead><tr><th>क्लाइंट</th><th>GSTIN</th><th>मोबाइल</th><th>रिटर्न</th><th>प्लेटफॉर्म</th><th>Verified</th><th>Push</th><th>रजिस्टर</th><th>कुल बाकी</th></tr></thead><tbody id="cBody"></tbody></table></div>
+  </section>
+
+  <!-- INBOX -->
+  <section id="v-inbox" class="hide">
+    <div class="bar"><b>सूचनाएँ</b><span class="grow"></span><button class="btn sm sec" onclick="readAll()">सब पढ़ लिया</button></div>
+    <div class="card" style="padding:0" id="inboxBody"></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="v-settings" class="hide">
+    <div class="card"><h3 style="margin-top:0">रिमाइंडर और पेमेंट</h3>
+      <div class="grid2">
+        <label>डेटा रिमाइंडर की तारीखें<input class="i" id="sDays" placeholder="1,5,8"></label>
+        <label>पेमेंट रिमाइंडर हर कितने दिन<input class="i" id="sPay" type="number" min="1"></label>
+        <label>डिफ़ॉल्ट फीस (₹ प्रति रिटर्न)<input class="i" id="sFee" type="number" min="0"></label>
+        <label>UPI ID (पेमेंट के लिए)<input class="i" id="sUpi" placeholder="name@bank"></label>
+        <label>UPI पर नाम<input class="i" id="sPayee"></label>
+        <label>ऑफिस WhatsApp नंबर<input class="i" id="sPhone"></label>
+        <label>फर्म का नाम<input class="i" id="sFirm"></label>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="btn" onclick="saveSettings()">सेव करें</button></div>
+    </div>
+    <div class="card"><h3 style="margin-top:0">रिमाइंडर अभी चलाएँ</h3>
+      <p class="mute">सर्वर हर दिन सुबह अपने आप चलाता है (सेट तारीखों पर डेटा रिमाइंडर, और फाइल हो चुके रिटर्न की बाकी फीस का रिमाइंडर). टेस्ट के लिए यहाँ से अभी चला सकते हैं – तारीख की शर्त नहीं देखी जाएगी.</p>
+      <button class="btn sec" onclick="runTick()">▶ अभी चलाएँ</button> <span id="tickOut" class="mute"></span>
+    </div>
+    <div class="card"><h3 style="margin-top:0">कनेक्शन</h3>
+      <div id="connInfo" class="mute"></div>
+      <div class="row" style="margin-top:10px"><button class="btn sec" onclick="logoutAdmin()">Admin लॉगआउट</button><button class="btn bad hide" id="demoReset" onclick="demoReset()">डेमो डेटा मिटाएँ</button></div>
+    </div>
+  </section>
+</main>
+</div>
+
+<div class="shade" id="shade" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer"><div class="dh"><div class="grow" id="dTitle"></div><button class="btn sec sm" onclick="closeDrawer()">✕</button></div><div class="db" id="dBody"></div></div>
+<div id="toast"></div>
+
+<script src="config.js"></script>
+<script src="core.js"></script>
+<script src="api.js"></script>
+<script>
+'use strict';
+var KEY = '', LIST = null, PAY = null, INBOX = [], SEL = {}, TILE = '', OPEN = null;
+var $ = function (id) { return document.getElementById(id); };
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function toast(m, ms) { var t = $('toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(function () { t.style.display = 'none'; }, ms || 2600); }
+function rupee(n) { return n == null ? '–' : '₹' + Number(n).toLocaleString('en-IN'); }
+function fmtDate(iso) { if (!iso) return ''; var d = new Date(iso); return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }); }
+function today() { var d = new Date(Date.now() + 19800000); return d.toISOString().slice(0, 10); }
+function A(action, p) { return API.call(action, Object.assign({ adminKey: KEY }, p || {})).catch(function (e) { if (e.code === 'ADMIN_KEY_WRONG') { logoutAdmin(); } throw e; }); }
+function plats(c) { return (c.platforms || []).map(function (k) { var P = Core.PLATFORMS[k]; return '<span class="plat" style="background:' + P.color + '">' + esc(k === 'tool' ? 'Tool' : k === 'pdf' ? 'PDF' : P.label) + '</span>'; }).join('') || '<span class="mute">–</span>'; }
+var DATA_TXT = { NONE: 'नहीं भेजा', PARTIAL: 'अधूरा', COMPLETE: 'पूरा ✓', SUBMITTED: 'भेज दिया ✓', NIL: 'NIL' };
+var WORK_TXT = { '': 'शुरू नहीं', PROCESS: 'चल रहा', FILED: 'फाइल ✓' };
+
+/* ---------- login ---------- */
+function login() {
+  KEY = $('key').value.trim();
+  A('aSettings').then(function () { try { localStorage.setItem('vas_admin_key', KEY); } catch (e) {} start(); }).catch(function (e) { toast(e.code === 'ADMIN_KEY_WRONG' ? 'Admin Key गलत है' : e.message); });
+}
+function logoutAdmin() { try { localStorage.removeItem('vas_admin_key'); } catch (e) {} KEY = ''; $('app').classList.add('hide'); $('login').classList.remove('hide'); }
+function start() {
+  $('login').classList.add('hide'); $('app').classList.remove('hide');
+  if (!$('month').value) $('month').value = Core.lastMonth(new Date());
+  refresh();
+}
+
+/* ---------- views ---------- */
+function view(v) {
+  document.querySelectorAll('nav button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === v); });
+  ['dash', 'pay', 'clients', 'inbox', 'settings'].forEach(function (k) { $('v-' + k).classList.toggle('hide', k !== v); });
+  if (v === 'pay') loadPay(); if (v === 'inbox') loadInbox(); if (v === 'settings') loadSettings();
+}
+function refresh() {
+  return A('aList', { month: $('month').value }).then(function (d) {
+    LIST = d;
+    $('nBadge').textContent = d.unread; $('nBadge').classList.toggle('hide', !d.unread);
+    var q = Core.quarterOf(d.month), qm = Core.monthsOf(q);
+    $('monthNote').textContent = 'Monthly: ' + d.label + ' • Quarterly: ' + Core.periodLabel(q) + (qm[2] === d.month ? '' : ' (तिमाही अभी पूरी नहीं)');
+    renderDash(); renderClients();
+    if (!$('v-pay').classList.contains('hide')) loadPay();
+    if (OPEN) openClient(OPEN, true);
+  }).catch(function (e) { toast(e.message, 4000); });
+}
+
+/* ---------- dashboard ---------- */
+function prio(r) {
+  var s = r.summary;
+  if (s.work === 'FILED') return 9;
+  if (s.data === 'NIL') return 0;
+  if (s.data === 'SUBMITTED' || s.data === 'COMPLETE') return s.work === 'PROCESS' ? 2 : 1;
+  if (s.work === 'PROCESS') return 2;
+  if (s.data === 'PARTIAL') return 3;
+  return 4;
+}
+var TILES = [
+  ['', 'कुल क्लाइंट', function () { return true; }],
+  ['nil', 'NIL – पहले फाइल करें', function (r) { return r.summary.data === 'NIL' && r.summary.work !== 'FILED'; }],
+  ['ready', 'डेटा पूरा – फाइलिंग बाकी', function (r) { return (r.summary.data === 'SUBMITTED' || r.summary.data === 'COMPLETE') && r.summary.work !== 'FILED'; }],
+  ['partial', 'अधूरा डेटा', function (r) { return r.summary.data === 'PARTIAL' && r.summary.work !== 'FILED'; }],
+  ['none', 'डेटा नहीं आया', function (r) { return r.summary.data === 'NONE' && r.summary.work !== 'FILED'; }],
+  ['filed', 'फाइल हो गया', function (r) { return r.summary.work === 'FILED'; }],
+  ['due', 'फीस बाकी (क्लाइंट)', function (r) { return r.totalDue > 0; }]
+];
+function tileFn(k) { return TILES.filter(function (t) { return t[0] === k; })[0][2]; }
+function dashRows() {
+  var q = $('q').value.trim().toLowerCase(), fq = $('fFreq').value, fn = tileFn(TILE);
+  return LIST.rows.filter(function (r) {
+    var c = r.client;
+    if (fq && c.freq !== fq) return false;
+    if (q && (c.trade + ' ' + c.legal + ' ' + c.gstin + ' ' + c.mobile + ' ' + c.owner).toLowerCase().indexOf(q) < 0) return false;
+    return fn(r);
+  }).sort(function (a, b) { return prio(a) - prio(b) || (b.summary.lastUpload || '').localeCompare(a.summary.lastUpload || '') || a.client.trade.localeCompare(b.client.trade); });
+}
+function renderDash() {
+  if (!LIST) return;
+  $('tiles').innerHTML = TILES.map(function (t) {
+    var n = LIST.rows.filter(t[2]).length;
+    return '<div class="tile' + (TILE === t[0] ? ' on' : '') + '" onclick="TILE=\'' + t[0] + '\';renderDash()"><div class="n">' + n + '</div><div class="l">' + t[1] + '</div></div>';
+  }).join('');
+  var rows = dashRows();
+  $('dashBody').innerHTML = rows.map(function (r, i) {
+    var c = r.client, s = r.summary;
+    var dataCell = '<span class="pill ' + s.data + '">' + DATA_TXT[s.data] + '</span>' + (s.data !== 'NIL' && s.required ? ' <span class="mute">' + s.done + '/' + s.required + '</span>' : '') +
+      (s.missing.length && s.files && s.data !== 'NIL' ? '<div class="mute" style="max-width:260px">बाकी: ' + esc(Core.missingText(s)) + '</div>' : '');
+    var fee = s.fee == null ? '<span class="mute">–</span>' : (s.due > 0 ? '<span class="pill ' + (s.payClaim ? 'CLAIM' : 'DUE') + '">' + rupee(s.due) + ' बाकी</span>' : '<span class="pill PAID">' + rupee(s.fee) + ' ✓</span>');
+    return '<tr class="rowc" onclick="openClient(\'' + c.gstin + '\',false,\'' + s.pid + '\')">' +
+      '<td onclick="event.stopPropagation()"><input type="checkbox" ' + (SEL[c.gstin] ? 'checked' : '') + ' onchange="SEL[\'' + c.gstin + '\']=this.checked;selInfo()"></td>' +
+      '<td class="mute">' + (i + 1) + '</td>' +
+      '<td><b>' + esc(c.trade) + '</b>' + (c.verified ? '' : ' <span class="pill PARTIAL" title="नाम GST पोर्टल से मिलाना बाकी">नया</span>') + '<div class="mute">' + esc(c.gstin) + ' • ' + esc(c.mobile) + '</div></td>' +
+      '<td>' + (c.freq === 'Q' ? 'Q' : 'M') + '<div class="mute">' + esc(s.label) + '</div></td>' +
+      '<td>' + plats(c) + '</td><td>' + dataCell + '</td>' +
+      '<td class="mute">' + (fmtDate(s.lastUpload) || '–') + '</td>' +
+      '<td><span class="pill ' + (s.work || 'NONE') + '">' + WORK_TXT[s.work || ''] + '</span></td>' +
+      '<td>' + fee + '</td>' +
+      '<td onclick="event.stopPropagation()"><a class="btn wa sm" target="_blank" rel="noopener" href="' + waLink(c, s, 'data') + '" title="WhatsApp">WA</a></td></tr>';
+  }).join('') || '<tr><td colspan="10" class="mute" style="padding:30px;text-align:center">कोई क्लाइंट नहीं</td></tr>';
+  selInfo();
+}
+function selAll(on) { SEL = {}; if (on) dashRows().forEach(function (r) { SEL[r.client.gstin] = true; }); renderDash(); }
+function selInfo() { var n = Object.keys(SEL).filter(function (k) { return SEL[k]; }).length; $('selCount').textContent = n ? n + ' चुने' : ''; }
+function waLink(c, s, kind) {
+  var who = c.owner || c.trade, txt;
+  if (kind === 'pay') txt = 'नमस्ते ' + who + ', ' + s.label + ' का GST रिटर्न फाइल हो चुका है. फीस ₹' + s.due + ' बाकी है, कृपया भुगतान करें. – Vishal Accounting Services';
+  else if (s.files && s.missing.length) txt = 'नमस्ते ' + who + ', ' + s.label + ' के GST रिटर्न के लिए ये रिपोर्ट बाकी हैं: ' + Core.missingText(s) + '. कृपया Vishal GST ऐप में अपलोड करें. – Vishal Accounting Services';
+  else txt = 'नमस्ते ' + who + ', ' + s.label + ' का GST डेटा (Meesho/Amazon/Flipkart रिपोर्ट या बिल) Vishal GST ऐप में अपलोड करें. कोई सेल नहीं थी तो ऐप में NIL चुनें. – Vishal Accounting Services';
+  return 'https://wa.me/91' + c.mobile + '?text=' + encodeURIComponent(txt);
+}
+function bulkRemind(kind) {
+  var list;
+  if (kind === 'pay') list = (PAY ? PAY.rows : []).filter(function (r) { return r.summary.due > 0; }).map(function (r) { return r.client.gstin; });
+  else list = Object.keys(SEL).filter(function (k) { return SEL[k]; });
+  list = list.filter(function (g, i) { return list.indexOf(g) === i; });
+  if (!list.length) return toast(kind === 'pay' ? 'कोई बाकी पेमेंट नहीं' : 'पहले क्लाइंट चुनें');
+  if (!confirm(list.length + ' क्लाइंट को ' + (kind === 'pay' ? 'पेमेंट' : 'डेटा') + ' रिमाइंडर भेजें?')) return;
+  A('aRemind', { gstins: list, kind: kind, month: $('month').value }).then(function (d) { toast(d.sent + ' रिमाइंडर भेजे ✓ (जिनका डेटा पूरा है उन्हें नहीं भेजा)'); refresh(); }).catch(function (e) { toast(e.message); });
+}
+function exportCsv() {
+  var rows = [['Trade', 'GSTIN', 'Mobile', 'Freq', 'Period', 'Platforms', 'Data', 'Done', 'Required', 'Missing', 'Work', 'GSTR1 ARN', 'Fee', 'Due']];
+  dashRows().forEach(function (r) { var c = r.client, s = r.summary; rows.push([c.trade, c.gstin, c.mobile, c.freq, s.label, c.platforms.join(' '), s.data, s.done, s.required, Core.missingText(s), s.work, s.filed.gstr1 ? s.filed.gstr1.arn : '', s.fee == null ? '' : s.fee, s.due]); });
+  var csv = '﻿' + rows.map(function (r) { return r.map(function (v) { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(','); }).join('\r\n');
+  var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'GST_Data_Status_' + $('month').value + '.csv'; a.click();
+}
+
+/* ---------- client drawer ---------- */
+function openClient(g, keep, focusPid) {
+  OPEN = g;
+  A('aClient', { gstin: g, pid: focusPid }).then(function (d) {
+    var c = d.client;
+    $('dTitle').innerHTML = '<b style="font-size:16px">' + esc(c.trade) + '</b><div class="mute">' + esc(c.gstin) + ' • ' + esc(c.state) + ' • ' + (c.freq === 'Q' ? 'Quarterly' : 'Monthly') + '</div>';
+    var h = '';
+    h += d.periods.map(function (p) { return periodBlock(c, p, p.summary.pid === focusPid); }).join('');
+    h += '<div class="per"><h3>प्रोफाइल</h3><div class="grid2" style="margin-top:8px">' +
+      fld('trade', 'ट्रेड नाम', c.trade) + fld('legal', 'लीगल नाम', c.legal) + fld('owner', 'मालिक', c.owner) + fld('mobile', 'मोबाइल', c.mobile) + fld('email', 'ईमेल', c.email) +
+      '<label>रिटर्न<select class="i" id="pf_freq"><option value="M"' + (c.freq !== 'Q' ? ' selected' : '') + '>Monthly</option><option value="Q"' + (c.freq === 'Q' ? ' selected' : '') + '>Quarterly</option></select></label>' +
+      fld('defaultFee', 'इस क्लाइंट की फीस (₹)', c.defaultFee == null ? '' : c.defaultFee) +
+      '<label>स्थिति<select class="i" id="pf_status"><option value="ACTIVE">Active</option><option value="BLOCKED"' + (c.status === 'BLOCKED' ? ' selected' : '') + '>Blocked</option></select></label></div>' +
+      '<div style="margin-top:8px"><label style="font-size:12px;font-weight:600">प्लेटफॉर्म</label><div class="pk" style="margin-top:4px">' + Core.PLATFORM_ORDER.map(function (k) { return '<label><input type="checkbox" class="pf_plat" value="' + k + '"' + (c.platforms.indexOf(k) >= 0 ? ' checked' : '') + '>' + esc(Core.PLATFORMS[k].label) + '</label>'; }).join('') + '</div></div>' +
+      '<div style="margin-top:8px"><label style="font-size:12px;font-weight:600">नोट्स</label><textarea class="i" id="pf_notes" rows="2" style="width:100%">' + esc(c.notes) + '</textarea></div>' +
+      '<div class="row" style="margin-top:8px"><label><input type="checkbox" id="pf_verified"' + (c.verified ? ' checked' : '') + '> नाम/GSTIN GST पोर्टल से मिला लिया (Verified)</label></div>' +
+      '<div class="row" style="margin-top:10px"><button class="btn" onclick="saveClient(\'' + c.gstin + '\')">प्रोफाइल सेव</button><button class="btn sec" onclick="resetPin(\'' + c.gstin + '\')">नया PIN दें</button><button class="btn bad sm" onclick="delClient(\'' + c.gstin + '\')">क्लाइंट हटाएँ</button></div></div>';
+    h += '<div class="per"><h3>क्लाइंट को मैसेज (ऐप में + नोटिफिकेशन)</h3><input class="i" id="msgT" placeholder="शीर्षक" style="width:100%;margin-top:8px"><textarea class="i" id="msgB" rows="2" placeholder="मैसेज" style="width:100%;margin-top:6px"></textarea>' +
+      '<div class="row" style="margin-top:6px"><button class="btn" onclick="sendMsg(\'' + c.gstin + '\')">भेजें</button><span class="mute">' + (c.push ? '🔔 नोटिफिकेशन चालू (' + c.push + ' फोन)' : 'इस क्लाइंट ने नोटिफिकेशन चालू नहीं किया – सिर्फ ऐप में दिखेगा') + '</span></div></div>';
+    $('dBody').innerHTML = h;
+    if (!keep) { $('drawer').classList.add('on'); $('shade').classList.add('on'); $('dBody').scrollTop = 0; }
+  }).catch(function (e) { toast(e.message); });
+}
+function fld(k, l, v) { return '<label>' + l + '<input class="i" id="pf_' + k + '" value="' + esc(v == null ? '' : v) + '"></label>'; }
+function periodBlock(c, p, focus) {
+  var s = p.summary, g = c.gstin, pid = s.pid, f1 = s.filed.gstr1 || {}, f3 = s.filed.gstr3b || {};
+  var bySlot = {};
+  p.files.forEach(function (f) { (bySlot[f.slot] = bySlot[f.slot] || []).push(f); });
+  var slots = p.slots.map(function (sl) {
+    var fs = bySlot[sl.id] || [];
+    delete bySlot[sl.id];
+    return '<div class="sl"><span>' + (fs.length ? '✅' : sl.optional ? '➖' : '❌') + '</span><span class="nm">' + esc(Core.PLATFORMS[sl.plat].label + ' – ' + sl.name) + '</span><span>' +
+      (fs.map(function (f) { return fileLink(f); }).join('<br>') || '<span class="mute">' + (sl.optional ? 'वैकल्पिक' : 'नहीं आया') + '</span>') + '</span></div>';
+  }).join('');
+  var orphan = Object.keys(bySlot).map(function (k) { return bySlot[k].map(function (f) { return '<div class="sl"><span>📎</span><span class="nm mute">' + esc(k) + '</span><span>' + fileLink(f) + '</span></div>'; }).join(''); }).join('');
+  var pays = p.payments.map(function (x) { return '<div class="mute">' + esc(x.date) + ' • ' + rupee(x.amt) + ' • ' + esc(x.mode) + (x.note ? ' • ' + esc(x.note) : '') + ' <button class="btn sec sm" style="padding:1px 6px" onclick="delPay(\'' + g + '\',\'' + pid + '\',\'' + x.id + '\')">✕</button></div>'; }).join('');
+  var id = pid.replace(/\W/g, '');
+  return '<div class="per" style="' + (focus ? 'border-color:var(--pri2);box-shadow:0 0 0 2px #cfe0f2' : '') + '">' +
+    '<div class="row"><h3>' + esc(s.label) + '</h3><span class="pill ' + s.data + '">' + DATA_TXT[s.data] + (s.data !== 'NIL' && s.required ? ' ' + s.done + '/' + s.required : '') + '</span><span class="pill ' + (s.work || 'NONE') + '">' + WORK_TXT[s.work || ''] + '</span>' +
+    (s.submittedAt ? '<span class="mute">भेजा: ' + fmtDate(s.submittedAt) + '</span>' : '') + '</div>' +
+    (s.data === 'NIL' ? '<div class="mute" style="margin-top:6px">क्लाइंट ने बताया: इस अवधि में कोई सेल नहीं – NIL रिटर्न.</div>' : '<div class="slots">' + (slots || '<span class="mute">कोई प्लेटफॉर्म नहीं</span>') + orphan + '</div>') +
+    '<hr class="sep"><div class="row">' +
+    (s.work ? '' : '<button class="btn sec sm" onclick="setWork(\'' + g + '\',\'' + pid + '\',\'PROCESS\')">▶ फाइलिंग शुरू (क्लाइंट को बताएँ)</button>') +
+    '<label>GSTR-1 ARN <input class="i" id="a1' + id + '" value="' + esc(f1.arn || '') + '" style="width:170px"></label><input class="i" type="date" id="d1' + id + '" value="' + esc(f1.date || today()) + '">' +
+    '<button class="btn ok sm" onclick="saveFiled(\'' + g + '\',\'' + pid + '\',\'gstr1\')">GSTR-1 फाइल ✓</button></div>' +
+    '<div class="row" style="margin-top:6px"><label>GSTR-3B ARN <input class="i" id="a3' + id + '" value="' + esc(f3.arn || '') + '" style="width:170px"></label><input class="i" type="date" id="d3' + id + '" value="' + esc(f3.date || today()) + '">' +
+    '<button class="btn ok sm" onclick="saveFiled(\'' + g + '\',\'' + pid + '\',\'gstr3b\')">GSTR-3B फाइल ✓</button>' +
+    (s.work ? '<button class="btn sec sm" onclick="undoWork(\'' + g + '\',\'' + pid + '\')">↺ स्थिति हटाएँ</button>' : '') + '</div>' +
+    '<hr class="sep"><div class="row"><label>फीस ₹ <input class="i" type="number" id="fee' + id + '" value="' + (s.fee == null ? '' : s.fee) + '" style="width:100px"></label><button class="btn sec sm" onclick="saveFee(\'' + g + '\',\'' + pid + '\')">सेव</button>' +
+    '<span>मिला: <b>' + rupee(s.paid) + '</b></span><span>बाकी: <b style="color:' + (s.due > 0 ? 'var(--bad)' : 'var(--ok)') + '">' + rupee(s.due) + '</b></span></div>' +
+    (s.payClaim ? '<div class="row" style="margin-top:6px"><span class="pill CLAIM">क्लाइंट ने कहा पेमेंट कर दिया – ' + fmtDate(s.payClaim.at) + (s.payClaim.note ? ': ' + esc(s.payClaim.note) : '') + '</span><button class="btn sec sm" onclick="rejectClaim(\'' + g + '\',\'' + pid + '\')">नहीं मिला</button></div>' : '') +
+    (s.fee != null || p.payments.length ? '<div class="row" style="margin-top:6px"><label>पेमेंट मिला ₹ <input class="i" type="number" id="pa' + id + '" value="' + (s.due > 0 ? s.due : '') + '" style="width:100px"></label><select class="i" id="pm' + id + '"><option>UPI</option><option>Cash</option><option>Bank</option></select><input class="i" id="pn' + id + '" placeholder="नोट / Ref" style="width:140px"><button class="btn ok sm" onclick="addPay(\'' + g + '\',\'' + pid + '\')">+ जोड़ें</button></div>' + pays : '') +
+    (s.due > 0 ? '<div class="row" style="margin-top:6px"><a class="btn wa sm" target="_blank" rel="noopener" href="' + waLink(c, s, 'pay') + '">WhatsApp पेमेंट रिमाइंडर</a></div>' : '') +
+    '</div>';
+}
+function fileLink(f) {
+  var t = esc(f.name) + ' <span class="mute">(' + fmtDate(f.at) + ')</span>';
+  if (f.url && f.url.indexOf('demo:') !== 0) return '<a href="' + esc(f.url) + '" target="_blank" rel="noopener">📄 ' + t + '</a>';
+  return '<button class="lnk" onclick="demoDownload(\'' + esc(f.fileId) + '\')">📄 ' + t + '</button>';
+}
+function demoDownload(id) {
+  API.demoFile(id).then(function (f) { var a = document.createElement('a'); a.href = URL.createObjectURL(f.blob); a.download = f.name; a.click(); }).catch(function (e) { toast(e.message); });
+}
+function closeDrawer() { OPEN = null; $('drawer').classList.remove('on'); $('shade').classList.remove('on'); }
+function after(p, msg) { return p.then(function () { if (msg) toast(msg); return refresh(); }).catch(function (e) { toast(e.message, 4000); }); }
+function setWork(g, pid, w) { after(A('aSetWork', { gstin: g, pid: pid, work: w }), 'स्थिति अपडेट ✓'); }
+function undoWork(g, pid) { if (confirm('फाइलिंग की स्थिति और ARN हटाएँ?')) after(A('aSetWork', { gstin: g, pid: pid, work: '', gstr1: null, gstr3b: null }), 'हटा दिया'); }
+function saveFiled(g, pid, k) {
+  var id = pid.replace(/\W/g, ''), n = k === 'gstr1' ? '1' : '3', o = {};
+  o[k] = { arn: $('a' + n + id).value.trim(), date: $('d' + n + id).value || today() };
+  o.gstin = g; o.pid = pid;
+  after(A('aSetWork', o), (k === 'gstr1' ? 'GSTR-1' : 'GSTR-3B') + ' फाइल ✓ – क्लाइंट को सूचना गई');
+}
+function saveFee(g, pid) { after(A('aSetFee', { gstin: g, pid: pid, fee: $('fee' + pid.replace(/\W/g, '')).value }), 'फीस सेव ✓'); }
+function addPay(g, pid) { var id = pid.replace(/\W/g, ''); after(A('aAddPayment', { gstin: g, pid: pid, amt: $('pa' + id).value, mode: $('pm' + id).value, note: $('pn' + id).value }), 'पेमेंट जुड़ गया ✓ – क्लाइंट को रसीद गई'); }
+function delPay(g, pid, pidx) { if (confirm('यह पेमेंट एंट्री हटाएँ?')) after(A('aDeletePayment', { gstin: g, pid: pid, id: pidx }), 'हटा दिया'); }
+function rejectClaim(g, pid) { if (confirm('क्लाइंट को बताएँ कि पेमेंट नहीं मिला?')) after(A('aRejectClaim', { gstin: g, pid: pid }), 'क्लाइंट को सूचना गई'); }
+function saveClient(g) {
+  var f = {};
+  ['trade', 'legal', 'owner', 'mobile', 'email', 'defaultFee'].forEach(function (k) { f[k] = $('pf_' + k).value; });
+  f.freq = $('pf_freq').value; f.status = $('pf_status').value; f.notes = $('pf_notes').value; f.verified = $('pf_verified').checked;
+  f.platforms = Array.prototype.map.call(document.querySelectorAll('.pf_plat:checked'), function (x) { return x.value; });
+  after(A('aUpdateClient', { gstin: g, fields: f }), 'प्रोफाइल सेव ✓');
+}
+function resetPin(g) { var p = prompt('नया PIN (4–6 अंक) – क्लाइंट को WhatsApp पर बता दें:'); if (p) after(A('aResetPin', { gstin: g, pin: p }), 'PIN बदल गया ✓'); }
+function delClient(g) { if (prompt('क्लाइंट और उसकी सारी फाइलें हमेशा के लिए हटेंगी. पक्का करने के लिए GSTIN टाइप करें:') === g) after(A('aDeleteClient', { gstin: g }).then(closeDrawer), 'हटा दिया'); }
+function sendMsg(g) { after(A('aMessage', { gstins: [g], title: $('msgT').value, body: $('msgB').value }), 'मैसेज भेजा ✓'); }
+
+/* ---------- payments ---------- */
+function loadPay() { A('aPayments').then(function (d) { PAY = d; renderPay(); }).catch(function (e) { toast(e.message); }); }
+function renderPay() {
+  if (!PAY) return;
+  var tot = 0, got = 0, due = 0, dueN = 0, claims = 0;
+  PAY.rows.forEach(function (r) { tot += r.summary.fee || 0; got += r.summary.paid; due += r.summary.due; if (r.summary.due > 0) dueN++; if (r.summary.payClaim) claims++; });
+  $('payTiles').innerHTML = '<div class="tile"><div class="n">' + rupee(tot) + '</div><div class="l">कुल फीस</div></div><div class="tile"><div class="n" style="color:var(--ok)">' + rupee(got) + '</div><div class="l">मिल गया</div></div>' +
+    '<div class="tile"><div class="n" style="color:var(--bad)">' + rupee(due) + '</div><div class="l">बाकी (' + dueN + ' रिटर्न)</div></div><div class="tile"><div class="n" style="color:#92400e">' + claims + '</div><div class="l">"पे कर दिया" – जाँचें</div></div>';
+  var f = $('payF').value, q = $('payQ').value.trim().toLowerCase();
+  var rows = PAY.rows.filter(function (r) {
+    if (f === 'due' && !(r.summary.due > 0)) return false;
+    if (f === 'claim' && !r.summary.payClaim) return false;
+    return !q || (r.client.trade + ' ' + r.client.gstin + ' ' + r.client.mobile).toLowerCase().indexOf(q) >= 0;
+  }).sort(function (a, b) { return (b.summary.payClaim ? 1 : 0) - (a.summary.payClaim ? 1 : 0) || b.summary.due - a.summary.due; });
+  $('payBody').innerHTML = rows.map(function (r) {
+    var c = r.client, s = r.summary;
+    var st = s.due > 0 ? (s.payClaim ? '<span class="pill CLAIM">क्लाइंट: पे कर दिया</span>' : '<span class="pill DUE">बाकी</span>') : '<span class="pill PAID">मिल गया ✓</span>';
+    return '<tr class="rowc" onclick="openClient(\'' + c.gstin + '\',false,\'' + s.pid + '\')"><td><b>' + esc(c.trade) + '</b><div class="mute">' + esc(c.gstin) + ' • ' + esc(c.mobile) + '</div></td><td>' + esc(s.label) + '</td>' +
+      '<td><span class="pill ' + (s.work || 'NONE') + '">' + WORK_TXT[s.work || ''] + '</span></td><td>' + rupee(s.fee) + '</td><td>' + rupee(s.paid) + '</td><td><b>' + rupee(s.due) + '</b></td><td>' + st +
+      (r.payRemindAt && s.due > 0 ? '<div class="mute">रिमाइंडर: ' + fmtDate(r.payRemindAt) + '</div>' : '') + '</td>' +
+      '<td onclick="event.stopPropagation()">' + (s.due > 0 ? '<button class="btn ok sm" onclick="quickPaid(\'' + c.gstin + '\',\'' + s.pid + '\',' + s.due + ')">✓ मिला</button> <a class="btn wa sm" target="_blank" rel="noopener" href="' + waLink(c, s, 'pay') + '">WA</a>' : '') + '</td></tr>';
+  }).join('') || '<tr><td colspan="8" class="mute" style="padding:30px;text-align:center">कुछ नहीं</td></tr>';
+}
+function quickPaid(g, pid, due) {
+  var amt = prompt('कितना मिला? (₹)', due); if (!amt) return;
+  var mode = prompt('कैसे? UPI / Cash / Bank', 'UPI'); if (mode === null) return;
+  A('aAddPayment', { gstin: g, pid: pid, amt: amt, mode: mode }).then(function () { toast('पेमेंट जुड़ गया ✓'); loadPay(); refresh(); }).catch(function (e) { toast(e.message); });
+}
+
+/* ---------- clients ---------- */
+function renderClients() {
+  if (!LIST) return;
+  var f = $('cF').value, q = $('cQ').value.trim().toLowerCase();
+  var rows = LIST.rows.filter(function (r) {
+    var c = r.client;
+    if (f === 'new' && c.verified) return false;
+    if (f === 'blocked' && c.status !== 'BLOCKED') return false;
+    return !q || (c.trade + ' ' + c.legal + ' ' + c.gstin + ' ' + c.mobile + ' ' + c.owner).toLowerCase().indexOf(q) >= 0;
+  }).sort(function (a, b) { return (a.client.verified ? 1 : 0) - (b.client.verified ? 1 : 0) || b.client.createdAt.localeCompare(a.client.createdAt); });
+  $('cCount').textContent = rows.length + ' क्लाइंट';
+  $('cBody').innerHTML = rows.map(function (r) {
+    var c = r.client;
+    return '<tr class="rowc" onclick="openClient(\'' + c.gstin + '\')"><td><b>' + esc(c.trade) + '</b><div class="mute">' + esc(c.legal || '') + (c.owner ? ' • ' + esc(c.owner) : '') + '</div></td><td>' + esc(c.gstin) + '<div class="mute">' + esc(c.state) + '</div></td><td>' + esc(c.mobile) + '</td>' +
+      '<td>' + (c.freq === 'Q' ? 'Quarterly' : 'Monthly') + '</td><td>' + plats(c) + '</td><td>' + (c.verified ? '✅' : '<span class="pill PARTIAL">बाकी</span>') + (c.status === 'BLOCKED' ? ' <span class="pill NONE">Blocked</span>' : '') + '</td>' +
+      '<td>' + (c.push ? '🔔' : '–') + '</td><td class="mute">' + fmtDate(c.createdAt) + '</td><td>' + (r.totalDue > 0 ? '<b style="color:var(--bad)">' + rupee(r.totalDue) + '</b>' : '–') + '</td></tr>';
+  }).join('') || '<tr><td colspan="9" class="mute" style="padding:30px;text-align:center">अभी कोई क्लाइंट नहीं. क्लाइंट को ऐप का लिंक भेजें – वो खुद रजिस्टर करेंगे.</td></tr>';
+}
+
+/* ---------- inbox ---------- */
+var KIND = { REG: ['नया क्लाइंट', 'PARTIAL'], NIL: ['NIL', 'NIL'], COMPLETE: ['डेटा पूरा', 'COMPLETE'], SUBMIT: ['डेटा भेजा', 'SUBMITTED'], PAYCLAIM: ['पेमेंट', 'CLAIM'], PROFILE: ['प्रोफाइल', 'FILED'], TICK: ['रिमाइंडर', 'PROCESS'] };
+function loadInbox() {
+  A('aInbox').then(function (d) {
+    INBOX = d.inbox;
+    $('inboxBody').innerHTML = INBOX.map(function (n) {
+      var k = KIND[n.kind] || [n.kind, 'FILED'];
+      return '<div class="note' + (n.read ? '' : ' unread') + '"' + (n.gstin ? ' onclick="openClient(\'' + n.gstin + '\')"' : '') + '><span class="k"><span class="pill ' + k[1] + '">' + k[0] + '</span></span><div class="grow"><b>' + esc(n.title) + '</b><div class="mute">' + esc(n.body) + '</div></div><span class="mute">' + fmtDate(n.at) + '</span></div>';
+    }).join('') || '<div class="mute" style="padding:20px">कोई सूचना नहीं</div>';
+  }).catch(function (e) { toast(e.message); });
+}
+function readAll() { A('aReadInbox').then(function () { loadInbox(); refresh(); }); }
+
+/* ---------- settings ---------- */
+function loadSettings() {
+  A('aSettings').then(function (d) {
+    var s = d.settings;
+    $('sDays').value = (s.remindDays || []).join(','); $('sPay').value = s.payEveryDays; $('sFee').value = s.defaultFee || '';
+    $('sUpi').value = s.upi || ''; $('sPayee').value = s.payeeName || ''; $('sPhone').value = s.phone || ''; $('sFirm').value = s.firm || '';
+  });
+  $('connInfo').innerHTML = API.DEMO ? '<b>डेमो मोड</b> – डेटा सिर्फ इस ब्राउज़र में है. असली इस्तेमाल के लिए config.js में API_URL डालें (SETUP.md देखें).' : 'सर्वर: ' + esc(CONFIG.API_URL.slice(0, 60)) + '…';
+  $('demoReset').classList.toggle('hide', !API.DEMO);
+}
+function saveSettings() {
+  A('aSettings', { set: { remindDays: $('sDays').value, payEveryDays: $('sPay').value, defaultFee: $('sFee').value, upi: $('sUpi').value, payeeName: $('sPayee').value, phone: $('sPhone').value, firm: $('sFirm').value } })
+    .then(function () { toast('सेव ✓'); loadSettings(); }).catch(function (e) { toast(e.message); });
+}
+function runTick() { A('aTick').then(function (d) { $('tickOut').textContent = 'डेटा रिमाइंडर: ' + d.dataSent + ' • पेमेंट रिमाइंडर: ' + d.paySent; refresh(); }).catch(function (e) { toast(e.message); }); }
+function demoReset() { if (confirm('डेमो का सारा डेटा मिटाएँ?')) { localStorage.removeItem('vas_demo_db'); indexedDB.deleteDatabase('vas_demo_files'); location.reload(); } }
+
+/* ---------- start ---------- */
+$('demoHint').textContent = API.DEMO ? 'डेमो मोड – Admin Key: admin' : '';
+try { KEY = localStorage.getItem('vas_admin_key') || ''; } catch (e) {}
+if (KEY) A('aSettings').then(start).catch(function () { logoutAdmin(); });
+setInterval(function () { if (KEY && document.visibilityState === 'visible' && !OPEN) refresh(); }, 120000);
+</script>
+</body>
+</html>

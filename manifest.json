@@ -1,0 +1,16 @@
+{
+  "name": "Vishal Accounting Services – GST Data",
+  "short_name": "Vishal GST",
+  "description": "Meesho, Amazon, Flipkart, Vyapar रिपोर्ट और बिल भेजें – GST रिटर्न के लिए",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#0d3b66",
+  "lang": "hi",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
