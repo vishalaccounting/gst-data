@@ -11,5 +11,6 @@ var CONFIG = {
     apiKey: '...', authDomain: '...', projectId: '...', messagingSenderId: '...', appId: '...',
     vapidKey: '...'
   }, */
+  OFFICE_PHONE: '9359076851',   // "PIN भूल गए?" WhatsApp goes here (also editable in dashboard settings)
   MAX_FILE_MB: 25
 };

@@ -5,7 +5,7 @@
    No DOM, no async, no modules – plain ES2019.
    ============================================================ */
 var Core = (function () {
-  var VERSION = '1.1.0';
+  var VERSION = '1.2.0';
 
   /* ---------- Platforms and the reports each one must send ----------
      perMonth:true  -> one report per month (quarterly client = 3 slots)
@@ -242,6 +242,8 @@ var Core = (function () {
       platforms: c.platforms, status: c.status, verified: !!c.verified, createdAt: c.createdAt, defaultFee: c.defaultFee,
       notes: c.notes || '', push: (c.pushTokens || []).length, state: gstinInfo(c.gstin).state };
   }
+  // dashboard view: also the PIN (kept so the office can tell a client who forgot it; set on register/login/PIN change)
+  function adminClient(c) { var o = publicClient(c); o.pin = c.pin || ''; o.pinReqAt = c.pinReqAt || ''; return o; }
   function folderName(c) { return (str(c.trade, 60) || c.gstin).replace(/[\\\/:*?"<>|]/g, ' ') + ' ' + c.gstin; }
   function notifyClient(db, ctx, c, title, body) {
     c.inbox = c.inbox || [];
@@ -298,7 +300,7 @@ var Core = (function () {
     var c = {
       gstin: g, trade: trade, legal: str(q.legal, 100), owner: str(q.owner, 80), mobile: mobile, email: str(q.email, 100),
       freq: q.freq === 'Q' ? 'Q' : 'M', platforms: cleanPlatforms(q.platforms), status: 'ACTIVE', verified: false,
-      salt: salt, pinHash: pinHash(pin, salt), tokens: [], pushTokens: [], inbox: [], defaultFee: null, notes: '',
+      salt: salt, pinHash: pinHash(pin, salt), pin: pin, tokens: [], pushTokens: [], inbox: [], defaultFee: null, notes: '',
       createdAt: ctx.now.toISOString()
     };
     db.clients[g] = c;
@@ -310,10 +312,22 @@ var Core = (function () {
     var id = str(q.id, 15).toUpperCase(), pin = str(q.pin, 6), out = [];
     Object.keys(db.clients).forEach(function (g) {
       var c = db.clients[g];
-      if ((c.gstin === id || c.mobile === id) && c.pinHash === pinHash(pin, c.salt) && c.status !== 'BLOCKED') out.push(newSession(c, ctx));
+      if ((c.gstin === id || c.mobile === id) && c.pinHash === pinHash(pin, c.salt) && c.status !== 'BLOCKED') { c.pin = pin; c.pinReqAt = ''; out.push(newSession(c, ctx)); }
     });
     if (!out.length) fail('GSTIN / मोबाइल या PIN गलत है');
     return { sessions: out };
+  };
+  // "PIN भूल गए?" – tells the office (dashboard + email). Max once per 10 minutes per client.
+  A.forgotPin = function (db, q, ctx) {
+    var id = str(q.id, 15).toUpperCase(), list = [];
+    Object.keys(db.clients).forEach(function (g) { var c = db.clients[g]; if (c.gstin === id || c.mobile === id) list.push(c); });
+    if (!list.length) fail('ये GSTIN / मोबाइल रजिस्टर नहीं है – पहले "नया रजिस्ट्रेशन" करें');
+    list.forEach(function (c) {
+      if (c.pinReqAt && ctx.now - new Date(c.pinReqAt) < 600000) return;
+      c.pinReqAt = ctx.now.toISOString();
+      notifyAdmin(db, ctx, 'PIN', displayName(c) + ' PIN भूल गए', c.gstin + ' • ' + c.mobile + ' – डैशबोर्ड में क्लाइंट खोलकर PIN WhatsApp करें', c.gstin);
+    });
+    return { phone: db.settings.phone };
   };
   A.logout = function (db, q) { var c = byToken(db, q.token); c.tokens = c.tokens.filter(function (t) { return t !== q.token; }); return {}; };
   A.state = function (db, q, ctx) {
@@ -420,7 +434,7 @@ var Core = (function () {
     var c = byToken(db, q.token);
     if (c.pinHash !== pinHash(str(q.old, 6), c.salt)) fail('पुराना PIN गलत है');
     if (!/^\d{4,6}$/.test(str(q.pin, 6))) fail('PIN 4 से 6 अंकों का रखें');
-    c.pinHash = pinHash(str(q.pin, 6), c.salt);
+    c.pinHash = pinHash(str(q.pin, 6), c.salt); c.pin = str(q.pin, 6);
     return {};
   };
   A.pushToken = function (db, q) {
@@ -447,7 +461,7 @@ var Core = (function () {
       var rec = getRec(db, g, pid, false);
       var pend = 0, all = db.periods[g] || {};
       Object.keys(all).forEach(function (p) { pend += summary(c, p, all[p]).due; });
-      return { client: publicClient(c), summary: summary(c, pid, rec), totalDue: pend };
+      return { client: adminClient(c), summary: summary(c, pid, rec), totalDue: pend };
     });
     return { month: month, label: monthLabel(month), rows: rows, unread: db.adminInbox.filter(function (n) { return !n.read; }).length };
   };
@@ -459,7 +473,7 @@ var Core = (function () {
     if (q.pid && isPid(q.pid) && pids.indexOf(q.pid) < 0) pids.push(q.pid);
     pids.sort().reverse();
     return {
-      client: publicClient(c),
+      client: adminClient(c),
       periods: pids.map(function (p) {
         var rec = all[p] || emptyRec();
         return { summary: summary(c, p, rec), slots: slotsFor(c, p), files: rec.files || [], payments: rec.payments || [] };
@@ -481,7 +495,7 @@ var Core = (function () {
   A.aResetPin = function (db, q) {
     var c = client(db, q.gstin), pin = str(q.pin, 6);
     if (!/^\d{4,6}$/.test(pin)) fail('PIN 4 से 6 अंकों का रखें');
-    c.pinHash = pinHash(pin, c.salt); c.tokens = [];
+    c.pinHash = pinHash(pin, c.salt); c.pin = pin; c.pinReqAt = ''; c.tokens = [];
     return {};
   };
   A.aSetWork = function (db, q, ctx) {

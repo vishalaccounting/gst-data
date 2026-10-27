@@ -104,7 +104,7 @@ input.i:focus,select.i:focus{border-color:var(--pri2)}
     <label class="f">PIN</label>
     <input class="i" id="lPin" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password" required>
     <button class="btn block" style="margin-top:16px">लॉगिन करें</button>
-    <div class="mute" style="margin-top:10px;text-align:center">PIN भूल गए? ऑफिस को WhatsApp करें, नया PIN मिल जाएगा.</div>
+    <button type="button" class="btn ghost block" style="margin-top:6px" onclick="forgotPin()">🔑 PIN भूल गए?</button>
   </form>
 
   <form id="fReg" class="card hide" onsubmit="doRegister(event)">
@@ -135,6 +135,7 @@ input.i:focus,select.i:focus{border-color:var(--pri2)}
     <input class="i" id="rPin" type="password" inputmode="numeric" maxlength="6" required autocomplete="new-password">
     <label class="f">PIN दोबारा</label>
     <input class="i" id="rPin2" type="password" inputmode="numeric" maxlength="6" required autocomplete="new-password">
+    <div class="mute" style="margin-top:6px">⚠ ATM / बैंक वाला PIN न रखें. PIN भूल जाने पर ऑफिस आपको बता सकता है.</div>
     <button class="btn block" style="margin-top:16px">रजिस्टर करें</button>
     <div class="mute" style="margin-top:10px">आपका नाम और GSTIN ऑफिस द्वारा GST पोर्टल से मिलाया जाएगा.</div>
   </form>
@@ -232,13 +233,28 @@ function doRegister(e) {
     gstin: $('rGstin').value, trade: $('rTrade').value, legal: $('rLegal').value, owner: $('rOwner').value,
     mobile: $('rMobile').value, email: $('rEmail').value, pin: $('rPin').value,
     freq: document.querySelector('input[name=rFreq]:checked').value, platforms: plats
-  }).then(function (d) { addSessions(d.sessions); toast('रजिस्ट्रेशन हो गया ✓'); }).catch(function (er) { toast(er.message, 4000); }).finally(function () { busy(false); });
+  }).then(function (d) { savePin($('rGstin').value.trim().toUpperCase(), $('rPin').value, $('rTrade').value); addSessions(d.sessions); toast('रजिस्ट्रेशन हो गया ✓'); }).catch(function (er) { toast(er.message, 4000); }).finally(function () { busy(false); });
 }
 function doLogin(e) {
   e.preventDefault();
+  var id = $('lId').value.trim().toUpperCase(), pin = $('lPin').value;
   busy(true, 'लॉगिन…');
-  API.call('login', { id: $('lId').value, pin: $('lPin').value })
-    .then(function (d) { addSessions(d.sessions); }).catch(function (er) { toast(er.message, 4000); }).finally(function () { busy(false); });
+  API.call('login', { id: id, pin: pin })
+    .then(function (d) { savePin(id, pin, d.sessions[0].trade); addSessions(d.sessions); }).catch(function (er) { toast(er.message, 4000); }).finally(function () { busy(false); });
+}
+// asks Chrome / the phone's password manager to save GSTIN + PIN, so it fills itself next time (even after reinstall)
+function savePin(id, pin, name) {
+  try {
+    if (window.PasswordCredential && navigator.credentials) navigator.credentials.store(new PasswordCredential({ id: id, password: pin, name: name || id })).catch(function () {});
+  } catch (e) {}
+}
+function forgotPin() {
+  var id = $('lId').value.trim().toUpperCase() || (prompt('अपना GSTIN या मोबाइल नंबर डालें:') || '').trim().toUpperCase();
+  if (!id) return;
+  // WhatsApp opens right away (inside the tap, so it is not blocked); the office dashboard is told in the background
+  if (CONFIG.OFFICE_PHONE) window.open('https://wa.me/91' + CONFIG.OFFICE_PHONE + '?text=' + encodeURIComponent('नमस्ते, मैं Vishal GST ऐप का PIN भूल गया हूँ. मेरा GSTIN / मोबाइल: ' + id + ' – कृपया PIN बता दें.'), '_blank');
+  API.call('forgotPin', { id: id }).then(function () { toast('ऑफिस को बता दिया ✓ – WhatsApp पर PIN मिल जाएगा', 4000); })
+    .catch(function (er) { toast(er.message, 4500); });
 }
 function addSessions(list) {
   list.forEach(function (s) { S.sessions = S.sessions.filter(function (x) { return x.gstin !== s.gstin; }); S.sessions.push(s); });

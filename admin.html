@@ -26,7 +26,7 @@ main{padding:16px 18px 60px;max-width:1500px;margin:0 auto}
 .grow{flex:1}
 input.i,select.i,textarea.i{padding:8px 10px;border:1.5px solid var(--line);border-radius:9px;background:#fff;outline:none}
 input.i:focus,select.i:focus,textarea.i:focus{border-color:var(--pri2)}
-.btn{border:0;border-radius:9px;padding:8px 14px;font-weight:600;cursor:pointer;background:var(--pri);color:#fff;white-space:nowrap}
+.btn{border:0;border-radius:9px;padding:8px 14px;font-weight:600;cursor:pointer;background:var(--pri);color:#fff;white-space:nowrap;text-decoration:none;display:inline-block}
 .btn.sec{background:#e8eef6;color:var(--pri)}.btn.ok{background:var(--ok)}.btn.bad{background:var(--bad)}.btn.wa{background:#25d366}
 .btn.sm{padding:5px 10px;font-size:12.5px;border-radius:8px}.btn:disabled{opacity:.5}
 table{width:100%;border-collapse:collapse;background:#fff}
@@ -125,7 +125,7 @@ tr.rowc{cursor:pointer}tr.rowc:hover td{background:#f8fafc}
       <input class="i" id="cQ" placeholder="🔍 खोजें" oninput="renderClients()" style="width:240px">
       <span class="grow"></span><span class="mute" id="cCount"></span>
     </div>
-    <div class="tw"><table><thead><tr><th>क्लाइंट</th><th>GSTIN</th><th>मोबाइल</th><th>रिटर्न</th><th>प्लेटफॉर्म</th><th>Verified</th><th>Push</th><th>रजिस्टर</th><th>कुल बाकी</th></tr></thead><tbody id="cBody"></tbody></table></div>
+    <div class="tw"><table><thead><tr><th>क्लाइंट</th><th>GSTIN</th><th>मोबाइल</th><th>PIN</th><th>रिटर्न</th><th>प्लेटफॉर्म</th><th>Verified</th><th>Push</th><th>रजिस्टर</th><th>कुल बाकी</th></tr></thead><tbody id="cBody"></tbody></table></div>
   </section>
 
   <!-- INBOX -->
@@ -298,6 +298,12 @@ function openClient(g, keep, focusPid) {
     var c = d.client;
     $('dTitle').innerHTML = '<b style="font-size:16px">' + esc(c.trade) + '</b><div class="mute">' + esc(c.gstin) + ' • ' + esc(c.state) + ' • ' + (c.freq === 'Q' ? 'Quarterly' : 'Monthly') + '</div>';
     var h = '';
+    h += '<div class="per" style="background:#f8fafc"><div class="row"><h3>🔑 लॉगिन जानकारी</h3>' + (c.pinReqAt ? '<span class="pill CLAIM">PIN माँगा – ' + fmtDate(c.pinReqAt) + '</span>' : '') + '</div>' +
+      '<div class="grid2" style="margin-top:8px"><div><span class="mute">GSTIN</span><div><b>' + esc(c.gstin) + '</b></div></div><div><span class="mute">मोबाइल</span><div><b>' + esc(c.mobile) + '</b></div></div>' +
+      '<div><span class="mute">PIN</span><div><b style="font-size:17px;letter-spacing:2px">' + (c.pin ? esc(c.pin) : '<span class="mute" style="letter-spacing:0">पता नहीं (पुराना रजिस्ट्रेशन) – नया PIN दें</span>') + '</b></div></div>' +
+      '<div><span class="mute">ईमेल</span><div>' + (esc(c.email) || '–') + '</div></div></div>' +
+      '<div class="row" style="margin-top:10px">' + (c.pin ? '<a class="btn wa sm" target="_blank" rel="noopener" href="' + loginWa(c, c.pin) + '">WhatsApp पर लॉगिन भेजें</a>' : '') +
+      '<button class="btn sec sm" onclick="resetPin(\'' + c.gstin + '\')">नया PIN दें</button></div></div>';
     h += d.periods.map(function (p) { return periodBlock(c, p, p.summary.pid === focusPid); }).join('');
     h += '<div class="per"><h3>प्रोफाइल</h3><div class="grid2" style="margin-top:8px">' +
       fld('trade', 'ट्रेड नाम', c.trade) + fld('legal', 'लीगल नाम', c.legal) + fld('owner', 'मालिक', c.owner) + fld('mobile', 'मोबाइल', c.mobile) + fld('email', 'ईमेल', c.email) +
@@ -376,7 +382,15 @@ function saveClient(g) {
   f.platforms = Array.prototype.map.call(document.querySelectorAll('.pf_plat:checked'), function (x) { return x.value; });
   after(A('aUpdateClient', { gstin: g, fields: f }), 'प्रोफाइल सेव ✓');
 }
-function resetPin(g) { var p = prompt('नया PIN (4–6 अंक) – क्लाइंट को WhatsApp पर बता दें:'); if (p) after(A('aResetPin', { gstin: g, pin: p }), 'PIN बदल गया ✓'); }
+function loginWa(c, pin) {
+  var txt = 'नमस्ते ' + (c.owner || c.trade) + ', Vishal GST ऐप की लॉगिन जानकारी:\nलिंक: ' + new URL('./', location.href).href + '\nGSTIN: ' + c.gstin + '\nPIN: ' + pin + '\n(ये PIN किसी को न बताएँ) – Vishal Accounting Services';
+  return 'https://wa.me/91' + c.mobile + '?text=' + encodeURIComponent(txt);
+}
+function resetPin(g) {
+  var p = prompt('नया PIN (4–6 अंक):', String(Math.floor(1000 + Math.random() * 9000)));
+  if (!p) return;
+  A('aResetPin', { gstin: g, pin: p }).then(function () { toast('PIN बदल गया ✓ – अब "WhatsApp पर लॉगिन भेजें" दबाएँ'); return refresh(); }).catch(function (e) { toast(e.message, 4000); });
+}
 function delClient(g) { if (prompt('क्लाइंट और उसकी सारी फाइलें हमेशा के लिए हटेंगी. पक्का करने के लिए GSTIN टाइप करें:') === g) after(A('aDeleteClient', { gstin: g }).then(closeDrawer), 'हटा दिया'); }
 function sendMsg(g) { after(A('aMessage', { gstins: [g], title: $('msgT').value, body: $('msgB').value }), 'मैसेज भेजा ✓'); }
 
@@ -423,13 +437,14 @@ function renderClients() {
   $('cBody').innerHTML = rows.map(function (r) {
     var c = r.client;
     return '<tr class="rowc" onclick="openClient(\'' + c.gstin + '\')"><td><b>' + esc(c.trade) + '</b><div class="mute">' + esc(c.legal || '') + (c.owner ? ' • ' + esc(c.owner) : '') + '</div></td><td>' + esc(c.gstin) + '<div class="mute">' + esc(c.state) + '</div></td><td>' + esc(c.mobile) + '</td>' +
+      '<td>' + (c.pin ? '<b>' + esc(c.pin) + '</b>' : '<span class="mute">–</span>') + (c.pinReqAt ? ' <span class="pill CLAIM">माँगा</span>' : '') + '</td>' +
       '<td>' + (c.freq === 'Q' ? 'Quarterly' : 'Monthly') + '</td><td>' + plats(c) + '</td><td>' + (c.verified ? '✅' : '<span class="pill PARTIAL">बाकी</span>') + (c.status === 'BLOCKED' ? ' <span class="pill NONE">Blocked</span>' : '') + '</td>' +
       '<td>' + (c.push ? '🔔' : '–') + '</td><td class="mute">' + fmtDate(c.createdAt) + '</td><td>' + (r.totalDue > 0 ? '<b style="color:var(--bad)">' + rupee(r.totalDue) + '</b>' : '–') + '</td></tr>';
-  }).join('') || '<tr><td colspan="9" class="mute" style="padding:30px;text-align:center">अभी कोई क्लाइंट नहीं. क्लाइंट को ऐप का लिंक भेजें – वो खुद रजिस्टर करेंगे.</td></tr>';
+  }).join('') || '<tr><td colspan="10" class="mute" style="padding:30px;text-align:center">अभी कोई क्लाइंट नहीं. क्लाइंट को ऐप का लिंक भेजें – वो खुद रजिस्टर करेंगे.</td></tr>';
 }
 
 /* ---------- inbox ---------- */
-var KIND = { REG: ['नया क्लाइंट', 'PARTIAL'], NIL: ['NIL', 'NIL'], COMPLETE: ['डेटा पूरा', 'COMPLETE'], SUBMIT: ['डेटा भेजा', 'SUBMITTED'], PAYCLAIM: ['पेमेंट', 'CLAIM'], PROFILE: ['प्रोफाइल', 'FILED'], TICK: ['रिमाइंडर', 'PROCESS'] };
+var KIND = { REG: ['नया क्लाइंट', 'PARTIAL'], NIL: ['NIL', 'NIL'], COMPLETE: ['डेटा पूरा', 'COMPLETE'], SUBMIT: ['डेटा भेजा', 'SUBMITTED'], PAYCLAIM: ['पेमेंट', 'CLAIM'], PROFILE: ['प्रोफाइल', 'FILED'], TICK: ['रिमाइंडर', 'PROCESS'], PIN: ['PIN भूले', 'CLAIM'] };
 function loadInbox() {
   A('aInbox').then(function (d) {
     INBOX = d.inbox;
