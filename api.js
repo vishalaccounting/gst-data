@@ -42,7 +42,8 @@ var API = (function () {
       saveImage: function (b64, mime) { return 'data:' + mime + ';base64,' + b64; },
       push: function (tokens, title, body) { console.log('[demo push]', title, body); },
       notifyAdmin: function (kind, title, body) { console.log('[demo admin]', kind, title, body); },
-      adminKeyOk: function (k) { return k === 'admin'; }
+      adminKeyOk: function (k) { return k === ((db.meta && db.meta.demoAdminKey) || 'admin'); },
+      setAdminKey: function (k) { db.meta.demoAdminKey = k; }
     };
     var r = Core.handle(db, q, ctx);
     if (r.dirty) localStorage.setItem(DB_KEY, JSON.stringify(db));

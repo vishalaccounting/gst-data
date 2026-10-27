@@ -85,6 +85,7 @@ function makeCtx() {
   var ctx = { now: new Date(), _push: [], _mail: [] };
   ctx.uuid = function () { return Utilities.getUuid(); };
   ctx.adminKeyOk = function (k) { var a = PROPS.getProperty('ADMIN_KEY'); return !!a && k === a; };
+  ctx.setAdminKey = function (k) { PROPS.setProperty('ADMIN_KEY', k); };
   ctx.saveFile = function (meta, b64) {
     var folder = rootFolder();
     meta.folders.forEach(function (n) { folder = subFolder(folder, n); });

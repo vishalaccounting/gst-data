@@ -5,7 +5,7 @@
    No DOM, no async, no modules – plain ES2019.
    ============================================================ */
 var Core = (function () {
-  var VERSION = '1.4.0';
+  var VERSION = '1.4.1';
 
   /* ---------- Platforms and the reports each one must send ----------
      perMonth:true  -> one report per month (quarterly client = 3 slots)
@@ -661,6 +661,14 @@ var Core = (function () {
       });
     });
     return { rows: rows };
+  };
+  // office sets its own easy-to-remember admin password (stored by the host: Script Properties / demo db)
+  A.aSetAdminKey = function (db, q, ctx) {
+    var k = String(q.newKey == null ? '' : q.newKey);
+    if (k.length < 6) fail('पासवर्ड कम से कम 6 अक्षर का रखें');
+    if (k.length > 60 || /\s/.test(k)) fail('पासवर्ड में स्पेस न डालें (60 अक्षर तक)');
+    ctx.setAdminKey(k);
+    return {};
   };
   A.aInbox = function (db) { return { inbox: db.adminInbox.slice(0, 150) }; };
   A.aReadInbox = function (db) { db.adminInbox.forEach(function (n) { n.read = true; }); return {}; };

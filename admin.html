@@ -68,8 +68,12 @@ tr.rowc{cursor:pointer}tr.rowc:hover td{background:#f8fafc}
   <img src="icon-192.png" width="64" style="border-radius:14px">
   <h2>Master Dashboard</h2>
   <p class="mute" id="demoHint"></p>
-  <input class="i" id="key" type="password" placeholder="Admin Key" style="width:100%" onkeydown="if(event.key==='Enter')login()">
-  <button class="btn" style="width:100%;margin-top:10px" onclick="login()">खोलें</button>
+  <form onsubmit="event.preventDefault();login()">
+    <input class="i" id="adminUser" name="username" autocomplete="username" value="VAS Admin" readonly style="width:100%;margin-bottom:8px;color:var(--mute)">
+    <input class="i" id="key" name="password" type="password" autocomplete="current-password" placeholder="Admin पासवर्ड" style="width:100%">
+    <button class="btn" style="width:100%;margin-top:10px">खोलें</button>
+  </form>
+  <p class="mute" style="margin-bottom:0">Chrome "पासवर्ड सेव करें?" पूछे तो Save दबाएँ – अगली बार अपने आप भर जाएगा.</p>
 </div>
 
 <div id="app" class="hide">
@@ -182,6 +186,15 @@ tr.rowc{cursor:pointer}tr.rowc:hover td{background:#f8fafc}
       </div>
       <div class="row" style="margin-top:12px"><button class="btn" onclick="saveSettings()">सेव करें</button></div>
     </div>
+    <div class="card"><h3 style="margin-top:0">🔑 Admin पासवर्ड बदलें</h3>
+      <p class="mute">अपना आसान पासवर्ड रखें (कम से कम 6 अक्षर, बिना स्पेस). पुराना लंबा वाला Key उसी समय बंद हो जाएगा.</p>
+      <form class="grid2" onsubmit="event.preventDefault();changeAdminPw()">
+        <input type="text" name="username" autocomplete="username" value="VAS Admin" readonly style="display:none">
+        <label>नया पासवर्ड<input class="i" id="newPw1" type="password" autocomplete="new-password"></label>
+        <label>नया पासवर्ड दोबारा<input class="i" id="newPw2" type="password" autocomplete="new-password"></label>
+        <div style="align-self:end"><button class="btn">पासवर्ड बदलें</button></div>
+      </form>
+    </div>
     <div class="card"><h3 style="margin-top:0">रिमाइंडर अभी चलाएँ</h3>
       <p class="mute">सर्वर हर दिन सुबह अपने आप चलाता है (सेट तारीखों पर डेटा रिमाइंडर, और फाइल हो चुके रिटर्न की बाकी फीस का रिमाइंडर). टेस्ट के लिए यहाँ से अभी चला सकते हैं – तारीख की शर्त नहीं देखी जाएगी.</p>
       <button class="btn sec" onclick="runTick()">▶ अभी चलाएँ</button> <span id="tickOut" class="mute"></span>
@@ -219,7 +232,18 @@ var WORK_TXT = { '': 'शुरू नहीं', PROCESS: 'चल रहा', F
 /* ---------- login ---------- */
 function login() {
   KEY = $('key').value.trim();
-  A('aSettings').then(function () { try { localStorage.setItem('vas_admin_key', KEY); } catch (e) {} start(); }).catch(function (e) { toast(e.code === 'ADMIN_KEY_WRONG' ? 'Admin Key गलत है' : e.message); });
+  A('aSettings').then(function () { try { localStorage.setItem('vas_admin_key', KEY); } catch (e) {} saveAdminPw(KEY); start(); }).catch(function (e) { toast(e.code === 'ADMIN_KEY_WRONG' ? 'पासवर्ड गलत है' : e.message); });
+}
+// asks Chrome's password manager to keep the admin password (works across reinstalls / new Chrome on same Google account)
+function saveAdminPw(pw) { try { if (window.PasswordCredential && navigator.credentials) navigator.credentials.store(new PasswordCredential({ id: 'VAS Admin', password: pw, name: 'VAS Admin' })).catch(function () {}); } catch (e) {} }
+function changeAdminPw() {
+  var a = $('newPw1').value, b = $('newPw2').value;
+  if (a !== b) return toast('दोनों पासवर्ड एक जैसे नहीं हैं');
+  A('aSetAdminKey', { newKey: a }).then(function () {
+    KEY = a; try { localStorage.setItem('vas_admin_key', KEY); } catch (e) {}
+    saveAdminPw(KEY); $('newPw1').value = ''; $('newPw2').value = '';
+    toast('पासवर्ड बदल गया ✓ – अब यही डालें', 4000);
+  }).catch(function (e) { toast(e.message, 4000); });
 }
 function logoutAdmin() { try { localStorage.removeItem('vas_admin_key'); } catch (e) {} KEY = ''; $('app').classList.add('hide'); $('login').classList.remove('hide'); }
 function start() {
@@ -790,7 +814,7 @@ function runTick() { A('aTick').then(function (d) { $('tickOut').textContent = '
 function demoReset() { if (confirm('डेमो का सारा डेटा मिटाएँ?')) { localStorage.removeItem('vas_demo_db'); indexedDB.deleteDatabase('vas_demo_files'); location.reload(); } }
 
 /* ---------- start ---------- */
-$('demoHint').textContent = API.DEMO ? 'डेमो मोड – Admin Key: admin' : '';
+$('demoHint').textContent = API.DEMO ? 'डेमो मोड – पासवर्ड: admin' : '';
 try { KEY = localStorage.getItem('vas_admin_key') || ''; } catch (e) {}
 if (KEY) A('aSettings').then(start).catch(function () { logoutAdmin(); });
 setInterval(function () { if (KEY && document.visibilityState === 'visible' && !OPEN) refresh(); }, 120000);
