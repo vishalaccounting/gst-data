@@ -1,6 +1,6 @@
 /* Transport: Google Apps Script backend, or a DEMO backend that runs Core in this browser. */
 var API = (function () {
-  var DEMO = !CONFIG.API_URL;
+  var DEMO = !CONFIG.API_URL || /^(localhost|127\.0\.0\.1)$/.test(location.hostname);   // local testing never touches the live server
 
   /* ---------- demo backend (localStorage db + IndexedDB files) ---------- */
   var DB_KEY = 'vas_demo_db';

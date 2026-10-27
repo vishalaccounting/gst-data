@@ -167,6 +167,7 @@ tr.rowc{cursor:pointer}tr.rowc:hover td{background:#f8fafc}
 <script src="config.js"></script>
 <script src="core.js"></script>
 <script src="api.js"></script>
+<script src="detect.js"></script>
 <script>
 'use strict';
 var KEY = '', LIST = null, PAY = null, INBOX = [], SEL = {}, TILE = '', OPEN = null;
@@ -346,7 +347,8 @@ function periodBlock(c, p, focus) {
     '</div>';
 }
 function fileLink(f) {
-  var t = esc(f.name) + ' <span class="mute">(' + fmtDate(f.at) + ')</span>';
+  var tl = f.type && Detect.TYPES[f.type] ? ' ✔ ' + Detect.TYPES[f.type][2] + (f.months && f.months.length ? ' ' + f.months.map(Core.monthLabel).join(', ') : '') : '';
+  var t = esc(f.name) + ' <span class="mute">(' + fmtDate(f.at) + esc(tl) + (f.covers ? ' • पूरी तिमाही' : '') + ')</span>';
   if (f.url && f.url.indexOf('demo:') !== 0) return '<a href="' + esc(f.url) + '" target="_blank" rel="noopener">📄 ' + t + '</a>';
   return '<button class="lnk" onclick="demoDownload(\'' + esc(f.fileId) + '\')">📄 ' + t + '</button>';
 }

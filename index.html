@@ -168,6 +168,11 @@ input.i:focus,select.i:focus{border-color:var(--pri2)}
   <div id="profBody"></div>
 </div></div>
 
+<div class="sheet" id="sResult" onclick="if(event.target===this)closeSheet(this)"><div class="pane">
+  <div class="hd"><h2 style="margin:0" id="resultHead"></h2><button class="btn ghost" onclick="closeSheet(sResult)">ठीक है ✕</button></div>
+  <div id="resultList"></div>
+</div></div>
+
 <input type="file" id="filePick" class="hide" multiple onchange="filesChosen(this)">
 <div id="toast"></div>
 <div id="busy"><div id="busyTxt">रुकिए…</div></div>
@@ -175,6 +180,7 @@ input.i:focus,select.i:focus{border-color:var(--pri2)}
 <script src="config.js"></script>
 <script src="core.js"></script>
 <script src="api.js"></script>
+<script src="detect.js"></script>
 <script>
 'use strict';
 var S = { sessions: [], active: null, st: null, pid: null, uploadSlot: null, uploading: 0 };
@@ -338,6 +344,11 @@ function render() {
       html += '</div>';
     });
   }
+  var more = Core.PLATFORM_ORDER.filter(function (k) { return c.platforms.indexOf(k) < 0; });
+  if (!locked && sm.data !== 'NIL' && more.length) {
+    html += '<div class="card"><h3>कुछ और भी भेजना है?</h3><div class="mute" style="margin:2px 0 10px">ऑफलाइन बिल, Vyapar, हमारा GST टूल या कोई और फाइल – सेक्शन जोड़ें:</div><div class="pick">' +
+      more.map(function (k) { return '<button class="btn sec sm" style="flex:1 1 45%" onclick="addPlatform(\'' + k + '\')">+ ' + esc(Core.PLATFORMS[k].label) + '</button>'; }).join('') + '</div></div>';
+  }
   html += '<div class="foot">v' + Core.VERSION + (API.DEMO ? ' • डेमो मोड' : '') + ' • ' + esc(st.settings.firm) + '</div>';
   $('hBody').innerHTML = html;
 
@@ -349,7 +360,7 @@ function render() {
   else bar = '<button class="btn block ok" onclick="submitData()" ' + (sm.files ? '' : 'disabled') + '>✔ डेटा पूरा भेज दिया' + (sm.missing.length && sm.files ? ' (' + sm.missing.length + ' बाकी)' : '') + '</button>';
   $('hBarIn').innerHTML = bar;
 }
-function filesOf(slotId) { return S.st.files.filter(function (f) { return f.slot === slotId; }); }
+function filesOf(slotId) { return S.st.files.filter(function (f) { return f.slot === slotId || (f.covers || []).indexOf(slotId) >= 0; }); }
 function toggleHint(b) { b.closest('.slot').classList.toggle('open'); }
 
 /* ---------- upload ---------- */
@@ -358,21 +369,85 @@ function pickFor(slotId) {
   S.uploadSlot = slotId;
   var fp = $('filePick'); fp.value = ''; fp.accept = s.accept || ''; fp.click();
 }
+/* Every file is checked before upload: a marketplace slot only takes that marketplace's report
+   (a ZIP is opened and each report inside goes to its own slot), wrong platform / wrong month is refused,
+   and an offline slot refuses marketplace reports. */
+function slotName(s) { return Core.PLATFORMS[s.plat].label + ' – ' + s.name; }
+function planFor(clicked, it, out) {
+  var st = S.st, nm = it.file.name;
+  if (it.type) {
+    var T = Detect.TYPES[it.type], P = Core.PLATFORMS[T[0]];
+    if (T[0] !== clicked.plat) {
+      var hint = st.client.platforms.indexOf(T[0]) < 0 ? ' (पहले नीचे "+ ' + P.label + '" दबाकर ' + P.label + ' जोड़ें)' : '';
+      return out.bad.push({ name: nm, why: 'ये ' + it.label + ' है – इसे ' + P.label + ' वाले सेक्शन में डालें' + hint });
+    }
+    var cands = st.slots.filter(function (s) { return s.plat === T[0] && s.key === T[1]; });
+    var target = null, covers = null;
+    if (it.months.length && cands[0] && cands[0].month) {
+      var hit = cands.filter(function (s) { return it.months.indexOf(s.month) >= 0; });
+      if (!hit.length) return out.bad.push({ name: nm, why: 'ये ' + it.label + ' ' + it.months.map(Core.monthLabel).join(', ') + ' की है, पर यहाँ ' + st.summary.label + ' का डेटा चाहिए' });
+      target = hit[0]; if (hit.length > 1) covers = hit.map(function (s) { return s.id; });
+    } else {
+      target = cands.filter(function (s) { return s.id === clicked.id; })[0] || cands.filter(function (s) { return s.month === clicked.month; })[0]
+        || cands.filter(function (s) { return !filesOf(s.id).length; })[0] || cands[0];
+    }
+    if (!target) return out.bad.push({ name: nm, why: 'इस रिपोर्ट का खाना आपकी प्रोफाइल में नहीं है' });
+    if (filesOf(target.id).some(function (f) { return f.name === nm && Math.abs(f.size - it.file.size) < 2; })) return out.bad.push({ name: nm, why: 'ये फाइल ' + target.name + ' में पहले से अपलोड है' });
+    return out.ok.push({ it: it, slot: target, covers: covers });
+  }
+  if (clicked.detect && !it.plain) return out.bad.push({ name: nm, why: 'ये ' + Core.PLATFORMS[clicked.plat].label + ' की ' + clicked.name.replace(/ \(.*\)$/, '') + ' नहीं लग रही. ' + Core.PLATFORMS[clicked.plat].label + ' से डाउनलोड की हुई असली फाइल डालें (फाइल के अंदर कुछ न बदलें).' });
+  if (clicked.detect) return out.bad.push({ name: nm, why: 'यहाँ सिर्फ ' + Core.PLATFORMS[clicked.plat].label + ' की Excel/CSV रिपोर्ट या उसकी ZIP डालें' });
+  out.ok.push({ it: it, slot: clicked, covers: null });
+}
 function filesChosen(inp) {
   var list = Array.prototype.slice.call(inp.files || []);
   if (!list.length) return;
   var big = list.filter(function (f) { return f.size > CONFIG.MAX_FILE_MB * 1048576; });
   if (big.length) return toast(big[0].name + ' – ' + CONFIG.MAX_FILE_MB + ' MB से बड़ी फाइल नहीं चलेगी', 4000);
-  var slot = S.uploadSlot, pid = S.pid, i = 0;
+  var clicked = S.st.slots.filter(function (s) { return s.id === S.uploadSlot; })[0], pid = S.pid;
+  var out = { ok: [], bad: [] };
   S.uploading++;
-  (function next() {
-    if (i >= list.length) { S.uploading--; busy(false); toast(list.length + ' फाइल अपलोड ✓'); return load(pid, true); }
-    var f = list[i++];
-    busy(true, 'अपलोड ' + i + '/' + list.length + ': ' + f.name);
-    API.fileToB64(f).then(function (b64) {
-      return call('upload', { pid: pid, slot: slot, name: f.name, mime: f.type, b64: b64 });
-    }).then(next).catch(function (e) { S.uploading--; busy(false); toast(f.name + ': ' + e.message, 5000); load(pid, true); });
-  })();
+  busy(true, 'फाइल जाँच रहे हैं…');
+  var chain = Promise.resolve();
+  list.forEach(function (f) {
+    chain = chain.then(function () {
+      var isSheet = /\.(xlsx|xls|csv)$/i.test(f.name), isZip = /\.zip$/i.test(f.name);
+      if (!clicked.detect && !isSheet) { out.ok.push({ it: { file: f, type: '', months: [] }, slot: clicked, covers: null }); return; }   // bills, photos, ZIP of PDFs
+      return Detect.inspect(f).then(function (r) {
+        if (r.zip && !r.items.length) return out.bad.push({ name: f.name, why: 'ZIP में कोई Excel/CSV रिपोर्ट नहीं मिली' });
+        if (!clicked.detect && isZip) return out.ok.push({ it: { file: f, type: '', months: [] }, slot: clicked, covers: null });
+        r.items.forEach(function (it) { planFor(clicked, it, out); });
+      });
+    });
+  });
+  chain.then(function () {
+    var done = [], i = 0;
+    return (function next() {
+      if (i >= out.ok.length) return done;
+      var p = out.ok[i++], f = p.it.file;
+      busy(true, 'अपलोड ' + i + '/' + out.ok.length + ': ' + f.name);
+      return API.fileToB64(f).then(function (b64) {
+        return call('upload', { pid: pid, slot: p.slot.id, name: f.name, mime: f.type, b64: b64, ftype: p.it.type || '', fmonths: p.it.months || [], covers: p.covers });
+      }).then(function () { done.push(p); }, function (e) { out.bad.push({ name: f.name, why: e.message }); }).then(next);
+    })();
+  }).then(function (done) {
+    showResult(done || [], out.bad, clicked);
+  }).catch(function (e) { toast(e.message, 5000); }).finally(function () { S.uploading--; busy(false); load(pid, true); });
+}
+function showResult(done, bad, clicked) {
+  if (!bad.length && done.length && done.every(function (p) { return p.slot.id === clicked.id && !p.covers; })) return toast(done.length + ' फाइल अपलोड ✓');
+  $('resultList').innerHTML =
+    done.map(function (p) { return '<div class="file" style="background:var(--okbg)">✅<span><b>' + esc(slotName(p.slot)) + (p.covers ? ' (पूरी तिमाही)' : '') + '</b><br>' + esc(p.it.file.name) + (p.slot.id !== clicked.id ? ' <small>– सही खाने में डाली</small>' : '') + '</span></div>'; }).join('') +
+    bad.map(function (b) { return '<div class="file" style="background:var(--badbg);white-space:normal">❌<span style="white-space:normal"><b>' + esc(b.name) + '</b><br>' + esc(b.why) + '</span></div>'; }).join('');
+  $('resultHead').textContent = bad.length ? (done.length ? done.length + ' अपलोड, ' + bad.length + ' नहीं ली गईं' : 'फाइल नहीं ली गई') : done.length + ' फाइल अपलोड ✓';
+  openSheet(sResult);
+}
+function addPlatform(k) {
+  var P = Core.PLATFORMS[k];
+  if (!confirm(P.label + ' का सेक्शन जोड़ें?')) return;
+  busy(true);
+  call('profile', { platforms: S.st.client.platforms.concat([k]) }).then(function () { toast(P.label + ' जोड़ दिया ✓'); return load(S.pid, true); })
+    .catch(function (e) { toast(e.message); }).finally(function () { busy(false); });
 }
 function delFile(id) {
   if (!confirm('यह फाइल हटाएँ?')) return;

@@ -1,8 +1,8 @@
 /* Service worker: offline shell + auto-update + (optional) Firebase push.
    Network-first: whenever the phone is online it loads the newest files from GitHub Pages,
    so every push to GitHub reaches all clients automatically. Bump CACHE on each release. */
-var CACHE = 'vas-gst-1.0.1';
-var SHELL = ['./', 'index.html', 'core.js', 'api.js', 'config.js', 'manifest.json', 'icon-192.png', 'icon-512.png'];
+var CACHE = 'vas-gst-1.1.0';
+var SHELL = ['./', 'index.html', 'core.js', 'api.js', 'detect.js', 'config.js', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL.map(function (u) { return new Request(u, { cache: 'reload' }); })); }).then(function () { return self.skipWaiting(); }));

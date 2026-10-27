@@ -5,7 +5,7 @@
    No DOM, no async, no modules – plain ES2019.
    ============================================================ */
 var Core = (function () {
-  var VERSION = '1.0.0';
+  var VERSION = '1.1.0';
 
   /* ---------- Platforms and the reports each one must send ----------
      perMonth:true  -> one report per month (quarterly client = 3 slots)
@@ -15,28 +15,32 @@ var Core = (function () {
     meesho: {
       label: 'Meesho', group: 'online', color: '#c2187a',
       reports: [
-        { key: 'tcs_sales', name: 'TCS Sales Report', perMonth: true, accept: '.xlsx,.xls,.csv,.zip',
-          hint: 'Meesho Supplier Panel → GST Report डाउनलोड करें (महीना चुनें). ZIP में से tcs_sales फाइल, या पूरी ZIP यहाँ डालें.' },
-        { key: 'tcs_return', name: 'TCS Sales Return Report', perMonth: true, accept: '.xlsx,.xls,.csv,.zip',
-          hint: 'उसी GST Report ZIP की tcs_sales_return फाइल. पूरी ZIP ऊपर डाल दी हो तो भी यहाँ डालें.' }
+        { key: 'tcs_sales', name: 'TCS Sales Report', perMonth: true, accept: '.xlsx,.xls,.csv,.zip', detect: 'MEESHO_SALE',
+          hint: 'Meesho Supplier Panel → GST Report डाउनलोड करें (महीना चुनें). पूरी ZIP (gst_…zip) डाल दें – tcs_sales और tcs_sales_return दोनों अपने आप सही खाने में चली जाएँगी.' },
+        { key: 'tcs_return', name: 'TCS Sales Return Report', perMonth: true, accept: '.xlsx,.xls,.csv,.zip', detect: 'MEESHO_RET',
+          hint: 'उसी GST Report ZIP की tcs_sales_return फाइल.' },
+        { key: 'tax_invoice', name: 'Tax Invoice Details', perMonth: true, accept: '.xlsx,.xls,.csv,.zip', detect: 'MEESHO_INV',
+          hint: 'Meesho → Tax Invoice डाउनलोड करें (…_TAX_INVOICE.zip). पूरी ZIP या उसमें की Tax_invoice_details.xlsx डालें.' }
       ]
     },
     amazon: {
       label: 'Amazon', group: 'online', color: '#e88a00',
       reports: [
-        { key: 'mtr_b2c', name: 'MTR B2C Report', perMonth: true, accept: '.csv,.xlsx,.xls,.zip',
-          hint: 'Seller Central → Reports → Tax Document Library → GST MTR (B2C), महीना चुनें.' },
-        { key: 'mtr_b2b', name: 'MTR B2B Report', perMonth: true, accept: '.csv,.xlsx,.xls,.zip',
-          hint: 'उसी जगह से GST MTR (B2B). B2B सेल नहीं है तो भी खाली रिपोर्ट डाल दें.' }
+        { key: 'mtr_b2c', name: 'MTR B2C Report', perMonth: true, accept: '.csv,.xlsx,.xls,.zip', detect: 'AMZ_B2C',
+          hint: 'Seller Central → Reports → Tax Document Library → GST MTR (B2C), महीना चुनें. CSV या ZIP दोनों चलेंगी.' },
+        { key: 'mtr_b2b', name: 'MTR B2B Report', perMonth: true, accept: '.csv,.xlsx,.xls,.zip', detect: 'AMZ_B2B',
+          hint: 'उसी जगह से GST MTR (B2B). B2B सेल नहीं है तो भी खाली रिपोर्ट डाल दें.' },
+        { key: 'gstr1', name: 'GST Report (GSTR-1)', perMonth: true, accept: '.xlsx,.xls,.zip', detect: 'AMZ_GSTR1',
+          hint: 'Seller Central → Reports → Tax Document Library → GST Report (Ready to file GSTR-1). फाइल का नाम GSTR1-महीना-… होता है.' }
       ]
     },
     flipkart: {
       label: 'Flipkart', group: 'online', color: '#2874f0',
       reports: [
-        { key: 'sales', name: 'Sales Report', perMonth: true, accept: '.xlsx,.xls,.csv,.zip',
+        { key: 'sales', name: 'Sales Report', perMonth: true, accept: '.xlsx,.xls,.csv,.zip', detect: 'FK_SALES',
           hint: 'Seller Hub → Reports → Tax Reports → Sales Report, महीना चुनें.' },
-        { key: 'gst', name: 'GST Report (GSTR-1)', perMonth: true, optional: true, accept: '.xlsx,.xls,.csv,.zip',
-          hint: 'Seller Hub → Reports से GST/GSTR-1 Report (हो तो).' }
+        { key: 'gst', name: 'GSTR Return Report', perMonth: true, accept: '.xlsx,.xls,.zip', detect: 'FK_GST',
+          hint: 'Seller Hub → Reports → Tax Reports → GST Report (GSTR-1 & GSTR-8 वाली), महीना चुनें.' }
       ]
     },
     vyapar: {
@@ -59,9 +63,16 @@ var Core = (function () {
         { key: 'bills', name: 'सारे बिल – PDF / फोटो', perMonth: false, multi: true, accept: '.pdf,.jpg,.jpeg,.png,.zip',
           hint: 'इस अवधि के सारे सेल बिल. एक PDF में या अलग-अलग – जितने हों सब डालें.' }
       ]
+    },
+    other: {
+      label: 'अन्य फाइलें', group: 'offline', color: '#6b7280',
+      reports: [
+        { key: 'files', name: 'कोई और डेटा (Excel / PDF / फोटो)', perMonth: false, multi: true, optional: true, accept: '.pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.json,.zip',
+          hint: 'जो ऊपर किसी खाने में नहीं आता – जैसे दूसरी वेबसाइट की रिपोर्ट, खरीद बिल, या ऑफिस ने जो माँगा हो.' }
+      ]
     }
   };
-  var PLATFORM_ORDER = ['meesho', 'amazon', 'flipkart', 'vyapar', 'tool', 'pdf'];
+  var PLATFORM_ORDER = ['meesho', 'amazon', 'flipkart', 'vyapar', 'tool', 'pdf', 'other'];
 
   var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var STATES = { '01': 'Jammu & Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh', '05': 'Uttarakhand', '06': 'Haryana', '07': 'Delhi', '08': 'Rajasthan', '09': 'Uttar Pradesh', '10': 'Bihar', '11': 'Sikkim', '12': 'Arunachal Pradesh', '13': 'Nagaland', '14': 'Manipur', '15': 'Mizoram', '16': 'Tripura', '17': 'Meghalaya', '18': 'Assam', '19': 'West Bengal', '20': 'Jharkhand', '21': 'Odisha', '22': 'Chhattisgarh', '23': 'Madhya Pradesh', '24': 'Gujarat', '26': 'Dadra & Nagar Haveli and Daman & Diu', '27': 'Maharashtra', '29': 'Karnataka', '30': 'Goa', '31': 'Lakshadweep', '32': 'Kerala', '33': 'Tamil Nadu', '34': 'Puducherry', '35': 'Andaman & Nicobar', '36': 'Telangana', '37': 'Andhra Pradesh', '38': 'Ladakh' };
@@ -141,7 +152,7 @@ var Core = (function () {
           out.push({
             id: pk + '.' + r.key + (mid ? '.' + mid : ''), plat: pk, key: r.key, month: mid,
             name: r.name + (mid && months.length > 1 ? ' (' + monthLabel(mid).slice(0, 3) + ')' : ''),
-            optional: !!r.optional, multi: !!r.multi, accept: r.accept, hint: r.hint
+            optional: !!r.optional, multi: !!r.multi, accept: r.accept, hint: r.hint, detect: r.detect || ''
           });
         });
       });
@@ -158,7 +169,7 @@ var Core = (function () {
   function paidOf(rec) { return (rec.payments || []).reduce(function (s, p) { return s + num(p.amt); }, 0); }
   function summary(client, pid, rec) {
     var slots = slotsFor(client, pid), have = {};
-    (rec.files || []).forEach(function (f) { have[f.slot] = (have[f.slot] || 0) + 1; });
+    (rec.files || []).forEach(function (f) { (f.covers || [f.slot]).forEach(function (s) { have[s] = (have[s] || 0) + 1; }); });
     var req = slots.filter(function (s) { return !s.optional; });
     var missing = req.filter(function (s) { return !have[s.id]; });
     var files = (rec.files || []).length;
@@ -317,7 +328,7 @@ var Core = (function () {
       client: publicClient(c), pid: pid, current: cur,
       periods: choices.map(function (p) { var s = summary(c, p, all[p] || emptyRec()); return { pid: p, label: s.label, data: s.data, work: s.work, done: s.done, required: s.required, running: p === choices[0] && p !== cur }; }),
       summary: summary(c, pid, rec), slots: slotsFor(c, pid),
-      files: (rec.files || []).map(function (f) { return { id: f.id, slot: f.slot, name: f.name, size: f.size, at: f.at }; }),
+      files: (rec.files || []).map(function (f) { return { id: f.id, slot: f.slot, covers: f.covers, name: f.name, size: f.size, at: f.at }; }),
       inbox: (c.inbox || []).slice(0, 30), unread: (c.inbox || []).filter(function (n) { return !n.read; }).length,
       dues: dues, settings: { upi: db.settings.upi, payeeName: db.settings.payeeName, phone: db.settings.phone, firm: db.settings.firm }
     };
@@ -343,17 +354,25 @@ var Core = (function () {
     if (!q.b64) fail('फाइल खाली है');
     var size = Math.round(String(q.b64).length * 0.75);
     if (size > 30 * 1048576) fail('फाइल 30 MB से बड़ी है');
+    if (rec.files.some(function (x) { return x.slot === slot.id && x.name === name && Math.abs(x.size - size) < 4; })) fail('ये फाइल ' + slot.name + ' में पहले से अपलोड है');
     var P = PLATFORMS[slot.plat];
     var stored = ctx.saveFile({
       folders: [folderName(c), periodLabel(pid), P.label],
       name: slot.name.replace(/[\\\/:*?"<>|]/g, ' ') + ' __ ' + name,
       mime: str(q.mime, 100) || 'application/octet-stream'
     }, q.b64);
-    var f = { id: ctx.uuid(), slot: slot.id, name: name, size: size, mime: str(q.mime, 100), at: ctx.now.toISOString(), fileId: stored.fileId, url: stored.url || '' };
+    var f = { id: ctx.uuid(), slot: slot.id, name: name, size: size, mime: str(q.mime, 100), at: ctx.now.toISOString(), fileId: stored.fileId, url: stored.url || '',
+      type: str(q.ftype, 20), months: (Array.isArray(q.fmonths) ? q.fmonths : []).map(function (m) { return str(m, 7); }).slice(0, 12) };
+    // one quarterly report (e.g. Amazon GSTR1-OCTOBER-DECEMBER) can fill the same report's slot for every month
+    if (Array.isArray(q.covers)) {
+      var ids = slotsFor(c, pid).map(function (s) { return s.id; });
+      var cov = q.covers.filter(function (s) { return ids.indexOf(s) >= 0 && s.split('.').slice(0, 2).join('.') === slot.plat + '.' + slot.key; });
+      if (cov.length > 1) f.covers = cov;
+    }
     rec.files.push(f);
     rec.nil = false;
     checkComplete(db, ctx, c, pid, rec);
-    return { file: { id: f.id, slot: f.slot, name: f.name, size: f.size, at: f.at } };
+    return { file: { id: f.id, slot: f.slot, covers: f.covers, name: f.name, size: f.size, at: f.at } };
   };
   A.deleteFile = function (db, q, ctx) {
     var c = byToken(db, q.token), rec = editableRec(db, c, str(q.pid, 10));
