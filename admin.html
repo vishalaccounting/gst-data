@@ -78,6 +78,7 @@ tr.rowc{cursor:pointer}tr.rowc:hover td{background:#f8fafc}
   <nav>
     <button data-v="clients" class="on" onclick="view('clients')">👥 क्लाइंट्स<span id="newBadge" class="badge hide"></span></button>
     <button data-v="dash" onclick="view('dash')">📅 फाइलिंग</button>
+    <button data-v="cal" onclick="view('cal')">📆 ड्यू डेट</button>
     <button data-v="pay" onclick="view('pay')">💰 पेमेंट</button>
     <button data-v="content" onclick="view('content')">📣 ऐप कंटेंट</button>
     <button data-v="leads" onclick="view('leads')">🙋 पूछताछ<span id="leadBadge" class="badge hide"></span></button>
@@ -103,6 +104,7 @@ tr.rowc{cursor:pointer}tr.rowc:hover td{background:#f8fafc}
       <button class="btn sm sec" onclick="selAll(false)">हटाएँ</button>
       <span class="mute" id="selCount"></span>
       <span class="grow"></span>
+      <button class="btn sm ok" onclick="openReturnSender()" title="पोर्टल से डाउनलोड की GSTR-3B PDF क्लाइंट्स के ऐप में भेजें और कंप्यूटर से हटाएँ">📄 3B PDF भेजें (Ctrl+X)</button>
       <button class="btn sm" onclick="bulkRemind('data')">🔔 चुने हुए को डेटा रिमाइंडर</button>
       <button class="btn sm sec" onclick="exportCsv()">⬇ CSV</button>
     </div>
@@ -133,6 +135,14 @@ tr.rowc{cursor:pointer}tr.rowc:hover td{background:#f8fafc}
       <button class="btn sm sec" onclick="vcardAll()" title="फोन / Google Contacts में एक साथ सेव">📇 सब कॉन्टैक्ट (vCard)</button>
     </div>
     <div class="tw"><table><thead><tr><th>#</th><th>नाम <span class="mute">(बात करने वाले • GST धारक • फर्म)</span></th><th>GSTIN</th><th>मोबाइल</th><th>PIN</th><th>रिटर्न</th><th>प्लेटफॉर्म</th><th>रजिस्टर / लॉगिन</th><th>स्थिति</th><th>फीस बाकी</th><th></th></tr></thead><tbody id="cBody"></tbody></table></div>
+  </section>
+
+  <!-- DUE DATE CALENDAR -->
+  <section id="v-cal" class="hide">
+    <h2 style="margin:4px 0 4px">📆 ड्यू डेट कैलेंडर</h2>
+    <p class="mute" style="margin:0 0 12px">हर क्लाइंट की GST (GSTR-1, 3B, PMT-06), TDS, ITR, GSTR-9/9C और एडवांस टैक्स की तारीखें. सरकार तारीख बढ़ाए तो "तारीख बढ़ी" दबाएँ – सबके लिए बदल जाएगी. क्लाइंट्स को 3 दिन पहले और आखिरी दिन अपने आप रिमाइंडर जाता है.</p>
+    <div class="bar"><label>पिछले <input class="i" id="calBack" type="number" value="10" style="width:60px"> दिन</label><label>अगले <input class="i" id="calAhead" type="number" value="45" style="width:60px"> दिन</label><button class="btn sm sec" onclick="loadCal()">दिखाएँ</button><label><input type="checkbox" id="calPend" checked onchange="renderCal()"> सिर्फ बाकी वाले</label></div>
+    <div id="calBody"></div>
   </section>
 
   <!-- APP CONTENT -->
@@ -168,6 +178,7 @@ tr.rowc{cursor:pointer}tr.rowc:hover td{background:#f8fafc}
         <label>UPI पर नाम<input class="i" id="sPayee"></label>
         <label>ऑफिस WhatsApp नंबर<input class="i" id="sPhone"></label>
         <label>फर्म का नाम<input class="i" id="sFirm"></label>
+        <label>रेफरल इनाम (क्लाइंट को दिखेगा)<input class="i" id="sRef" placeholder="जैसे: हर रेफरल पर अगली फीस में ₹200 छूट"></label>
       </div>
       <div class="row" style="margin-top:12px"><button class="btn" onclick="saveSettings()">सेव करें</button></div>
     </div>
@@ -220,7 +231,8 @@ function start() {
 /* ---------- views ---------- */
 function view(v) {
   document.querySelectorAll('nav button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === v); });
-  ['clients', 'dash', 'pay', 'content', 'leads', 'inbox', 'settings'].forEach(function (k) { $('v-' + k).classList.toggle('hide', k !== v); });
+  ['clients', 'dash', 'cal', 'pay', 'content', 'leads', 'inbox', 'settings'].forEach(function (k) { $('v-' + k).classList.toggle('hide', k !== v); });
+  if (v === 'cal') loadCal();
   if (v === 'pay') loadPay(); if (v === 'inbox') loadInbox(); if (v === 'settings') loadSettings(); if (v === 'content' || v === 'leads') loadContent();
 }
 function refresh() {
@@ -337,6 +349,29 @@ function openClient(g, keep, focusPid) {
       '<div><span class="mute">ईमेल</span><div>' + (esc(c.email) || '–') + '</div></div></div>' +
       '<div class="row" style="margin-top:10px">' + (c.pin ? '<a class="btn wa sm" target="_blank" rel="noopener" href="' + loginWa(c, c.pin) + '">WhatsApp पर लॉगिन भेजें</a>' : '') +
       '<button class="btn sec sm" onclick="resetPin(\'' + c.gstin + '\')">नया PIN दें</button></div></div>';
+    // turnover + compliance flags + referral
+    var ft = c.fyTurnover || {}, pt = c.prevFyTurnover || {};
+    h += '<div class="per"><h3>📈 टर्नओवर और नियम</h3><div class="grid2" style="margin-top:8px">' +
+      kv('FY ' + esc(ft.fy) + ' (अब तक)', ft.months ? rupee(Math.round(ft.total)) + ' <span class="mute">(' + ft.months + ' महीने)</span>' : '') +
+      kv('पूरे साल का अनुमान', ft.projected ? rupee(Math.round(ft.projected)) : '') + kv('पिछला FY ' + esc(pt.fy), pt.months ? rupee(Math.round(pt.total)) : '') + '</div>' +
+      (ft.total >= 2e7 || ft.projected >= 2e7 ? '<div class="pill DUE" style="margin-top:8px">₹2 करोड़+ → GSTR-9 ज़रूरी' + (ft.total >= 5e7 || ft.projected >= 5e7 ? ' • ₹5 करोड़+ → GSTR-9C, e-invoice, QRMP नहीं' : '') + '</div>' : '') +
+      '<div class="row" style="margin-top:10px"><label><input type="checkbox" id="fl_tds"' + (c.tds ? ' checked' : '') + '> TDS काटते हैं (TDS की तारीखें)</label><label><input type="checkbox" id="fl_adv"' + (c.advtax ? ' checked' : '') + '> एडवांस टैक्स</label><label><input type="checkbox" id="fl_annual"' + (c.annual ? ' checked' : '') + '> GSTR-9 भरना है (₹2 Cr से कम भी)</label>' +
+      '<button class="btn sec sm" onclick="saveFlags(\'' + c.gstin + '\')">सेव</button></div>' +
+      '<div class="mute" style="margin-top:8px">🎁 रेफरल कोड: <b>' + esc(c.refCode) + '</b>' + (c.referredBy ? ' • इन्हें <b>' + esc(c.referredBy.name) + '</b> ने रेफर किया' : '') +
+      (c.referrals && c.referrals.length ? ' • इनके ज़रिए आए: ' + c.referrals.map(function (x) { return esc(x.name); }).join(', ') : '') + '</div></div>';
+    // document vault
+    var reqT = (c.docReq && c.docReq.types) || [];
+    h += '<div class="per"><div class="row"><h3>📁 डॉक्यूमेंट तिजोरी</h3>' + (reqT.length ? '<span class="pill CLAIM">माँगे: ' + reqT.map(function (t) { return esc(d.docTypes[t]); }).join(', ') + '</span>' : '') + '</div>' +
+      ((c.docs || []).length ? (c.docs || []).map(function (x) { return '<div class="sl"><span class="nm">' + esc(x.label) + '</span><span>' + fileLink({ name: x.name, at: x.at, url: x.url, fileId: x.fileId }) + '</span></div>'; }).join('') : '<div class="mute" style="margin-top:6px">अभी कोई डॉक्यूमेंट नहीं.</div>') +
+      '<div style="margin-top:10px"><b style="font-size:12.5px">डॉक्यूमेंट माँगें:</b> <button class="btn sec sm" onclick="presetDocs(\'itr\')">ITR के लिए</button> <button class="btn sec sm" onclick="presetDocs(\'reg\')">रजिस्ट्रेशन के लिए</button>' +
+      '<div class="pk" style="margin-top:6px">' + Object.keys(d.docTypes).map(function (t) { return '<label><input type="checkbox" class="dq" value="' + t + '"' + (reqT.indexOf(t) >= 0 ? ' checked' : '') + '>' + esc(d.docTypes[t]) + '</label>'; }).join('') + '</div>' +
+      '<div class="row" style="margin-top:6px"><input class="i" id="dqNote" placeholder="नोट – जैसे: ITR FY 2025-26 के लिए" style="flex:1" value="' + esc(c.docReq ? c.docReq.note : '') + '"><button class="btn sm" onclick="requestDocs(\'' + c.gstin + '\')">📩 क्लाइंट से माँगें</button></div></div></div>';
+    // this client's due dates
+    h += '<div class="per"><h3>📆 ड्यू डेट (इस क्लाइंट की)</h3>' + (d.dues || []).map(function (x) {
+      return '<div class="sl"><span style="width:84px;flex:none"><b>' + x.date.split('-').reverse().join('-') + '</b></span><span class="nm" style="width:auto;flex:1">' + esc(x.title) + '</span>' +
+        (x.done ? '<span class="pill FILED">हो गया ✓</span>' : '<span class="pill ' + (x.days < 0 ? 'NONE' : x.days <= 3 ? 'PARTIAL' : 'COMPLETE') + '">' + (x.days < 0 ? (-x.days) + ' दिन ऊपर' : x.days + ' दिन') + '</span>') +
+        (x.pid ? '' : ' <label class="mute"><input type="checkbox"' + (x.done ? ' checked' : '') + ' onchange="dueDone(\'' + c.gstin + '\',\'' + esc(x.key) + '\',this.checked)"> हो गया</label>') + '</div>';
+    }).join('') + '</div>';
     h += d.periods.map(function (p) { return periodBlock(c, p, p.summary.pid === focusPid); }).join('');
     h += '<div class="per"><h3>प्रोफाइल</h3><div class="grid2" style="margin-top:8px">' +
       fld('owner', '👤 बात करने वाले का नाम', c.owner) + fld('legal', '🪪 GST धारक (लीगल नाम)', c.legal) + fld('trade', '🏪 फर्म (ट्रेड नाम)', c.trade) + fld('mobile', 'मोबाइल', c.mobile) + fld('email', 'ईमेल', c.email) +
@@ -378,6 +413,10 @@ function periodBlock(c, p, focus) {
     '<div class="row" style="margin-top:6px"><label>GSTR-3B ARN <input class="i" id="a3' + id + '" value="' + esc(f3.arn || '') + '" style="width:170px"></label><input class="i" type="date" id="d3' + id + '" value="' + esc(f3.date || today()) + '">' +
     '<button class="btn ok sm" onclick="saveFiled(\'' + g + '\',\'' + pid + '\',\'gstr3b\')">GSTR-3B फाइल ✓</button>' +
     (s.work ? '<button class="btn sec sm" onclick="undoWork(\'' + g + '\',\'' + pid + '\')">↺ स्थिति हटाएँ</button>' : '') + '</div>' +
+    '<div class="row" style="margin-top:6px"><label>टर्नओवर (taxable) ₹ <input class="i" type="number" id="to' + id + '" value="' + (s.turnover == null ? '' : s.turnover) + '" style="width:130px"></label>' +
+    (s.autoTurnover != null ? '<span class="mute">रिपोर्ट से अनुमान: ' + rupee(Math.round(s.autoTurnover)) + '</span>' : '') + '<button class="btn sec sm" onclick="saveTurnover(\'' + g + '\',\'' + pid + '\')">सेव</button></div>' +
+    '<div style="margin-top:8px"><b style="font-size:12.5px">📄 क्लाइंट को भेजी PDF:</b> ' + ((s.returns || []).map(function (r) { return '<span class="pill FILED">' + esc(r.kind) + ': ' + esc(r.name) + ' <button class="lnk" style="border:0;background:none;cursor:pointer" onclick="delReturn(\'' + g + '\',\'' + pid + '\',\'' + r.id + '\')">✕</button></span>'; }).join(' ') || '<span class="mute">अभी नहीं</span>') +
+    ' <select class="i" id="rk' + id + '"><option>GSTR3B</option><option>GSTR1</option><option value="OTHER">अन्य</option></select> <input type="file" accept=".pdf" id="rf' + id + '" onchange="sendReturn(\'' + g + '\',\'' + pid + '\',this)"></div>' +
     '<hr class="sep"><div class="row"><label>फीस ₹ <input class="i" type="number" id="fee' + id + '" value="' + (s.fee == null ? '' : s.fee) + '" style="width:100px"></label><button class="btn sec sm" onclick="saveFee(\'' + g + '\',\'' + pid + '\')">सेव</button>' +
     '<span>मिला: <b>' + rupee(s.paid) + '</b></span><span>बाकी: <b style="color:' + (s.due > 0 ? 'var(--bad)' : 'var(--ok)') + '">' + rupee(s.due) + '</b></span></div>' +
     (s.payClaim ? '<div class="row" style="margin-top:6px"><span class="pill CLAIM">क्लाइंट ने कहा पेमेंट कर दिया – ' + fmtDate(s.payClaim.at) + (s.payClaim.note ? ': ' + esc(s.payClaim.note) : '') + '</span><button class="btn sec sm" onclick="rejectClaim(\'' + g + '\',\'' + pid + '\')">नहीं मिला</button></div>' : '') +
@@ -466,6 +505,8 @@ var CTILES = [
   ['M', 'Monthly', function (r) { return r.client.freq !== 'Q'; }],
   ['Q', 'Quarterly', function (r) { return r.client.freq === 'Q'; }],
   ['due', 'फीस बाकी', function (r) { return r.totalDue > 0; }],
+  ['big', '📈 ₹2 करोड़+ टर्नओवर (अनुमान)', function (r) { var t = r.client.fyTurnover; return !!t && (t.total >= 2e7 || (t.months >= 3 && t.projected >= 2e7)); }],
+  ['ref', 'रेफरल से आए', function (r) { return !!r.client.referredBy; }],
   ['blocked', 'Blocked', function (r) { return r.client.status === 'BLOCKED'; }]
 ];
 // name parts, labelled – contact person (who talks to us) → GST holder → firm
@@ -518,6 +559,122 @@ function vcardAll() { var list = clientRows().map(function (r) { return vcard(r.
 function vcardOne(g) { var r = LIST.rows.filter(function (x) { return x.client.gstin === g; })[0]; if (r) download(r.client.fullName.replace(/[\\\/:*?"<>|]/g, ' ') + '.vcf', vcard(r.client) + '\r\n', 'text/vcard'); }
 function copyText(t, msg) { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast(msg || 'कॉपी हो गया ✓'); }, function () { prompt('कॉपी करें:', t); }); }
 function quickVerify(g, on) { after(A('aUpdateClient', { gstin: g, fields: { verified: on } }), on ? 'Verified ✓' : 'Verify हटाया'); }
+
+function saveFlags(g) { after(A('aUpdateClient', { gstin: g, fields: { tds: $('fl_tds').checked, advtax: $('fl_adv').checked, annual: $('fl_annual').checked } }), 'सेव ✓ – ड्यू डेट अपडेट'); }
+function presetDocs(k) {
+  var set = k === 'itr' ? ['pan', 'aadhaar', 'bank_stmt', 'form16'] : ['pan', 'aadhaar', 'photo', 'bank', 'address'];
+  document.querySelectorAll('.dq').forEach(function (x) { x.checked = set.indexOf(x.value) >= 0; });
+  $('dqNote').value = k === 'itr' ? 'ITR के लिए ये डॉक्यूमेंट चाहिए' : 'रजिस्ट्रेशन के लिए ये डॉक्यूमेंट चाहिए';
+}
+function requestDocs(g) {
+  var types = Array.prototype.map.call(document.querySelectorAll('.dq:checked'), function (x) { return x.value; });
+  after(A('aDocRequest', { gstin: g, types: types, note: $('dqNote').value }), types.length ? 'क्लाइंट को सूचना गई ✓' : 'माँग हटा दी');
+}
+function dueDone(g, key, on) { A('aDueDone', { gstin: g, key: key, done: on }).then(function () { toast('सेव ✓'); }).catch(function (e) { toast(e.message); }); }
+function saveTurnover(g, pid) { after(A('aSetWork', { gstin: g, pid: pid, turnover: $('to' + pid.replace(/\W/g, '')).value }), 'टर्नओवर सेव ✓'); }
+function delReturn(g, pid, id) { if (confirm('ये PDF क्लाइंट के ऐप से हटाएँ?')) after(A('aReturnDelete', { gstin: g, pid: pid, id: id }), 'हटा दिया'); }
+function sendReturn(g, pid, inp) {
+  var f = inp.files[0]; if (!f) return;
+  API.fileToB64(f).then(function (b64) { return A('aReturnUpload', { gstin: g, pid: pid, kind: $('rk' + pid.replace(/\W/g, '')).value, name: f.name, b64: b64 }); })
+    .then(function () { toast('PDF क्लाइंट के ऐप में भेज दी ✓ – अब कंप्यूटर से हटा सकते हैं'); return refresh(); }).catch(function (e) { toast(e.message, 4000); });
+}
+
+/* ---------- due date calendar ---------- */
+var CAL = null;
+function loadCal() { A('aCalendar', { back: $('calBack').value, ahead: $('calAhead').value }).then(function (d) { CAL = d; renderCal(); }).catch(function (e) { toast(e.message); }); }
+function renderCal() {
+  if (!CAL) return;
+  var onlyPend = $('calPend').checked, rows = CAL.rows.filter(function (r) { return !onlyPend || r.pending.length; });
+  $('calBody').innerHTML = rows.map(function (r, i) {
+    var col = r.days < 0 ? 'var(--bad)' : r.days <= 3 ? 'var(--warn)' : 'var(--ok)';
+    var ext = r.pending.concat(r.done).some(function (p) { return CAL.ext[p.ownKey]; });
+    return '<div class="card" style="border-left:5px solid ' + col + '"><div class="row"><b style="font-size:16px">' + r.date.split('-').reverse().join('-') + '</b><span class="pill" style="background:#f1f5f9">' + (r.days < 0 ? (-r.days) + ' दिन पहले' : r.days === 0 ? 'आज' : r.days + ' दिन बाकी') + '</span>' +
+      '<b>' + esc(r.title) + '</b>' + (ext ? ' <span class="pill CLAIM">तारीख बढ़ी</span>' : '') + '<span class="grow"></span><span class="pill COMPLETE">✓ ' + r.done.length + '</span><span class="pill ' + (r.pending.length ? 'DUE' : 'COMPLETE') + '">बाकी ' + r.pending.length + '</span>' +
+      '<button class="btn sec sm" onclick="extendDue(' + i + ')">तारीख बढ़ी</button>' + (r.pending.length ? '<button class="btn sm" onclick="remindDue(' + i + ')">🔔 बाकी को याद दिलाएँ</button>' : '') + '</div>' +
+      '<div class="mute">' + esc(r.desc) + '</div>' +
+      (r.pending.length ? '<details style="margin-top:6px"><summary class="mute" style="cursor:pointer">बाकी क्लाइंट (' + r.pending.length + ')</summary>' + r.pending.map(function (p) {
+        return '<div class="sl"><span class="nm" style="width:auto;flex:1;cursor:pointer" onclick="openClient(\'' + p.gstin + '\')">' + esc(p.name) + '</span><a class="btn wa sm" target="_blank" rel="noopener" href="https://wa.me/91' + esc(p.mobile) + '?text=' + encodeURIComponent('नमस्ते, ' + r.title + ' की आखिरी तारीख ' + r.date.split('-').reverse().join('-') + ' है. – Vishal Accounting Services') + '">WA</a></div>';
+      }).join('') + '</details>' : '') + '</div>';
+  }).join('') || '<div class="card mute" style="text-align:center;padding:30px">इस समय में कोई ड्यू डेट बाकी नहीं 🎉</div>';
+}
+function rowKeys(r) { var k = {}; r.pending.concat(r.done).forEach(function (p) { k[p.ownKey] = 1; }); return Object.keys(k); }
+function extendDue(i) {
+  var r = (CAL.rows.filter(function (x) { return !$('calPend').checked || x.pending.length; }))[i];
+  var d = prompt(r.title + '\nनई आखिरी तारीख (YYYY-MM-DD) – खाली छोड़ें तो पुरानी तारीख वापस:', r.date);
+  if (d === null) return;
+  A('aDueExt', { keys: rowKeys(r), date: d.trim() }).then(function () { toast('तारीख बदल गई ✓'); loadCal(); }).catch(function (e) { toast(e.message); });
+}
+function remindDue(i) {
+  var r = (CAL.rows.filter(function (x) { return !$('calPend').checked || x.pending.length; }))[i];
+  if (!confirm(r.pending.length + ' क्लाइंट को "' + r.title + '" का रिमाइंडर भेजें?')) return;
+  A('aMessage', { gstins: r.pending.map(function (p) { return p.gstin; }), title: '📅 ' + r.title + ' – आखिरी तारीख ' + r.date.split('-').reverse().join('-'), body: r.desc }).then(function (d) { toast(d.sent + ' को भेजा ✓'); }).catch(function (e) { toast(e.message); });
+}
+
+/* ---------- GSTR-3B PDFs → clients' apps, then removed from this computer (Ctrl+X) ----------
+   File name usually has the GSTIN and MMYYYY (portal download). With "फोल्डर चुनें" (Chrome/Edge) the
+   PDFs are deleted from that folder after they reach the client; with plain file picking they stay. */
+var RS = { dir: null, items: [] };
+function openReturnSender() {
+  OPEN = null; RS = { dir: null, items: [] };
+  $('dTitle').innerHTML = '<b style="font-size:16px">📄 GSTR-3B PDF क्लाइंट्स को भेजें</b><div class="mute">पोर्टल से डाउनलोड की PDF – GSTIN और महीना फाइल के नाम से पहचानेगा</div>';
+  $('dBody').innerHTML = '<div class="per"><div class="row">' + (window.showDirectoryPicker ? '<button class="btn ok" onclick="rsPickDir()">📂 फोल्डर चुनें (जैसे Downloads) – भेजने के बाद PDF वहाँ से हट जाएगी</button>' : '') +
+    '<label class="btn sec">📄 PDF चुनें<input type="file" accept=".pdf" multiple style="display:none" onchange="rsPickFiles(this)"></label></div>' +
+    '<div class="mute" style="margin-top:6px">PDF सिर्फ क्लाइंट के ऐप और Google Drive में रहेगी – कंप्यूटर में जगह नहीं घेरेगी.</div></div><div id="rsList"></div>';
+  $('drawer').classList.add('on'); $('shade').classList.add('on');
+}
+function rsGuess(name) {
+  var u = name.toUpperCase(), g = '', m = (u.match(/[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]/g) || []).filter(Core.gstinValid)[0] || '';
+  var row = m && LIST.rows.filter(function (r) { return r.client.gstin === m; })[0];
+  var rest = m ? u.split(m).join(' ') : u, mm = /(?:^|[^0-9])(0[1-9]|1[0-2])[-_ ]?(20[2-3][0-9])(?:[^0-9]|$)/.exec(rest);
+  var mid = mm ? mm[2] + '-' + mm[1] : $('month').value;
+  var pid = row ? Core.pidFor(row.client.freq, mid) : mid;
+  return { gstin: row ? m : '', pid: pid, kind: /3B/.test(u) ? 'GSTR3B' : /GSTR-?1|R1/.test(u) ? 'GSTR1' : 'GSTR3B' };
+}
+function rsPickDir() {
+  window.showDirectoryPicker({ mode: 'readwrite' }).then(function (dir) {
+    RS.dir = dir; RS.items = []; var it = dir.values(), out = [];
+    return (function next() {
+      return it.next().then(function (r) {
+        if (r.done) return out;
+        if (r.value.kind === 'file' && /\.pdf$/i.test(r.value.name)) out.push(r.value);
+        return next();
+      });
+    })().then(function (handles) {
+      return Promise.all(handles.map(function (h) { return h.getFile().then(function (f) { return { file: f, handle: h }; }); }));
+    });
+  }).then(function (list) { if (list) { RS.items = list.map(function (x) { return Object.assign({ file: x.file, handle: x.handle }, rsGuess(x.file.name)); }); rsRender(); } })
+    .catch(function (e) { if (e.name !== 'AbortError') toast(e.message, 4000); });
+}
+function rsPickFiles(inp) { RS.dir = null; RS.items = Array.prototype.map.call(inp.files, function (f) { return Object.assign({ file: f, handle: null }, rsGuess(f.name)); }); rsRender(); }
+function rsRender() {
+  var opts = LIST.rows.slice().sort(function (a, b) { return a.client.fullName.localeCompare(b.client.fullName); });
+  var matched = RS.items.filter(function (x) { return x.gstin; }).length;
+  $('rsList').innerHTML = '<div class="per"><b>' + RS.items.length + ' PDF मिलीं, ' + matched + ' का क्लाइंट पहचान लिया</b>' + (RS.items.length - matched ? '<span class="mute"> – बाकी के लिए क्लाइंट चुनें</span>' : '') +
+    RS.items.map(function (x, i) {
+      return '<div class="sl" style="flex-wrap:wrap"><input type="checkbox" id="rsOn' + i + '"' + (x.gstin ? ' checked' : '') + '><span style="flex:1;min-width:200px">📄 ' + esc(x.file.name) + '</span>' +
+        '<select class="i" id="rsC' + i + '" style="max-width:260px" onchange="document.getElementById(\'rsOn' + i + '\').checked=!!this.value"><option value="">– क्लाइंट चुनें –</option>' + opts.map(function (r) { return '<option value="' + r.client.gstin + '"' + (r.client.gstin === x.gstin ? ' selected' : '') + '>' + esc(r.client.fullName) + '</option>'; }).join('') + '</select>' +
+        '<input class="i" id="rsP' + i + '" value="' + esc(x.pid) + '" style="width:90px" title="2026-09 या 2026-Q2"><select class="i" id="rsK' + i + '"><option' + (x.kind === 'GSTR3B' ? ' selected' : '') + '>GSTR3B</option><option' + (x.kind === 'GSTR1' ? ' selected' : '') + '>GSTR1</option></select></div>';
+    }).join('') +
+    '<div class="row" style="margin-top:10px"><button class="btn ok" onclick="rsSend()">✔ चुनी हुई PDF भेजें' + (RS.dir ? ' और कंप्यूटर से हटाएँ' : '') + '</button></div></div>';
+}
+function rsSend() {
+  var jobs = RS.items.map(function (x, i) { return { x: x, on: $('rsOn' + i).checked, g: $('rsC' + i).value, pid: $('rsP' + i).value.trim(), kind: $('rsK' + i).value }; })
+    .filter(function (j) { return j.on && j.g && Core.isPid(j.pid); });
+  if (!jobs.length) return toast('कोई PDF चुनी नहीं (क्लाइंट और अवधि सही डालें)');
+  var ok = 0, moved = 0, bad = [], i = 0;
+  (function next() {
+    if (i >= jobs.length) {
+      toast(ok + ' PDF भेजीं ✓' + (RS.dir ? ' • ' + moved + ' कंप्यूटर से हटाईं' : '') + (bad.length ? ' • ' + bad.length + ' नहीं गईं' : ''), 5000);
+      if (bad.length) alert('नहीं गईं:\n' + bad.join('\n'));
+      closeDrawer(); return refresh();
+    }
+    var j = jobs[i++];
+    toast('भेज रहे हैं ' + i + '/' + jobs.length + '…', 20000);
+    API.fileToB64(j.x.file).then(function (b64) { return A('aReturnUpload', { gstin: j.g, pid: j.pid, kind: j.kind, name: j.x.file.name, b64: b64 }); })
+      .then(function () { ok++; if (RS.dir && j.x.handle) return RS.dir.removeEntry(j.x.file.name).then(function () { moved++; }, function () {}); })
+      .catch(function (e) { bad.push(j.x.file.name + ': ' + e.message); }).then(next);
+  })();
+}
 
 /* ---------- app content (learning / news / services / FAQ) ---------- */
 var CONTENT = null, CKIND = 'learn';
@@ -603,7 +760,7 @@ function renderLeads() {
 function leadSet(id, status, note) { A('aLeadUpdate', { id: id, status: status || undefined, note: note == null ? undefined : note }).then(function () { return loadContent(); }).then(function () { toast('सेव ✓'); }).catch(function (e) { toast(e.message); }); }
 
 /* ---------- inbox ---------- */
-var KIND = { LEAD: ['पूछताछ', 'COMPLETE'], REG: ['नया क्लाइंट', 'PARTIAL'], NIL: ['NIL', 'NIL'], COMPLETE: ['डेटा पूरा', 'COMPLETE'], SUBMIT: ['डेटा भेजा', 'SUBMITTED'], PAYCLAIM: ['पेमेंट', 'CLAIM'], PROFILE: ['प्रोफाइल', 'FILED'], TICK: ['रिमाइंडर', 'PROCESS'], PIN: ['PIN भूले', 'CLAIM'] };
+var KIND = { LEAD: ['पूछताछ', 'COMPLETE'], REG: ['नया क्लाइंट', 'PARTIAL'], NIL: ['NIL', 'NIL'], COMPLETE: ['डेटा पूरा', 'COMPLETE'], SUBMIT: ['डेटा भेजा', 'SUBMITTED'], PAYCLAIM: ['पेमेंट', 'CLAIM'], PROFILE: ['प्रोफाइल', 'FILED'], TICK: ['रिमाइंडर', 'PROCESS'], PIN: ['PIN भूले', 'CLAIM'], DUE: ['ड्यू डेट', 'PROCESS'], TURNOVER: ['टर्नओवर', 'DUE'], DOCS: ['डॉक्यूमेंट', 'COMPLETE'], REF: ['रेफरल', 'FILED'] };
 function loadInbox() {
   A('aInbox').then(function (d) {
     INBOX = d.inbox;
@@ -620,13 +777,13 @@ function loadSettings() {
   A('aSettings').then(function (d) {
     var s = d.settings;
     $('sDays').value = (s.remindDays || []).join(','); $('sPay').value = s.payEveryDays; $('sFee').value = s.defaultFee || '';
-    $('sUpi').value = s.upi || ''; $('sPayee').value = s.payeeName || ''; $('sPhone').value = s.phone || ''; $('sFirm').value = s.firm || '';
+    $('sUpi').value = s.upi || ''; $('sPayee').value = s.payeeName || ''; $('sPhone').value = s.phone || ''; $('sFirm').value = s.firm || ''; $('sRef').value = s.refReward || '';
   });
   $('connInfo').innerHTML = API.DEMO ? '<b>डेमो मोड</b> – डेटा सिर्फ इस ब्राउज़र में है. असली इस्तेमाल के लिए config.js में API_URL डालें (SETUP.md देखें).' : 'सर्वर: ' + esc(CONFIG.API_URL.slice(0, 60)) + '…';
   $('demoReset').classList.toggle('hide', !API.DEMO);
 }
 function saveSettings() {
-  A('aSettings', { set: { remindDays: $('sDays').value, payEveryDays: $('sPay').value, defaultFee: $('sFee').value, upi: $('sUpi').value, payeeName: $('sPayee').value, phone: $('sPhone').value, firm: $('sFirm').value } })
+  A('aSettings', { set: { remindDays: $('sDays').value, payEveryDays: $('sPay').value, defaultFee: $('sFee').value, upi: $('sUpi').value, payeeName: $('sPayee').value, phone: $('sPhone').value, firm: $('sFirm').value, refReward: $('sRef').value } })
     .then(function () { toast('सेव ✓'); loadSettings(); }).catch(function (e) { toast(e.message); });
 }
 function runTick() { A('aTick').then(function (d) { $('tickOut').textContent = 'डेटा रिमाइंडर: ' + d.dataSent + ' • पेमेंट रिमाइंडर: ' + d.paySent; refresh(); }).catch(function (e) { toast(e.message); }); }

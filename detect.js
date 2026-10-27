@@ -49,7 +49,8 @@ var Detect = (function () {
   // sheets -> [{name, head:[lowercase], rows:[[…]]}]
   function readSheets(buf, csv) {
     // CSV: keep text as-is (the library would read "10/09/26" as US month/day)
-    var wb = XLSX.read(buf, csv ? { type: 'array', raw: true, sheetRows: 400 } : { type: 'array', cellDates: true, sheetRows: 400 });
+    // every row is read: the taxable total (turnover) needs them all
+    var wb = XLSX.read(buf, csv ? { type: 'array', raw: true } : { type: 'array', cellDates: true });
     return wb.SheetNames.map(function (n) {
       var ws = wb.Sheets[n], maxR = 0, maxC = 0;
       // Flipkart files declare a wrong sheet size (A1:BH1) – rebuild the range from the real cells
@@ -64,6 +65,15 @@ var Detect = (function () {
     });
   }
   function has(sh, cols) { return cols.every(function (c) { return sh.head.indexOf(c) >= 0; }); }
+  // taxable value total of a report (turnover estimate; returns / refunds are negative in Amazon & Flipkart files)
+  function colSum(sh, test) {
+    var i = -1;
+    sh.head.some(function (h, k) { if (typeof test === 'string' ? h === test : test.test(h)) { i = k; return true; } return false; });
+    if (i < 0) return null;
+    var s = 0;
+    sh.rows.forEach(function (r) { var v = parseFloat(String(r[i] == null ? '' : r[i]).replace(/[,₹\s]/g, '')); if (isFinite(v)) s += v; });
+    return Math.round(s * 100) / 100;
+  }
   function colMonth(sh, col) {
     var i = sh.head.indexOf(col);
     return i < 0 ? '' : mostCommon(sh.rows.map(function (r) { return monthOf(r[i]); }));
@@ -98,14 +108,15 @@ var Detect = (function () {
       var sh = sheets[i], mo;
       if (has(sh, ['sub_order_num', 'end_customer_state_new', 'total_taxable_sale_value'])) {
         mo = meeshoMonth(sh);
-        return { type: has(sh, ['cancel_return_date']) ? 'MEESHO_RET' : 'MEESHO_SALE', months: mo ? [mo] : [] };
+        var ret = has(sh, ['cancel_return_date']), ms = colSum(sh, 'total_taxable_sale_value');
+        return { type: ret ? 'MEESHO_RET' : 'MEESHO_SALE', months: mo ? [mo] : [], taxable: ms == null ? null : ret ? -ms : ms };
       }
       if (has(sh, ['suborder no.', 'invoice no.'])) { mo = colMonth(sh, 'order date'); return { type: 'MEESHO_INV', months: mo ? [mo] : [] }; }
       if (has(sh, ['transaction type', 'ship to state', 'tax exclusive gross'])) {
         mo = colMonth(sh, 'invoice date') || nameMonths(name)[0];
-        return { type: has(sh, ['customer bill to gstid']) ? 'AMZ_B2B' : 'AMZ_B2C', months: mo ? [mo] : [] };
+        return { type: has(sh, ['customer bill to gstid']) ? 'AMZ_B2B' : 'AMZ_B2C', months: mo ? [mo] : [], taxable: colSum(sh, 'tax exclusive gross') };
       }
-      if (has(sh, ['event type', 'buyer invoice id'])) { mo = colMonth(sh, 'buyer invoice date') || colMonth(sh, 'order date'); return { type: 'FK_SALES', months: mo ? [mo] : [] }; }
+      if (has(sh, ['event type', 'buyer invoice id'])) { mo = colMonth(sh, 'buyer invoice date') || colMonth(sh, 'order date'); return { type: 'FK_SALES', months: mo ? [mo] : [], taxable: colSum(sh, /^taxable value/) }; }
     }
     return { type: '', months: [] };
   }
@@ -134,7 +145,7 @@ var Detect = (function () {
   function one(file, buf) {
     var r;
     try { r = classify(file.name, readSheets(buf, ext(file.name) === 'csv')); } catch (er) { r = { type: '', months: [] }; }
-    return { file: file, type: r.type, months: r.months, label: r.type ? TYPES[r.type][2] : '' };
+    return { file: file, type: r.type, months: r.months, label: r.type ? TYPES[r.type][2] : '', taxable: r.taxable == null ? null : r.taxable };
   }
 
   return { TYPES: TYPES, inspect: inspect };

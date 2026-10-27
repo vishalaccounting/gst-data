@@ -93,6 +93,7 @@ function makeCtx() {
     return { fileId: f.getId(), url: f.getUrl() };
   };
   ctx.deleteFile = function (id) { if (!id) return; try { DriveApp.getFileById(id).setTrashed(true); } catch (e) {} };
+  ctx.readFile = function (id) { return Utilities.base64Encode(DriveApp.getFileById(id).getBlob().getBytes()); };
   ctx.renameFolder = function (oldName, newName) {
     var it = rootFolder().getFoldersByName(oldName);
     if (it.hasNext()) it.next().setName(newName);

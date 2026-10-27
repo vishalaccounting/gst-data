@@ -5,7 +5,7 @@
    No DOM, no async, no modules – plain ES2019.
    ============================================================ */
 var Core = (function () {
-  var VERSION = '1.3.0';
+  var VERSION = '1.4.0';
 
   /* ---------- Platforms and the reports each one must send ----------
      perMonth:true  -> one report per month (quarterly client = 3 slots)
@@ -116,6 +116,12 @@ var Core = (function () {
     if (ms.length === 1) return monthLabel(ms[0]);
     return MON[+ms[0].slice(5, 7) - 1] + '–' + MON[+ms[2].slice(5, 7) - 1] + ' ' + ms[2].slice(0, 4);
   }
+  // same names as GST REPORT TOOL Get-Period: FY '2026-27', label 'SEP 2026' / 'JUL-AUG-SEP 2026'
+  function fyOf(mid) { var y = +mid.slice(0, 4), m = +mid.slice(5, 7), s = m >= 4 ? y : y - 1; return s + '-' + String((s + 1) % 100).padStart(2, '0'); }
+  function periodDirs(pid) {
+    var ms = monthsOf(pid), last = ms[ms.length - 1];
+    return { fy: fyOf(last), label: ms.map(function (m) { return MON[+m.slice(5, 7) - 1].toUpperCase(); }).join('-') + ' ' + last.slice(0, 4) };
+  }
   function pidFor(freq, mid) { return freq === 'Q' ? quarterOf(mid) : mid; }
   function lastMonth(now) { var t = ist(now); return addMonth(monthId(t.y, t.m), -1); }
   // The period clients should be sending now (last finished month / last finished quarter)
@@ -179,12 +185,17 @@ var Core = (function () {
       : files ? 'PARTIAL' : 'NONE';
     var fee = rec.fee == null ? null : num(rec.fee), paid = paidOf(rec);
     var last = (rec.files || []).reduce(function (m, f) { return f.at > m ? f.at : m; }, '');
+    // turnover: office figure (entered at filing) wins; else the sum the app read from the marketplace reports
+    var auto = null;
+    (rec.files || []).forEach(function (f) { if (f.taxable != null) auto = num((auto || 0) + f.taxable); });
     return {
       pid: pid, label: periodLabel(pid), data: data, required: req.length, done: req.length - missing.length,
       missing: missing.map(function (s) { return { id: s.id, plat: s.plat, name: s.name }; }),
       files: files, lastUpload: last, submittedAt: rec.submittedAt || '',
       work: rec.work || '', filed: rec.filed || {}, fee: fee, paid: paid,
-      due: fee == null ? 0 : Math.max(0, num(fee - paid)), payClaim: rec.payClaim || null
+      due: fee == null ? 0 : Math.max(0, num(fee - paid)), payClaim: rec.payClaim || null,
+      autoTurnover: auto, turnover: rec.nil ? 0 : rec.turnover != null ? rec.turnover : auto,
+      returns: (rec.returns || []).map(function (r) { return { id: r.id, kind: r.kind, name: r.name, size: r.size, at: r.at }; })
     };
   }
   function missingText(sm) {
@@ -241,8 +252,13 @@ var Core = (function () {
      contact person (who talks to us) → GST holder (legal name as per PAN) → firm (trade name).
      e.g. husband talks for wife's GST: "Ramesh Kumar Sunita Devi Shree Traders". Repeats are dropped. */
   function fullName(c) {
-    var out = [], seen = {};
-    [c.owner, c.legal, c.trade].forEach(function (s) { s = str(s, 100).replace(/\s+/g, ' '); var k = s.toUpperCase(); if (s && !seen[k]) { seen[k] = 1; out.push(s); } });
+    var parts = [c.owner, c.legal, c.trade].map(function (s) { return str(s, 100).replace(/\s+/g, ' '); }), out = [], seen = {};
+    parts.forEach(function (s, i) {
+      var k = s.toUpperCase();
+      // "Amit" + "Amit Patil" → just "Amit Patil"
+      var inNext = parts.some(function (o, j) { return j > i && o.toUpperCase().indexOf(k + ' ') === 0; });
+      if (s && !seen[k] && !inNext) { seen[k] = 1; out.push(s); }
+    });
     return out.join(' ') || c.gstin;
   }
   function publicClient(c) {
@@ -251,7 +267,18 @@ var Core = (function () {
       notes: c.notes || '', push: (c.pushTokens || []).length, state: gstinInfo(c.gstin).state, pan: gstinInfo(c.gstin).pan, fullName: fullName(c) };
   }
   // dashboard view: also the PIN (kept so the office can tell a client who forgot it; set on register/login/PIN change)
-  function adminClient(c) { var o = publicClient(c); o.pin = c.pin || ''; o.pinReqAt = c.pinReqAt || ''; o.folder = folderName(c); o.lastLogin = c.lastLogin || ''; return o; }
+  function adminClient(c, db, ctx) {
+    var o = publicClient(c); o.pin = c.pin || ''; o.pinReqAt = c.pinReqAt || ''; o.folder = folderName(c); o.lastLogin = c.lastLogin || '';
+    o.tds = !!c.tds; o.advtax = !!c.advtax; o.annual = !!c.annual; o.refCode = refCode(c);
+    if (db) {
+      var rb = c.referredBy && db.clients[c.referredBy];
+      o.referredBy = rb ? { gstin: rb.gstin, name: fullName(rb) } : null;
+      o.referrals = referralsOf(db, c).map(function (x) { return { gstin: x.gstin, name: fullName(x), at: x.createdAt }; });
+      o.docs = (c.docs || []).map(docView); o.docReq = c.docReq || null;
+      if (ctx) { var fs = +fyOf(lastMonth(ctx.now)).slice(0, 4); o.fyTurnover = fyTurnover(db, c, fs); o.prevFyTurnover = fyTurnover(db, c, fs - 1); }
+    }
+    return o;
+  }
   // Drive folder: "<CONTACT LEGAL TRADE> <GSTIN>", fixed at registration (c.folder); renamed on the server when the office edits the names
   function newFolderName(c) { return (fullName(c) + ' ' + c.gstin).replace(/[\\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase().slice(0, 140); }
   function folderName(c) { return c.folder || ((str(c.trade, 60) || c.gstin).replace(/[\\\/:*?"<>|]/g, ' ') + ' ' + c.gstin); }
@@ -316,7 +343,13 @@ var Core = (function () {
       createdAt: ctx.now.toISOString()
     };
     c.folder = newFolderName(c);
+    var ref = byRef(db, q.ref);
+    if (ref) c.referredBy = ref.gstin;
     db.clients[g] = c;
+    if (ref) {
+      notifyClient(db, ctx, ref, '🎉 आपके रेफरल से नया क्लाइंट जुड़ा', fullName(c) + ' आपके लिंक से जुड़े. धन्यवाद! ' + (db.settings.refReward || ''));
+      notifyAdmin(db, ctx, 'REF', 'रेफरल: ' + fullName(c) + ' ← ' + fullName(ref), 'नया क्लाइंट ' + fullName(ref) + ' के रेफरल से आया', g);
+    }
     notifyClient(db, ctx, c, 'स्वागत है 🙏', db.settings.firm + ' के ऐप में आपका स्वागत है. हर महीने/तिमाही डेटा भेजने का रिमाइंडर यहीं आएगा.');
     notifyAdmin(db, ctx, 'REG', 'नया क्लाइंट: ' + fullName(c), g + ' • ' + mobile + ' • ' + (c.freq === 'Q' ? 'Quarterly' : 'Monthly') + ' • ' + (c.platforms.map(function (p) { return PLATFORMS[p].label; }).join(', ') || 'कोई प्लेटफॉर्म नहीं'), g);
     return { sessions: [newSession(c, ctx)] };
@@ -358,6 +391,10 @@ var Core = (function () {
       files: (rec.files || []).map(function (f) { return { id: f.id, slot: f.slot, covers: f.covers, name: f.name, size: f.size, at: f.at }; }),
       inbox: (c.inbox || []).slice(0, 30), unread: (c.inbox || []).filter(function (n) { return !n.read; }).length,
       dues: dues, settings: { upi: db.settings.upi, payeeName: db.settings.payeeName, phone: db.settings.phone, firm: db.settings.firm },
+      due: duesFor(db, c, ctx.now, 5, 60).slice(0, 8),
+      docs: (c.docs || []).map(function (d) { var v = docView(d); delete v.url; delete v.fileId; return v; }), docReq: c.docReq || null, docTypes: DOC_TYPES,
+      refCode: refCode(c), referrals: referralsOf(db, c).length, refReward: db.settings.refReward || '',
+      fyTurnover: fyTurnover(db, c, +fyOf(lastMonth(ctx.now)).slice(0, 4)),
       content: contentFor(db).map(function (x) { return { id: x.id, kind: x.kind, icon: x.icon, title: x.title, body: x.body, img: x.img, price: x.price, partner: x.partner, cta: x.cta, link: x.link, pinned: x.pinned, at: x.at }; })
     };
   };
@@ -384,12 +421,15 @@ var Core = (function () {
     if (size > 30 * 1048576) fail('फाइल 30 MB से बड़ी है');
     if (rec.files.some(function (x) { return x.slot === slot.id && x.name === name && Math.abs(x.size - size) < 4; })) fail('ये फाइल ' + slot.name + ' में पहले से अपलोड है');
     var P = PLATFORMS[slot.plat];
+    // GST REPORT TOOL layout: <client>\<FY>\<PERIOD>\INPUT\  (the tool reads every report in INPUT by its columns)
+    var pd = periodDirs(pid);
     var stored = ctx.saveFile({
-      folders: [folderName(c), periodLabel(pid), P.label],
-      name: slot.name.replace(/[\\\/:*?"<>|]/g, ' ') + ' __ ' + name,
+      folders: [folderName(c), pd.fy, pd.label, 'INPUT'],
+      name: (slot.month && monthsOf(pid).length > 1 ? MON[+slot.month.slice(5, 7) - 1].toUpperCase() + '_' : '') + name,
       mime: str(q.mime, 100) || 'application/octet-stream'
     }, q.b64);
     var f = { id: ctx.uuid(), slot: slot.id, name: name, size: size, mime: str(q.mime, 100), at: ctx.now.toISOString(), fileId: stored.fileId, url: stored.url || '',
+      taxable: q.taxable == null || q.taxable === '' || !isFinite(Number(q.taxable)) ? null : num(q.taxable),
       type: str(q.ftype, 20), months: (Array.isArray(q.fmonths) ? q.fmonths : []).map(function (m) { return str(m, 7); }).slice(0, 12) };
     // one quarterly report (e.g. Amazon GSTR1-OCTOBER-DECEMBER) can fill the same report's slot for every month
     if (Array.isArray(q.covers)) {
@@ -475,7 +515,7 @@ var Core = (function () {
       var rec = getRec(db, g, pid, false);
       var pend = 0, all = db.periods[g] || {};
       Object.keys(all).forEach(function (p) { pend += summary(c, p, all[p]).due; });
-      return { client: adminClient(c), summary: summary(c, pid, rec), totalDue: pend };
+      return { client: adminClient(c, db, ctx), summary: summary(c, pid, rec), totalDue: pend };
     });
     return { month: month, label: monthLabel(month), rows: rows, unread: db.adminInbox.filter(function (n) { return !n.read; }).length };
   };
@@ -487,7 +527,7 @@ var Core = (function () {
     if (q.pid && isPid(q.pid) && pids.indexOf(q.pid) < 0) pids.push(q.pid);
     pids.sort().reverse();
     return {
-      client: adminClient(c),
+      client: adminClient(c, db, ctx), dues: duesFor(db, c, ctx.now, 30, 90), docTypes: DOC_TYPES,
       periods: pids.map(function (p) {
         var rec = all[p] || emptyRec();
         return { summary: summary(c, p, rec), slots: slotsFor(c, p), files: rec.files || [], payments: rec.payments || [] };
@@ -502,12 +542,13 @@ var Core = (function () {
     if (f.platforms) c.platforms = cleanPlatforms(f.platforms);
     if (f.defaultFee !== undefined) c.defaultFee = f.defaultFee === '' || f.defaultFee == null ? null : num(f.defaultFee);
     if (f.verified != null) c.verified = !!f.verified;
+    ['tds', 'advtax', 'annual'].forEach(function (k) { if (f[k] != null) c[k] = !!f[k]; });
     if (f.status) c.status = f.status === 'BLOCKED' ? 'BLOCKED' : 'ACTIVE';
     if (c.status === 'BLOCKED') c.tokens = [];
     // names changed → rename the client's Drive folder to the office naming rule
     var nf = newFolderName(c), of = folderName(c);
     if (nf !== of) { if (ctx.renameFolder) ctx.renameFolder(of, nf); c.folder = nf; }
-    return { client: adminClient(c) };
+    return { client: adminClient(c, db, ctx) };
   };
   A.aResetPin = function (db, q) {
     var c = client(db, q.gstin), pin = str(q.pin, 6);
@@ -526,6 +567,7 @@ var Core = (function () {
       if (!rec.filed[k]) delete rec.filed[k];
     });
     if (q.work !== undefined) rec.work = ['', 'PROCESS', 'FILED'].indexOf(q.work) >= 0 ? q.work : rec.work;
+    if (q.turnover !== undefined) rec.turnover = q.turnover === '' || q.turnover == null ? null : num(q.turnover);
     if (rec.filed.gstr1) rec.work = 'FILED';
     var label = periodLabel(pid);
     if (rec.work === 'PROCESS' && q.work === 'PROCESS' && !rec.processNotified) {
@@ -543,6 +585,7 @@ var Core = (function () {
       rec.r3bNotified = ctx.now.toISOString();
       notifyClient(db, ctx, c, label + ': GSTR-3B फाइल हो गया ✓', rec.filed.gstr3b.arn ? 'ARN: ' + rec.filed.gstr3b.arn : 'GSTR-3B भी फाइल हो गया.');
     }
+    checkTurnover(db, ctx, c);
     return { summary: summary(c, pid, rec) };
   };
   A.aSetFee = function (db, q) {
@@ -601,7 +644,7 @@ var Core = (function () {
     if (f) {
       if (f.remindDays != null) s.remindDays = String(f.remindDays).split(/[^0-9]+/).map(Number).filter(function (d) { return d >= 1 && d <= 28; });
       if (f.payEveryDays != null) s.payEveryDays = Math.max(1, Math.round(num(f.payEveryDays)) || 3);
-      ['upi', 'payeeName', 'phone', 'firm'].forEach(function (k) { if (f[k] != null) s[k] = str(f[k], 100); });
+      ['upi', 'payeeName', 'phone', 'firm', 'refReward', 'appUrl'].forEach(function (k) { if (f[k] != null) s[k] = str(f[k], 200); });
       if (f.defaultFee != null) s.defaultFee = num(f.defaultFee);
     }
     return { settings: s };
@@ -628,6 +671,206 @@ var Core = (function () {
     delete db.periods[c.gstin]; delete db.clients[c.gstin];
     return {};
   };
+
+  /* ---------- due dates ----------
+     GST: monthly GSTR-1 11th / GSTR-3B 20th of next month. QRMP: GSTR-1 13th and GSTR-3B 22nd (category X states) /
+     24th (others) after the quarter, PMT-06 25th for months 1-2. TDS (deductors only): deposit 7th (March: 30 Apr),
+     returns 31 Jul / 31 Oct / 31 Jan / 31 May. GSTR-9 > ₹2 Cr, GSTR-9C > ₹5 Cr: 31 Dec. ITR 31 Jul. Advance tax 15 Jun/Sep/Dec/Mar.
+     Government extensions: db.settings.dueExt[key] = 'YYYY-MM-DD' (set from the dashboard calendar). */
+  var X_STATES = ['22', '23', '24', '25', '26', '27', '29', '30', '31', '32', '33', '34', '35', '36', '37'];
+  function p2(n) { return (n < 10 ? '0' : '') + n; }
+  function ymd(y, m, d) { while (m > 12) { m -= 12; y++; } return y + '-' + p2(m) + '-' + p2(d); }
+  function crore(n) { return '₹' + (n / 1e7).toFixed(2) + ' करोड़'; }
+  function rawDues(db, c, fromMid, toMid) {
+    var out = [], x = c.gstin.slice(0, 2), mid = fromMid;
+    function add(key, type, title, date, desc, pid) { out.push({ key: key, type: type, title: title, date: (db.settings.dueExt || {})[key] || date, desc: desc, pid: pid || '' }); }
+    while (mid <= toMid) {
+      var y = +mid.slice(0, 4), m = +mid.slice(5, 7), lab = monthLabel(mid);
+      if (c.freq !== 'Q') {
+        add('GSTR1:' + mid, 'GSTR1', 'GSTR-1 (' + lab + ')', ymd(y, m + 1, 11), 'बिक्री का रिटर्न – डेटा पहले भेजें', mid);
+        add('GSTR3B:' + mid, 'GSTR3B', 'GSTR-3B (' + lab + ')', ymd(y, m + 1, 20), 'टैक्स भरने का रिटर्न – टैक्स बना हो तो पेमेंट तैयार रखें', mid);
+      } else {
+        var q = quarterOf(mid), qm = monthsOf(q);
+        if (qm[2] === mid) {
+          add('GSTR1:' + q, 'GSTR1', 'GSTR-1 (' + periodLabel(q) + ')', ymd(y, m + 1, 13), 'तिमाही बिक्री का रिटर्न – डेटा पहले भेजें', q);
+          add('GSTR3B:' + q + ':' + (X_STATES.indexOf(x) >= 0 ? 'X' : 'Y'), 'GSTR3B', 'GSTR-3B (' + periodLabel(q) + ')', ymd(y, m + 1, X_STATES.indexOf(x) >= 0 ? 22 : 24), 'तिमाही टैक्स रिटर्न', q);
+        } else add('PMT06:' + mid, 'PMT06', 'PMT-06 टैक्स जमा (' + lab + ')', ymd(y, m + 1, 25), 'QRMP – इस महीने का टैक्स 25 तारीख तक जमा करें (टैक्स बना हो तो)', '');
+      }
+      if (c.tds) add('TDSPAY:' + mid, 'TDS', 'TDS जमा (' + lab + ')', m === 3 ? ymd(y, 4, 30) : ymd(y, m + 1, 7), 'काटा हुआ TDS सरकार को जमा करें', '');
+      if (c.tds && [6, 9, 12, 3].indexOf(m) >= 0) add('TDSRET:' + mid, 'TDS', 'TDS रिटर्न (24Q/26Q) – तिमाही ' + lab, m === 12 ? ymd(y + 1, 1, 31) : m === 3 ? ymd(y, 5, 31) : ymd(y, m + 1, 31), 'तिमाही TDS रिटर्न', '');
+      if (c.advtax && [6, 9, 12, 3].indexOf(m) >= 0) add('ADV:' + mid, 'ADV', 'एडवांस टैक्स किस्त (' + lab + ')', ymd(y, m, 15), 'इनकम टैक्स की एडवांस किस्त', '');
+      if (m === 7) add('ITR:' + y, 'ITR', 'ITR – FY ' + (y - 1) + '-' + p2(y % 100), ymd(y, 7, 31), 'इनकम टैक्स रिटर्न (बिना ऑडिट वाले) – डॉक्यूमेंट तिजोरी में बैंक स्टेटमेंट डालें', '');
+      if (m === 12) {
+        var fy = fyTurnover(db, c, y - 1);
+        if (fy.total >= 2e7 || c.annual) add('GSTR9:' + (y - 1), 'GSTR9', 'GSTR-9 सालाना रिटर्न – FY ' + fy.fy, ymd(y, 12, 31), 'टर्नओवर ₹2 करोड़ से ऊपर – सालाना रिटर्न ज़रूरी', '');
+        if (fy.total >= 5e7) add('GSTR9C:' + (y - 1), 'GSTR9', 'GSTR-9C – FY ' + fy.fy, ymd(y, 12, 31), 'टर्नओवर ₹5 करोड़ से ऊपर – reconciliation statement ज़रूरी', '');
+      }
+      mid = addMonth(mid, 1);
+    }
+    return out;
+  }
+  function dueDone(db, c, d) {
+    if ((c.dueDone || {})[d.key]) return true;
+    if (!d.pid) return false;
+    var rec = getRec(db, c.gstin, d.pid, false);
+    return d.type === 'GSTR1' ? rec.work === 'FILED' : d.type === 'GSTR3B' ? !!(rec.filed && rec.filed.gstr3b) : false;
+  }
+  function duesFor(db, c, now, back, ahead) {
+    var t = ist(now), today = t.iso, from = ymd(t.y, t.m, t.d), cur = monthId(t.y, t.m);
+    var lo = new Date(Date.parse(today) - back * 86400000).toISOString().slice(0, 10), hi = new Date(Date.parse(today) + ahead * 86400000).toISOString().slice(0, 10);
+    return rawDues(db, c, addMonth(cur, -3), addMonth(cur, 2)).filter(function (d) { return d.date >= lo && d.date <= hi; })
+      .map(function (d) { d.done = dueDone(db, c, d); d.days = Math.round((Date.parse(d.date) - Date.parse(from)) / 86400000); return d; })
+      .sort(function (a, b) { return a.date.localeCompare(b.date); });
+  }
+
+  /* ---------- turnover (GSTR-9 / 9C / e-invoice / QRMP limits) ---------- */
+  function fyTurnover(db, c, fyStart) {
+    var all = db.periods[c.gstin] || {}, total = 0, months = 0;
+    Object.keys(all).forEach(function (p) {
+      var ms = monthsOf(p), mStart = +ms[0].slice(0, 4) * 12 + +ms[0].slice(5, 7), lo = fyStart * 12 + 4, hi = fyStart * 12 + 15;
+      if (mStart < lo || mStart > hi) return;
+      var t = summary(c, p, all[p]).turnover;
+      if (t != null) { total += t; months += ms.length; }
+    });
+    return { fy: fyStart + '-' + p2((fyStart + 1) % 100), total: num(total), months: months, projected: months ? num(total / months * 12) : null };
+  }
+  var LIMITS = [
+    { lim: 2e7, key: 'gstr9', text: 'GSTR-9 (सालाना रिटर्न) ज़रूरी हो जाएगा – 31 दिसंबर तक.' },
+    { lim: 5e7, key: 'gstr9c', text: 'GSTR-9C ज़रूरी, e-invoice ज़रूरी, और अगले साल से Quarterly (QRMP) नहीं चलेगा – Monthly रिटर्न.' }
+  ];
+  function checkTurnover(db, ctx, c) {
+    var fs = +fyOf(lastMonth(ctx.now)).slice(0, 4), t = fyTurnover(db, c, fs);
+    c.alerts = c.alerts || {};
+    LIMITS.forEach(function (L) {
+      var k = t.fy + ':' + L.key; if (c.alerts[k]) return;
+      var actual = t.total >= L.lim, proj = !actual && t.months >= 3 && t.projected >= L.lim;
+      if (!actual && !proj) return;
+      c.alerts[k] = ctx.now.toISOString();
+      var head = (actual ? 'टर्नओवर ' + crore(t.total) : 'साल का अनुमानित टर्नओवर ' + crore(t.projected)) + ' (FY ' + t.fy + ', ' + crore(L.lim).replace('.00', '') + ' से ऊपर)';
+      notifyAdmin(db, ctx, 'TURNOVER', fullName(c) + ': ' + head, L.text, c.gstin);
+      notifyClient(db, ctx, c, '📈 आपका टर्नओवर बढ़ रहा है', head + '. ' + L.text + ' हम आपको समय पर याद दिलाएँगे.');
+    });
+    return t;
+  }
+
+  /* ---------- referral: code = 6 letters from the GSTIN (same every time, nothing stored) ---------- */
+  function refCode(c) { return sha256('REF|' + c.gstin).slice(0, 6).toUpperCase(); }
+  function byRef(db, code) { code = str(code, 10).toUpperCase(); if (!code) return null; for (var g in db.clients) if (refCode(db.clients[g]) === code) return db.clients[g]; return null; }
+  function referralsOf(db, c) { return Object.keys(db.clients).map(function (g) { return db.clients[g]; }).filter(function (x) { return x.referredBy === c.gstin; }); }
+
+  /* ---------- document vault ---------- */
+  var DOC_TYPES = {
+    pan: 'PAN कार्ड', aadhaar: 'आधार कार्ड (आगे-पीछे)', gst_cert: 'GST सर्टिफिकेट', photo: 'पासपोर्ट साइज़ फोटो',
+    bank: 'बैंक पासबुक / कैंसल चेक', address: 'दुकान / ऑफिस का एड्रेस प्रूफ (बिजली बिल / रेंट एग्रीमेंट)', msme: 'उद्यम (MSME) सर्टिफिकेट',
+    fssai: 'फूड लाइसेंस (FSSAI)', bank_stmt: 'बैंक स्टेटमेंट (पूरे साल का – ITR के लिए)', form16: 'फॉर्म 16 (नौकरी है तो)', other: 'कोई और डॉक्यूमेंट'
+  };
+  function docView(d) { return { id: d.id, type: d.type, label: DOC_TYPES[d.type] || d.type, name: d.name, size: d.size, at: d.at, url: d.url || '', fileId: d.fileId }; }
+  A.docUpload = function (db, q, ctx) {
+    var c = byToken(db, q.token), type = DOC_TYPES[q.type] ? q.type : 'other';
+    if (!q.b64) fail('फाइल खाली है');
+    var name = str(q.name, 120).replace(/[\\\/:*?"<>|]/g, '_') || 'document';
+    var size = Math.round(String(q.b64).length * 0.75);
+    if (size > 20 * 1048576) fail('फाइल 20 MB से बड़ी है');
+    var st = ctx.saveFile({ folders: [folderName(c), 'KYC DOCUMENTS'], name: DOC_TYPES[type].replace(/[\\\/:*?"<>|()]/g, ' ').trim() + ' - ' + name, mime: str(q.mime, 100) || 'application/octet-stream' }, q.b64);
+    c.docs = c.docs || [];
+    c.docs.push({ id: ctx.uuid(), type: type, name: name, size: size, mime: str(q.mime, 100), at: ctx.now.toISOString(), fileId: st.fileId, url: st.url || '' });
+    if (c.docReq && c.docReq.types) {
+      var before = c.docReq.types.length;
+      c.docReq.types = c.docReq.types.filter(function (t) { return t !== type; });
+      if (before && !c.docReq.types.length) { notifyAdmin(db, ctx, 'DOCS', fullName(c) + ' ने सारे माँगे गए डॉक्यूमेंट दे दिए', c.docReq.note || '', c.gstin); c.docReq = null; }
+    }
+    return {};
+  };
+  A.docDelete = function (db, q, ctx) {
+    var c = byToken(db, q.token), d = (c.docs || []).filter(function (x) { return x.id === q.id; })[0];
+    if (!d) fail('नहीं मिला');
+    c.docs = c.docs.filter(function (x) { return x.id !== q.id; }); ctx.deleteFile(d.fileId);
+    return {};
+  };
+  A.aDocRequest = function (db, q, ctx) {
+    var c = client(db, q.gstin), types = (q.types || []).filter(function (t) { return DOC_TYPES[t]; });
+    if (!types.length) { c.docReq = null; return {}; }
+    c.docReq = { types: types, note: str(q.note, 300), at: ctx.now.toISOString() };
+    notifyClient(db, ctx, c, '📁 ये डॉक्यूमेंट भेजें', (c.docReq.note ? c.docReq.note + ': ' : '') + types.map(function (t) { return DOC_TYPES[t]; }).join(', ') + '. ऐप में "डॉक्यूमेंट तिजोरी" में अपलोड करें.');
+    return {};
+  };
+
+  /* ---------- filed return PDFs (GSTR-3B etc.) → client's app; kept in Drive, not on the office PC ---------- */
+  A.aReturnUpload = function (db, q, ctx) {
+    var c = client(db, q.gstin), pid = str(q.pid, 10);
+    if (!isPid(pid)) fail('अवधि सही नहीं');
+    if (!q.b64) fail('फाइल खाली है');
+    var kind = ['GSTR3B', 'GSTR1', 'OTHER'].indexOf(q.kind) >= 0 ? q.kind : 'OTHER', rec = getRec(db, c.gstin, pid, true), pd = periodDirs(pid);
+    var name = str(q.name, 120).replace(/[\\\/:*?"<>|]/g, '_') || kind + '.pdf';
+    rec.returns = rec.returns || [];
+    var dup = rec.returns.filter(function (r) { return r.name === name && r.kind === kind; })[0];
+    if (dup) { rec.returns = rec.returns.filter(function (r) { return r !== dup; }); ctx.deleteFile(dup.fileId); }   // re-upload replaces
+    var st = ctx.saveFile({ folders: [folderName(c), pd.fy, pd.label, 'FILED RETURNS'], name: name, mime: 'application/pdf' }, q.b64);
+    rec.returns.push({ id: ctx.uuid(), kind: kind, name: name, size: Math.round(String(q.b64).length * 0.75), at: ctx.now.toISOString(), fileId: st.fileId, url: st.url || '' });
+    rec.filed = rec.filed || {};
+    if (kind === 'GSTR3B' && !rec.filed.gstr3b) rec.filed.gstr3b = { arn: str(q.arn, 30), date: ist(ctx.now).iso };
+    if (kind === 'GSTR3B') rec.r3bNotified = rec.r3bNotified || ctx.now.toISOString();
+    notifyClient(db, ctx, c, periodLabel(pid) + ': ' + (kind === 'GSTR3B' ? 'GSTR-3B फाइल हो गया ✓' : kind === 'GSTR1' ? 'GSTR-1 की कॉपी' : 'नया डॉक्यूमेंट'), 'PDF ऐप में आ गई है – होम पर "' + periodLabel(pid) + '" खोलकर डाउनलोड करें.');
+    return { summary: summary(c, pid, rec) };
+  };
+  A.aReturnDelete = function (db, q, ctx) {
+    var c = client(db, q.gstin), rec = getRec(db, c.gstin, str(q.pid, 10), true);
+    var r = (rec.returns || []).filter(function (x) { return x.id === q.id; })[0];
+    if (r) { rec.returns = rec.returns.filter(function (x) { return x.id !== q.id; }); ctx.deleteFile(r.fileId); }
+    return {};
+  };
+  // client downloads one of their own files (document vault / filed return) – sent through the server, Drive stays private
+  A.fileGet = function (db, q, ctx) {
+    var c = byToken(db, q.token), f = (c.docs || []).filter(function (x) { return x.id === q.id; })[0];
+    if (!f) { var all = db.periods[c.gstin] || {}; Object.keys(all).forEach(function (p) { (all[p].returns || []).forEach(function (r) { if (r.id === q.id) f = r; }); }); }
+    if (!f) fail('फाइल नहीं मिली');
+    return { name: f.name, mime: f.mime || 'application/pdf', fileId: f.fileId, b64: ctx.readFile ? ctx.readFile(f.fileId) : null };
+  };
+
+  /* ---------- office calendar ---------- */
+  A.aCalendar = function (db, q, ctx) {
+    var back = Math.min(60, Math.max(0, num(q.back) || 10)), ahead = Math.min(120, Math.max(1, num(q.ahead) || 45)), rows = {};
+    Object.keys(db.clients).forEach(function (g) {
+      var c = db.clients[g]; if (c.status !== 'ACTIVE') return;
+      duesFor(db, c, ctx.now, back, ahead).forEach(function (d) {
+        var k = d.key.replace(/:[XY]$/, '') + '|' + d.date;
+        var r = rows[k] || (rows[k] = { key: d.key, type: d.type, title: d.title, date: d.date, days: d.days, desc: d.desc, done: [], pending: [] });
+        (d.done ? r.done : r.pending).push({ gstin: g, name: fullName(c), mobile: c.mobile, ownKey: d.key });
+      });
+    });
+    return { rows: Object.keys(rows).map(function (k) { return rows[k]; }).sort(function (a, b) { return a.date.localeCompare(b.date) || a.title.localeCompare(b.title); }), ext: db.settings.dueExt || {} };
+  };
+  A.aDueExt = function (db, q) {
+    db.settings.dueExt = db.settings.dueExt || {};
+    (q.keys || []).forEach(function (k) { k = str(k, 40); if (q.date && /^\d{4}-\d{2}-\d{2}$/.test(q.date)) db.settings.dueExt[k] = q.date; else delete db.settings.dueExt[k]; });
+    return {};
+  };
+  A.aDueDone = function (db, q) {
+    var c = client(db, q.gstin); c.dueDone = c.dueDone || {};
+    if (q.done) c.dueDone[str(q.key, 40)] = true; else delete c.dueDone[str(q.key, 40)];
+    return {};
+  };
+  function dueTick(db, ctx) {
+    var t = ist(ctx.now), sent = 0, soon = {};
+    var OFF = { GSTR1: [3, 0], GSTR3B: [3, 0], PMT06: [3, 0], TDS: [3, 0], ADV: [7, 0], ITR: [30, 7, 0], GSTR9: [30, 7, 0] };
+    Object.keys(db.clients).forEach(function (g) {
+      var c = db.clients[g]; if (c.status !== 'ACTIVE') return;
+      c.dueSent = c.dueSent || {};
+      duesFor(db, c, ctx.now, 0, 31).forEach(function (d) {
+        if (d.done) return;
+        if (d.days <= 3) { var k = d.title + '|' + d.date; (soon[k] = soon[k] || []).push(fullName(c)); }
+        if ((OFF[d.type] || [0]).indexOf(d.days) < 0 || c.dueSent[d.key + ':' + d.days]) return;
+        if (d.type === 'GSTR1') { var sm = summary(c, d.pid, getRec(db, g, d.pid, false)); if (sm.data === 'NIL' || sm.data === 'SUBMITTED' || sm.data === 'COMPLETE') return; }
+        c.dueSent[d.key + ':' + d.days] = ctx.now.toISOString();
+        notifyClient(db, ctx, c, '📅 ' + d.title + ' – ' + (d.days ? d.days + ' दिन बाकी' : 'आज आखिरी तारीख'), d.desc + ' (आखिरी तारीख ' + d.date.split('-').reverse().join('-') + ')');
+        sent++;
+      });
+      checkTurnover(db, ctx, c);
+    });
+    var lines = Object.keys(soon).sort().map(function (k) { return k.split('|')[0] + ' – ' + k.split('|')[1].split('-').reverse().join('-') + ': ' + soon[k].length + ' क्लाइंट बाकी'; });
+    if (lines.length) notifyAdmin(db, ctx, 'DUE', '📅 अगले 3 दिन की ड्यू डेट', lines.join(' • '));
+    return sent;
+  }
 
   /* ---------- app content: learning/offers, news, services, FAQ + leads ----------
      item = { id, kind: learn|news|service|faq, title, body, icon, img, price, partner, cta, link, pinned, active, order, at } */
@@ -716,7 +959,7 @@ var Core = (function () {
     return { lead: l };
   };
 
-  var READ_ONLY = { state: 1, aList: 1, aClient: 1, aInbox: 1, aPayments: 1, aContent: 1 };
+  var READ_ONLY = { state: 1, aList: 1, aClient: 1, aInbox: 1, aPayments: 1, aContent: 1, aCalendar: 1, fileGet: 1 };
 
   /* ---------- daily reminders (Apps Script time trigger / admin button) ---------- */
   function tick(db, ctx, force) {
@@ -745,8 +988,9 @@ var Core = (function () {
         }
       });
     });
-    if (dataSent || paySent) notifyAdmin(db, ctx, 'TICK', 'आज के रिमाइंडर भेजे गए', 'डेटा: ' + dataSent + ' • पेमेंट: ' + paySent);
-    return { dataSent: dataSent, paySent: paySent };
+    var dueSent = dueTick(db, ctx);
+    if (dataSent || paySent || dueSent) notifyAdmin(db, ctx, 'TICK', 'आज के रिमाइंडर भेजे गए', 'डेटा: ' + dataSent + ' • पेमेंट: ' + paySent + ' • ड्यू डेट: ' + dueSent);
+    return { dataSent: dataSent, paySent: paySent, dueSent: dueSent };
   }
 
   /* ---------- entry point ----------
@@ -766,7 +1010,7 @@ var Core = (function () {
   }
 
   return {
-    VERSION: VERSION, PLATFORMS: PLATFORMS, PLATFORM_ORDER: PLATFORM_ORDER, STATES: STATES, KINDS: KINDS,
+    VERSION: VERSION, PLATFORMS: PLATFORMS, PLATFORM_ORDER: PLATFORM_ORDER, STATES: STATES, KINDS: KINDS, DOC_TYPES: DOC_TYPES, periodDirs: periodDirs, isPid: isPid,
     newDb: newDb, handle: handle, tick: tick,
     gstinValid: gstinValid, gstinInfo: gstinInfo, sha256: sha256,
     monthsOf: monthsOf, monthLabel: monthLabel, periodLabel: periodLabel, currentPid: currentPid, pidFor: pidFor,
