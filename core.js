@@ -5,7 +5,7 @@
    No DOM, no async, no modules – plain ES2019.
    ============================================================ */
 var Core = (function () {
-  var VERSION = '1.2.0';
+  var VERSION = '1.3.0';
 
   /* ---------- Platforms and the reports each one must send ----------
      perMonth:true  -> one report per month (quarterly client = 3 slots)
@@ -237,14 +237,24 @@ var Core = (function () {
       settings: { remindDays: [1, 5, 8], payEveryDays: 3, defaultFee: 0, upi: '', payeeName: 'Vishal Accounting Services', phone: '9359076851', firm: 'Vishal Accounting Services' }
     };
   }
+  /* Office naming rule = how the office saves the phone contact:
+     contact person (who talks to us) → GST holder (legal name as per PAN) → firm (trade name).
+     e.g. husband talks for wife's GST: "Ramesh Kumar Sunita Devi Shree Traders". Repeats are dropped. */
+  function fullName(c) {
+    var out = [], seen = {};
+    [c.owner, c.legal, c.trade].forEach(function (s) { s = str(s, 100).replace(/\s+/g, ' '); var k = s.toUpperCase(); if (s && !seen[k]) { seen[k] = 1; out.push(s); } });
+    return out.join(' ') || c.gstin;
+  }
   function publicClient(c) {
     return { gstin: c.gstin, trade: c.trade, legal: c.legal, owner: c.owner, mobile: c.mobile, email: c.email, freq: c.freq,
       platforms: c.platforms, status: c.status, verified: !!c.verified, createdAt: c.createdAt, defaultFee: c.defaultFee,
-      notes: c.notes || '', push: (c.pushTokens || []).length, state: gstinInfo(c.gstin).state };
+      notes: c.notes || '', push: (c.pushTokens || []).length, state: gstinInfo(c.gstin).state, pan: gstinInfo(c.gstin).pan, fullName: fullName(c) };
   }
   // dashboard view: also the PIN (kept so the office can tell a client who forgot it; set on register/login/PIN change)
-  function adminClient(c) { var o = publicClient(c); o.pin = c.pin || ''; o.pinReqAt = c.pinReqAt || ''; return o; }
-  function folderName(c) { return (str(c.trade, 60) || c.gstin).replace(/[\\\/:*?"<>|]/g, ' ') + ' ' + c.gstin; }
+  function adminClient(c) { var o = publicClient(c); o.pin = c.pin || ''; o.pinReqAt = c.pinReqAt || ''; o.folder = folderName(c); o.lastLogin = c.lastLogin || ''; return o; }
+  // Drive folder: "<CONTACT LEGAL TRADE> <GSTIN>", fixed at registration (c.folder); renamed on the server when the office edits the names
+  function newFolderName(c) { return (fullName(c) + ' ' + c.gstin).replace(/[\\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase().slice(0, 140); }
+  function folderName(c) { return c.folder || ((str(c.trade, 60) || c.gstin).replace(/[\\\/:*?"<>|]/g, ' ') + ' ' + c.gstin); }
   function notifyClient(db, ctx, c, title, body) {
     c.inbox = c.inbox || [];
     c.inbox.unshift({ id: ctx.uuid(), at: ctx.now.toISOString(), title: title, body: body, read: false });
@@ -256,7 +266,7 @@ var Core = (function () {
     db.adminInbox = db.adminInbox.slice(0, 300);
     ctx.notifyAdmin(kind, title, body);
   }
-  function displayName(c) { return c.trade || c.legal || c.gstin; }
+  function displayName(c) { return fullName(c); }
 
   /* ---------- message texts ---------- */
   function dataReminder(c, sm, settings) {
@@ -296,6 +306,8 @@ var Core = (function () {
     if (!/^\d{4,6}$/.test(pin)) fail('PIN 4 से 6 अंकों का रखें');
     var trade = str(q.trade, 100);
     if (!trade) fail('फर्म / ट्रेड नाम डालें');
+    if (!str(q.legal, 100)) fail('GST में जिसका नाम है (लीगल नाम) वो डालें');
+    if (!str(q.owner, 80)) fail('आपका नाम डालें (जो ऑफिस से बात करेंगे)');
     var salt = ctx.uuid().slice(0, 8);
     var c = {
       gstin: g, trade: trade, legal: str(q.legal, 100), owner: str(q.owner, 80), mobile: mobile, email: str(q.email, 100),
@@ -303,16 +315,17 @@ var Core = (function () {
       salt: salt, pinHash: pinHash(pin, salt), pin: pin, tokens: [], pushTokens: [], inbox: [], defaultFee: null, notes: '',
       createdAt: ctx.now.toISOString()
     };
+    c.folder = newFolderName(c);
     db.clients[g] = c;
     notifyClient(db, ctx, c, 'स्वागत है 🙏', db.settings.firm + ' के ऐप में आपका स्वागत है. हर महीने/तिमाही डेटा भेजने का रिमाइंडर यहीं आएगा.');
-    notifyAdmin(db, ctx, 'REG', 'नया क्लाइंट: ' + trade, g + ' • ' + mobile + ' • ' + (c.freq === 'Q' ? 'Quarterly' : 'Monthly') + ' • ' + (c.platforms.map(function (p) { return PLATFORMS[p].label; }).join(', ') || 'कोई प्लेटफॉर्म नहीं'), g);
+    notifyAdmin(db, ctx, 'REG', 'नया क्लाइंट: ' + fullName(c), g + ' • ' + mobile + ' • ' + (c.freq === 'Q' ? 'Quarterly' : 'Monthly') + ' • ' + (c.platforms.map(function (p) { return PLATFORMS[p].label; }).join(', ') || 'कोई प्लेटफॉर्म नहीं'), g);
     return { sessions: [newSession(c, ctx)] };
   };
   A.login = function (db, q, ctx) {
     var id = str(q.id, 15).toUpperCase(), pin = str(q.pin, 6), out = [];
     Object.keys(db.clients).forEach(function (g) {
       var c = db.clients[g];
-      if ((c.gstin === id || c.mobile === id) && c.pinHash === pinHash(pin, c.salt) && c.status !== 'BLOCKED') { c.pin = pin; c.pinReqAt = ''; out.push(newSession(c, ctx)); }
+      if ((c.gstin === id || c.mobile === id) && c.pinHash === pinHash(pin, c.salt) && c.status !== 'BLOCKED') { c.pin = pin; c.pinReqAt = ''; c.lastLogin = ctx.now.toISOString(); out.push(newSession(c, ctx)); }
     });
     if (!out.length) fail('GSTIN / मोबाइल या PIN गलत है');
     return { sessions: out };
@@ -344,7 +357,8 @@ var Core = (function () {
       summary: summary(c, pid, rec), slots: slotsFor(c, pid),
       files: (rec.files || []).map(function (f) { return { id: f.id, slot: f.slot, covers: f.covers, name: f.name, size: f.size, at: f.at }; }),
       inbox: (c.inbox || []).slice(0, 30), unread: (c.inbox || []).filter(function (n) { return !n.read; }).length,
-      dues: dues, settings: { upi: db.settings.upi, payeeName: db.settings.payeeName, phone: db.settings.phone, firm: db.settings.firm }
+      dues: dues, settings: { upi: db.settings.upi, payeeName: db.settings.payeeName, phone: db.settings.phone, firm: db.settings.firm },
+      content: contentFor(db).map(function (x) { return { id: x.id, kind: x.kind, icon: x.icon, title: x.title, body: x.body, img: x.img, price: x.price, partner: x.partner, cta: x.cta, link: x.link, pinned: x.pinned, at: x.at }; })
     };
   };
   function editableRec(db, c, pid) {
@@ -480,7 +494,7 @@ var Core = (function () {
       })
     };
   };
-  A.aUpdateClient = function (db, q) {
+  A.aUpdateClient = function (db, q, ctx) {
     var c = client(db, q.gstin), f = q.fields || {};
     ['trade', 'legal', 'owner', 'email', 'notes'].forEach(function (k) { if (f[k] != null) c[k] = str(f[k], k === 'notes' ? 500 : 100); });
     if (f.mobile != null) { if (!/^[6-9]\d{9}$/.test(str(f.mobile, 10))) fail('मोबाइल नंबर सही नहीं'); c.mobile = str(f.mobile, 10); }
@@ -490,7 +504,10 @@ var Core = (function () {
     if (f.verified != null) c.verified = !!f.verified;
     if (f.status) c.status = f.status === 'BLOCKED' ? 'BLOCKED' : 'ACTIVE';
     if (c.status === 'BLOCKED') c.tokens = [];
-    return { client: publicClient(c) };
+    // names changed → rename the client's Drive folder to the office naming rule
+    var nf = newFolderName(c), of = folderName(c);
+    if (nf !== of) { if (ctx.renameFolder) ctx.renameFolder(of, nf); c.folder = nf; }
+    return { client: adminClient(c) };
   };
   A.aResetPin = function (db, q) {
     var c = client(db, q.gstin), pin = str(q.pin, 6);
@@ -612,7 +629,94 @@ var Core = (function () {
     return {};
   };
 
-  var READ_ONLY = { state: 1, aList: 1, aClient: 1, aInbox: 1, aPayments: 1 };
+  /* ---------- app content: learning/offers, news, services, FAQ + leads ----------
+     item = { id, kind: learn|news|service|faq, title, body, icon, img, price, partner, cta, link, pinned, active, order, at } */
+  var KINDS = { learn: 'सीखें / ऑफर', news: 'न्यूज़ / अपडेट', service: 'हमारी सेवाएँ', faq: 'सवाल-जवाब' };
+  function seedContent() {
+    var t = '2026-10-28T00:00:00.000Z', o = 0;
+    function it(kind, icon, title, body, cta) { o++; return { id: 'seed-' + kind + '-' + o, kind: kind, icon: icon, title: title, body: body, img: '', price: '', partner: '', cta: cta || '', link: '', pinned: false, active: true, order: o, at: t }; }
+    return [
+      it('service', '🧾', 'GST रजिस्ट्रेशन', 'नया GST नंबर – कागज़ात से लेकर सर्टिफिकेट तक सब हम करेंगे.', 'पूछताछ करें'),
+      it('service', '📅', 'GST रिटर्न फाइलिंग', 'GSTR-1, GSTR-3B, Meesho / Amazon / Flipkart का TCS मिलान, NIL रिटर्न – हर महीने / तिमाही.', 'पूछताछ करें'),
+      it('service', '💰', 'इनकम टैक्स रिटर्न (ITR)', 'बिज़नेस, नौकरी या दोनों – सही ITR फॉर्म, रिफंड और नोटिस का जवाब.', 'पूछताछ करें'),
+      it('service', '🏭', 'MSME / उद्यम रजिस्ट्रेशन', 'उद्यम सर्टिफिकेट – लोन, सब्सिडी और सरकारी योजनाओं के लिए ज़रूरी.', 'पूछताछ करें'),
+      it('service', '🍲', 'फूड लाइसेंस (FSSAI)', 'खाने-पीने का सामान बेचते हैं? Basic / State / Central FSSAI लाइसेंस.', 'पूछताछ करें'),
+      it('service', '🏢', 'प्राइवेट लिमिटेड कंपनी रजिस्ट्रेशन', 'नई कंपनी – नाम, DIN, DSC, MOA/AOA, PAN/TAN सब शामिल.', 'पूछताछ करें'),
+      it('service', '🤝', 'LLP रजिस्ट्रेशन', 'पार्टनरशिप बिज़नेस के लिए LLP – कम खर्च, कम झंझट.', 'पूछताछ करें'),
+      it('service', '™️', 'ट्रेडमार्क रजिस्ट्रेशन', 'अपने ब्रांड का नाम / लोगो सुरक्षित करें – Amazon Brand Registry के लिए भी.', 'पूछताछ करें'),
+      it('service', '📒', 'अकाउंटिंग और बुककीपिंग', 'खरीद-बिक्री, स्टॉक, P&L – पूरा हिसाब हम रखेंगे.', 'पूछताछ करें'),
+      it('faq', '🔐', 'ऐप में लॉगिन कैसे करें?', 'लॉगिन पेज पर अपना GSTIN या मोबाइल नंबर और PIN डालें. पहली बार हैं तो "नया रजिस्ट्रेशन" करें. फोन "Password सेव करें?" पूछे तो Save दबाएँ – अगली बार अपने आप भर जाएगा.'),
+      it('faq', '🔑', 'PIN भूल गया तो क्या करूँ?', 'लॉगिन पेज पर "PIN भूल गए?" दबाएँ – ऑफिस को WhatsApp चला जाएगा और हम आपको PIN बता देंगे.'),
+      it('faq', '🛍️', 'Meesho की रिपोर्ट कहाँ से डाउनलोड करें?', 'Meesho Supplier Panel → GST Report से महीने की ZIP (gst_…zip) और Tax Invoice ZIP डाउनलोड करें. दोनों ZIP सीधे Meesho सेक्शन में डाल दें – ऐप अंदर की फाइलें खुद सही खाने में डाल देगा.'),
+      it('faq', '📦', 'Amazon की रिपोर्ट कहाँ से डाउनलोड करें?', 'Seller Central → Reports → Tax Document Library से MTR B2C, MTR B2B और GST Report (GSTR1-महीना) डाउनलोड करें. CSV या ZIP दोनों चलेंगी.'),
+      it('faq', '🛒', 'Flipkart की रिपोर्ट कहाँ से डाउनलोड करें?', 'Seller Hub → Reports → Tax Reports से Sales Report और GST (GSTR Return) Report – दोनों उसी महीने की डाउनलोड करें.'),
+      it('faq', '❌', 'मेरी फाइल क्यों नहीं ली गई?', 'ऐप हर फाइल अंदर से जाँचता है. गलत प्लेटफॉर्म की रिपोर्ट (जैसे Meesho की फाइल Flipkart में), गलत महीने की रिपोर्ट या पहले से डाली हुई फाइल नहीं ली जाती. जो कारण लिखा आए उसके हिसाब से सही फाइल डालें. फाइल के अंदर कुछ न बदलें.'),
+      it('faq', '🧾', 'ऑफलाइन बिल, Vyapar या कोई और फाइल कैसे भेजूँ?', 'होम पर नीचे "कुछ और भी भेजना है?" में Vyapar, ऑफलाइन बिल (PDF) या "अन्य फाइलें" जोड़ें, फिर उसमें फाइल / फोटो अपलोड करें.'),
+      it('faq', '0️⃣', 'इस महीने कोई सेल नहीं हुई तो?', 'होम पर "इस अवधि में कोई सेल नहीं हुई?" वाला टिक चालू करें. हम आपका NIL रिटर्न सबसे पहले फाइल करेंगे.'),
+      it('faq', '⏰', 'डेटा कब तक भेजना है?', 'हर महीने 1 से 8 तारीख तक पिछले महीने का डेटा भेजें. Quarterly वाले तिमाही खत्म होने के बाद वाले महीने में (जैसे Jul–Sep का डेटा अक्टूबर में). सब डालकर "डेटा पूरा भेज दिया" दबाएँ.'),
+      it('faq', '✅', 'रिटर्न फाइल हुआ, कैसे पता चलेगा?', 'फाइल होते ही ऐप में सूचना आएगी और होम पर ARN नंबर दिखेगा.'),
+      it('faq', '💳', 'फीस कैसे भरें?', 'रिटर्न फाइल होने के बाद होम पर फीस दिखेगी – "UPI से पे करें" दबाएँ. पेमेंट कर दिया हो तो "मैंने पेमेंट कर दिया" दबाएँ.'),
+      it('faq', '🏬', 'मेरे पास एक से ज़्यादा GST नंबर हैं?', 'हर GST नंबर का अलग रजिस्ट्रेशन करें. ☰ मेनू → "दूसरी फर्म जोड़ें" से एक ही फोन में सब फर्म रख सकते हैं.'),
+      it('faq', '📲', 'ऐप इंस्टॉल और अपडेट कैसे करें?', 'लिंक Chrome में खोलें → "इंस्टॉल" (iPhone: Share → Add to Home Screen). अपडेट अपने आप आते हैं, कुछ नहीं करना.')
+    ];
+  }
+  function ensure(db) { if (!db.content) db.content = seedContent(); if (!db.leads) db.leads = []; }
+  function contentFor(db) {
+    return db.content.filter(function (x) { return x.active; }).sort(function (a, b) {
+      return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (a.kind === 'news' || a.kind === 'learn' ? (b.at || '').localeCompare(a.at || '') : (a.order || 0) - (b.order || 0));
+    });
+  }
+  A.lead = function (db, q, ctx) {
+    var c = byToken(db, q.token), item = db.content.filter(function (x) { return x.id === q.id; })[0];
+    if (!item) fail('ये जानकारी अब उपलब्ध नहीं है');
+    var dup = db.leads.filter(function (l) { return l.gstin === c.gstin && l.itemId === item.id && ctx.now - new Date(l.at) < 86400000; })[0];
+    if (!dup) {
+      db.leads.unshift({ id: ctx.uuid(), at: ctx.now.toISOString(), gstin: c.gstin, itemId: item.id, kind: item.kind, title: item.title, status: 'NEW', note: '' });
+      db.leads = db.leads.slice(0, 1000);
+      notifyAdmin(db, ctx, 'LEAD', fullName(c) + ' – ' + item.title, (KINDS[item.kind] || '') + ' • ' + c.mobile + ' • ' + c.gstin, c.gstin);
+    }
+    return { link: item.link || '' };
+  };
+  A.aContent = function (db) {
+    var names = {};
+    db.leads.forEach(function (l) { var c = db.clients[l.gstin]; if (c) names[l.gstin] = { name: fullName(c), mobile: c.mobile }; });
+    return { content: db.content, leads: db.leads, names: names, kinds: KINDS };
+  };
+  A.aContentSave = function (db, q, ctx) {
+    var f = q.item || {}, kind = KINDS[f.kind] ? f.kind : '';
+    if (!kind) fail('प्रकार चुनें');
+    if (!str(f.title, 150)) fail('शीर्षक डालें');
+    var it = f.id ? db.content.filter(function (x) { return x.id === f.id; })[0] : null, isNew = !it;
+    if (!it) { it = { id: ctx.uuid(), at: ctx.now.toISOString(), order: db.content.length + 1 }; db.content.push(it); }
+    it.kind = kind; it.title = str(f.title, 150); it.body = str(f.body, 3000); it.icon = str(f.icon, 8);
+    it.img = str(f.img, 600); it.price = str(f.price, 60); it.partner = str(f.partner, 80); it.cta = str(f.cta, 40);
+    it.link = /^https?:\/\//i.test(str(f.link, 500)) ? str(f.link, 500) : ''; it.pinned = !!f.pinned; it.active = f.active !== false;
+    if (f.order != null && f.order !== '') it.order = num(f.order);
+    var sent = 0;
+    if (q.notify && it.active) {
+      Object.keys(db.clients).forEach(function (g) {
+        var c = db.clients[g]; if (c.status !== 'ACTIVE') return;
+        notifyClient(db, ctx, c, (kind === 'news' ? '📰 ' : kind === 'learn' ? '🎓 ' : '') + it.title, it.body.slice(0, 160)); sent++;
+      });
+      it.notifiedAt = ctx.now.toISOString();
+    }
+    return { item: it, isNew: isNew, sent: sent };
+  };
+  A.aContentDelete = function (db, q) { db.content = db.content.filter(function (x) { return x.id !== q.id; }); return {}; };
+  A.aContentImage = function (db, q, ctx) {
+    if (!q.b64) fail('फोटो खाली है');
+    if (String(q.b64).length > 2.8e6) fail('फोटो 2 MB से छोटी रखें');
+    return { url: ctx.saveImage(q.b64, str(q.mime, 40) || 'image/jpeg', str(q.name, 80) || 'image.jpg') };
+  };
+  A.aLeadUpdate = function (db, q) {
+    var l = db.leads.filter(function (x) { return x.id === q.id; })[0];
+    if (!l) fail('नहीं मिला');
+    if (q.status) l.status = ['NEW', 'TALKED', 'WON', 'CLOSED'].indexOf(q.status) >= 0 ? q.status : l.status;
+    if (q.note != null) l.note = str(q.note, 300);
+    return { lead: l };
+  };
+
+  var READ_ONLY = { state: 1, aList: 1, aClient: 1, aInbox: 1, aPayments: 1, aContent: 1 };
 
   /* ---------- daily reminders (Apps Script time trigger / admin button) ---------- */
   function tick(db, ctx, force) {
@@ -652,6 +756,7 @@ var Core = (function () {
     var action = String(q && q.action || '');
     try {
       if (!A[action]) fail('Unknown action: ' + action);
+      ensure(db);
       if (action[0] === 'a' && action[1] === action[1].toUpperCase() && !ctx.adminKeyOk(q.adminKey)) fail('ADMIN_KEY_WRONG');
       var data = A[action](db, q, ctx);
       return { out: { ok: true, data: data, v: VERSION }, dirty: !READ_ONLY[action] };
@@ -661,7 +766,7 @@ var Core = (function () {
   }
 
   return {
-    VERSION: VERSION, PLATFORMS: PLATFORMS, PLATFORM_ORDER: PLATFORM_ORDER, STATES: STATES,
+    VERSION: VERSION, PLATFORMS: PLATFORMS, PLATFORM_ORDER: PLATFORM_ORDER, STATES: STATES, KINDS: KINDS,
     newDb: newDb, handle: handle, tick: tick,
     gstinValid: gstinValid, gstinInfo: gstinInfo, sha256: sha256,
     monthsOf: monthsOf, monthLabel: monthLabel, periodLabel: periodLabel, currentPid: currentPid, pidFor: pidFor,

@@ -76,17 +76,20 @@ tr.rowc{cursor:pointer}tr.rowc:hover td{background:#f8fafc}
 <header>
   <b>VAS • GST Data</b>
   <nav>
-    <button data-v="dash" class="on" onclick="view('dash')">डैशबोर्ड</button>
-    <button data-v="pay" onclick="view('pay')">पेमेंट</button>
-    <button data-v="clients" onclick="view('clients')">क्लाइंट्स</button>
-    <button data-v="inbox" onclick="view('inbox')">सूचनाएँ<span id="nBadge" class="badge hide"></span></button>
+    <button data-v="clients" class="on" onclick="view('clients')">👥 क्लाइंट्स<span id="newBadge" class="badge hide"></span></button>
+    <button data-v="dash" onclick="view('dash')">📅 फाइलिंग</button>
+    <button data-v="pay" onclick="view('pay')">💰 पेमेंट</button>
+    <button data-v="content" onclick="view('content')">📣 ऐप कंटेंट</button>
+    <button data-v="leads" onclick="view('leads')">🙋 पूछताछ<span id="leadBadge" class="badge hide"></span></button>
+    <button data-v="inbox" onclick="view('inbox')">🔔 सूचनाएँ<span id="nBadge" class="badge hide"></span></button>
     <button data-v="settings" onclick="view('settings')">सेटिंग्स</button>
   </nav>
   <button class="btn sec sm" onclick="refresh()">⟳ रिफ्रेश</button>
 </header>
 <main>
-  <!-- DASHBOARD -->
-  <section id="v-dash">
+  <!-- FILING -->
+  <section id="v-dash" class="hide">
+    <h2 style="margin:4px 0 12px" id="filingHead">फाइलिंग</h2>
     <div class="bar">
       <label>महीना: <input type="month" class="i" id="month" onchange="refresh()"></label>
       <span class="mute" id="monthNote"></span>
@@ -119,13 +122,33 @@ tr.rowc{cursor:pointer}tr.rowc:hover td{background:#f8fafc}
   </section>
 
   <!-- CLIENTS -->
-  <section id="v-clients" class="hide">
+  <section id="v-clients">
+    <h2 style="margin:4px 0 12px">क्लाइंट लिस्ट</h2>
+    <div class="tiles" id="cTiles"></div>
     <div class="bar">
-      <select class="i" id="cF" onchange="renderClients()"><option value="">सभी क्लाइंट</option><option value="new">नए (verify बाकी)</option><option value="blocked">Blocked</option></select>
-      <input class="i" id="cQ" placeholder="🔍 खोजें" oninput="renderClients()" style="width:240px">
+      <input class="i" id="cQ" placeholder="🔍 नाम / GSTIN / मोबाइल / PAN" oninput="renderClients()" style="width:280px">
+      <select class="i" id="cSort" onchange="renderClients()"><option value="new">नए पहले</option><option value="name">नाम से (A-Z)</option></select>
       <span class="grow"></span><span class="mute" id="cCount"></span>
+      <button class="btn sm sec" onclick="exportClients()" title="सारे क्लाइंट Excel में">⬇ लिस्ट (CSV)</button>
+      <button class="btn sm sec" onclick="vcardAll()" title="फोन / Google Contacts में एक साथ सेव">📇 सब कॉन्टैक्ट (vCard)</button>
     </div>
-    <div class="tw"><table><thead><tr><th>क्लाइंट</th><th>GSTIN</th><th>मोबाइल</th><th>PIN</th><th>रिटर्न</th><th>प्लेटफॉर्म</th><th>Verified</th><th>Push</th><th>रजिस्टर</th><th>कुल बाकी</th></tr></thead><tbody id="cBody"></tbody></table></div>
+    <div class="tw"><table><thead><tr><th>#</th><th>नाम <span class="mute">(बात करने वाले • GST धारक • फर्म)</span></th><th>GSTIN</th><th>मोबाइल</th><th>PIN</th><th>रिटर्न</th><th>प्लेटफॉर्म</th><th>रजिस्टर / लॉगिन</th><th>स्थिति</th><th>फीस बाकी</th><th></th></tr></thead><tbody id="cBody"></tbody></table></div>
+  </section>
+
+  <!-- APP CONTENT -->
+  <section id="v-content" class="hide">
+    <h2 style="margin:4px 0 4px">ऐप कंटेंट</h2>
+    <p class="mute" style="margin:0 0 12px">जो यहाँ डालेंगे वो क्लाइंट के ऐप में दिखेगा – सीखें / ऑफर (पार्टनर कोर्स, प्रोडक्ट, ऐड), न्यूज़ (GST अपडेट), हमारी सेवाएँ, और मदद (FAQ).</p>
+    <div class="bar" id="kindTabs"></div>
+    <div id="contentList"></div>
+  </section>
+
+  <!-- LEADS -->
+  <section id="v-leads" class="hide">
+    <h2 style="margin:4px 0 4px">पूछताछ (Leads)</h2>
+    <p class="mute" style="margin:0 0 12px">क्लाइंट ने ऐप में किसी सेवा / कोर्स / ऑफर पर "पूछताछ करें" दबाया – इन्हें कॉल या WhatsApp करें.</p>
+    <div class="bar"><select class="i" id="leadF" onchange="renderLeads()"><option value="open">खुली (नई + बात हुई)</option><option value="">सब</option><option value="WON">काम मिला</option><option value="CLOSED">बंद</option></select></div>
+    <div class="tw"><table><thead><tr><th>कब</th><th>क्लाइंट</th><th>किसमें रुचि</th><th>स्थिति</th><th>नोट</th><th></th></tr></thead><tbody id="leadBody"></tbody></table></div>
   </section>
 
   <!-- INBOX -->
@@ -197,8 +220,8 @@ function start() {
 /* ---------- views ---------- */
 function view(v) {
   document.querySelectorAll('nav button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === v); });
-  ['dash', 'pay', 'clients', 'inbox', 'settings'].forEach(function (k) { $('v-' + k).classList.toggle('hide', k !== v); });
-  if (v === 'pay') loadPay(); if (v === 'inbox') loadInbox(); if (v === 'settings') loadSettings();
+  ['clients', 'dash', 'pay', 'content', 'leads', 'inbox', 'settings'].forEach(function (k) { $('v-' + k).classList.toggle('hide', k !== v); });
+  if (v === 'pay') loadPay(); if (v === 'inbox') loadInbox(); if (v === 'settings') loadSettings(); if (v === 'content' || v === 'leads') loadContent();
 }
 function refresh() {
   return A('aList', { month: $('month').value }).then(function (d) {
@@ -206,6 +229,8 @@ function refresh() {
     $('nBadge').textContent = d.unread; $('nBadge').classList.toggle('hide', !d.unread);
     var q = Core.quarterOf(d.month), qm = Core.monthsOf(q);
     $('monthNote').textContent = 'Monthly: ' + d.label + ' • Quarterly: ' + Core.periodLabel(q) + (qm[2] === d.month ? '' : ' (तिमाही अभी पूरी नहीं)');
+    $('filingHead').textContent = '📅 ' + d.label + ' फाइलिंग' + (qm[2] === d.month ? ' (Quarterly: ' + Core.periodLabel(q) + ')' : '');
+    if (!CONTENT) loadContent();
     renderDash(); renderClients();
     if (!$('v-pay').classList.contains('hide')) loadPay();
     if (OPEN) openClient(OPEN, true);
@@ -256,7 +281,7 @@ function renderDash() {
     return '<tr class="rowc" onclick="openClient(\'' + c.gstin + '\',false,\'' + s.pid + '\')">' +
       '<td onclick="event.stopPropagation()"><input type="checkbox" ' + (SEL[c.gstin] ? 'checked' : '') + ' onchange="SEL[\'' + c.gstin + '\']=this.checked;selInfo()"></td>' +
       '<td class="mute">' + (i + 1) + '</td>' +
-      '<td><b>' + esc(c.trade) + '</b>' + (c.verified ? '' : ' <span class="pill PARTIAL" title="नाम GST पोर्टल से मिलाना बाकी">नया</span>') + '<div class="mute">' + esc(c.gstin) + ' • ' + esc(c.mobile) + '</div></td>' +
+      '<td><b>' + esc(c.fullName) + '</b>' + (c.verified ? '' : ' <span class="pill PARTIAL" title="नाम GST पोर्टल से मिलाना बाकी">नया</span>') + '<div class="mute">' + esc(c.gstin) + ' • ' + esc(c.mobile) + '</div></td>' +
       '<td>' + (c.freq === 'Q' ? 'Q' : 'M') + '<div class="mute">' + esc(s.label) + '</div></td>' +
       '<td>' + plats(c) + '</td><td>' + dataCell + '</td>' +
       '<td class="mute">' + (fmtDate(s.lastUpload) || '–') + '</td>' +
@@ -296,8 +321,16 @@ function openClient(g, keep, focusPid) {
   OPEN = g;
   A('aClient', { gstin: g, pid: focusPid }).then(function (d) {
     var c = d.client;
-    $('dTitle').innerHTML = '<b style="font-size:16px">' + esc(c.trade) + '</b><div class="mute">' + esc(c.gstin) + ' • ' + esc(c.state) + ' • ' + (c.freq === 'Q' ? 'Quarterly' : 'Monthly') + '</div>';
+    $('dTitle').innerHTML = '<b style="font-size:16px">' + esc(c.fullName) + '</b> ' + (c.verified ? '<span class="pill COMPLETE">✓ Verified</span>' : '<span class="pill PARTIAL">Verify बाकी</span>') + '<div class="mute">' + esc(c.gstin) + ' • ' + esc(c.state) + ' • ' + (c.freq === 'Q' ? 'Quarterly' : 'Monthly') + '</div>';
     var h = '';
+    var kv = function (l, v) { return '<div><span class="mute">' + l + '</span><div><b>' + (v || '<span class="mute">–</span>') + '</b></div></div>'; };
+    h += '<div class="per"><div class="row"><h3>📋 रजिस्ट्रेशन में क्या डाला</h3><span class="grow"></span>' +
+      (c.verified ? '<button class="btn sec sm" onclick="quickVerify(\'' + c.gstin + '\',false)">Verify हटाएँ</button>' : '<button class="btn ok sm" onclick="quickVerify(\'' + c.gstin + '\',true)">✓ GST पोर्टल से मिला लिया (Verify)</button>') + '</div>' +
+      '<div class="grid2" style="margin-top:8px">' + kv('👤 बात करने वाले', esc(c.owner)) + kv('🪪 GST धारक (लीगल नाम)', esc(c.legal)) + kv('🏪 फर्म (ट्रेड नाम)', esc(c.trade)) +
+      kv('GSTIN', esc(c.gstin)) + kv('PAN', esc(c.pan)) + kv('राज्य', esc(c.state)) + kv('मोबाइल', esc(c.mobile)) + kv('ईमेल', esc(c.email)) +
+      kv('रिटर्न', c.freq === 'Q' ? 'Quarterly' : 'Monthly') + kv('प्लेटफॉर्म', plats(c)) + kv('रजिस्टर हुआ', fmtDate(c.createdAt)) + kv('आखिरी लॉगिन', fmtDate(c.lastLogin)) + '</div>' +
+      '<div style="margin-top:8px"><span class="mute">फोन / फोल्डर में नाम</span><div class="row"><b>' + esc(c.fullName) + '</b><button class="btn sec sm" data-t="' + esc(c.fullName) + '" onclick="copyText(this.dataset.t,\'नाम कॉपी ✓\')">कॉपी</button><button class="btn sec sm" onclick="vcardOne(\'' + c.gstin + '\')">📇 कॉन्टैक्ट सेव (vCard)</button></div>' +
+      '<div class="mute" style="margin-top:4px">📁 Drive फोल्डर: ' + esc(c.folder) + '</div></div></div>';
     h += '<div class="per" style="background:#f8fafc"><div class="row"><h3>🔑 लॉगिन जानकारी</h3>' + (c.pinReqAt ? '<span class="pill CLAIM">PIN माँगा – ' + fmtDate(c.pinReqAt) + '</span>' : '') + '</div>' +
       '<div class="grid2" style="margin-top:8px"><div><span class="mute">GSTIN</span><div><b>' + esc(c.gstin) + '</b></div></div><div><span class="mute">मोबाइल</span><div><b>' + esc(c.mobile) + '</b></div></div>' +
       '<div><span class="mute">PIN</span><div><b style="font-size:17px;letter-spacing:2px">' + (c.pin ? esc(c.pin) : '<span class="mute" style="letter-spacing:0">पता नहीं (पुराना रजिस्ट्रेशन) – नया PIN दें</span>') + '</b></div></div>' +
@@ -306,7 +339,7 @@ function openClient(g, keep, focusPid) {
       '<button class="btn sec sm" onclick="resetPin(\'' + c.gstin + '\')">नया PIN दें</button></div></div>';
     h += d.periods.map(function (p) { return periodBlock(c, p, p.summary.pid === focusPid); }).join('');
     h += '<div class="per"><h3>प्रोफाइल</h3><div class="grid2" style="margin-top:8px">' +
-      fld('trade', 'ट्रेड नाम', c.trade) + fld('legal', 'लीगल नाम', c.legal) + fld('owner', 'मालिक', c.owner) + fld('mobile', 'मोबाइल', c.mobile) + fld('email', 'ईमेल', c.email) +
+      fld('owner', '👤 बात करने वाले का नाम', c.owner) + fld('legal', '🪪 GST धारक (लीगल नाम)', c.legal) + fld('trade', '🏪 फर्म (ट्रेड नाम)', c.trade) + fld('mobile', 'मोबाइल', c.mobile) + fld('email', 'ईमेल', c.email) +
       '<label>रिटर्न<select class="i" id="pf_freq"><option value="M"' + (c.freq !== 'Q' ? ' selected' : '') + '>Monthly</option><option value="Q"' + (c.freq === 'Q' ? ' selected' : '') + '>Quarterly</option></select></label>' +
       fld('defaultFee', 'इस क्लाइंट की फीस (₹)', c.defaultFee == null ? '' : c.defaultFee) +
       '<label>स्थिति<select class="i" id="pf_status"><option value="ACTIVE">Active</option><option value="BLOCKED"' + (c.status === 'BLOCKED' ? ' selected' : '') + '>Blocked</option></select></label></div>' +
@@ -411,7 +444,7 @@ function renderPay() {
   $('payBody').innerHTML = rows.map(function (r) {
     var c = r.client, s = r.summary;
     var st = s.due > 0 ? (s.payClaim ? '<span class="pill CLAIM">क्लाइंट: पे कर दिया</span>' : '<span class="pill DUE">बाकी</span>') : '<span class="pill PAID">मिल गया ✓</span>';
-    return '<tr class="rowc" onclick="openClient(\'' + c.gstin + '\',false,\'' + s.pid + '\')"><td><b>' + esc(c.trade) + '</b><div class="mute">' + esc(c.gstin) + ' • ' + esc(c.mobile) + '</div></td><td>' + esc(s.label) + '</td>' +
+    return '<tr class="rowc" onclick="openClient(\'' + c.gstin + '\',false,\'' + s.pid + '\')"><td><b>' + esc(c.fullName) + '</b><div class="mute">' + esc(c.gstin) + ' • ' + esc(c.mobile) + '</div></td><td>' + esc(s.label) + '</td>' +
       '<td><span class="pill ' + (s.work || 'NONE') + '">' + WORK_TXT[s.work || ''] + '</span></td><td>' + rupee(s.fee) + '</td><td>' + rupee(s.paid) + '</td><td><b>' + rupee(s.due) + '</b></td><td>' + st +
       (r.payRemindAt && s.due > 0 ? '<div class="mute">रिमाइंडर: ' + fmtDate(r.payRemindAt) + '</div>' : '') + '</td>' +
       '<td onclick="event.stopPropagation()">' + (s.due > 0 ? '<button class="btn ok sm" onclick="quickPaid(\'' + c.gstin + '\',\'' + s.pid + '\',' + s.due + ')">✓ मिला</button> <a class="btn wa sm" target="_blank" rel="noopener" href="' + waLink(c, s, 'pay') + '">WA</a>' : '') + '</td></tr>';
@@ -424,27 +457,153 @@ function quickPaid(g, pid, due) {
 }
 
 /* ---------- clients ---------- */
+var CTILE = '';
+function isNewClient(c) { return !c.verified || (Date.now() - new Date(c.createdAt)) < 7 * 86400000; }
+var CTILES = [
+  ['', 'कुल क्लाइंट', function () { return true; }],
+  ['new', 'नए (7 दिन) / Verify बाकी', function (r) { return isNewClient(r.client); }],
+  ['pin', 'PIN माँगा', function (r) { return !!r.client.pinReqAt; }],
+  ['M', 'Monthly', function (r) { return r.client.freq !== 'Q'; }],
+  ['Q', 'Quarterly', function (r) { return r.client.freq === 'Q'; }],
+  ['due', 'फीस बाकी', function (r) { return r.totalDue > 0; }],
+  ['blocked', 'Blocked', function (r) { return r.client.status === 'BLOCKED'; }]
+];
+// name parts, labelled – contact person (who talks to us) → GST holder → firm
+function nameParts(c) {
+  return '<span title="बात करने वाले">👤 ' + esc(c.owner || '–') + '</span> • <span title="GST धारक (लीगल नाम)">🪪 ' + esc(c.legal || '–') + '</span> • <span title="फर्म">🏪 ' + esc(c.trade || '–') + '</span>';
+}
+function clientRows() {
+  var q = $('cQ').value.trim().toLowerCase(), fn = CTILES.filter(function (t) { return t[0] === CTILE; })[0][2];
+  return LIST.rows.filter(function (r) {
+    var c = r.client;
+    return fn(r) && (!q || (c.fullName + ' ' + c.gstin + ' ' + c.mobile + ' ' + c.pan + ' ' + c.email).toLowerCase().indexOf(q) >= 0);
+  }).sort($('cSort').value === 'name'
+    ? function (a, b) { return a.client.fullName.localeCompare(b.client.fullName); }
+    : function (a, b) { return (isNewClient(b.client) ? 1 : 0) - (isNewClient(a.client) ? 1 : 0) || b.client.createdAt.localeCompare(a.client.createdAt); });
+}
 function renderClients() {
   if (!LIST) return;
-  var f = $('cF').value, q = $('cQ').value.trim().toLowerCase();
-  var rows = LIST.rows.filter(function (r) {
-    var c = r.client;
-    if (f === 'new' && c.verified) return false;
-    if (f === 'blocked' && c.status !== 'BLOCKED') return false;
-    return !q || (c.trade + ' ' + c.legal + ' ' + c.gstin + ' ' + c.mobile + ' ' + c.owner).toLowerCase().indexOf(q) >= 0;
-  }).sort(function (a, b) { return (a.client.verified ? 1 : 0) - (b.client.verified ? 1 : 0) || b.client.createdAt.localeCompare(a.client.createdAt); });
+  var nNew = LIST.rows.filter(function (r) { return isNewClient(r.client); }).length;
+  $('newBadge').textContent = nNew; $('newBadge').classList.toggle('hide', !nNew);
+  $('cTiles').innerHTML = CTILES.map(function (t) {
+    return '<div class="tile' + (CTILE === t[0] ? ' on' : '') + '" onclick="CTILE=\'' + t[0] + '\';renderClients()"><div class="n">' + LIST.rows.filter(t[2]).length + '</div><div class="l">' + t[1] + '</div></div>';
+  }).join('');
+  var rows = clientRows();
   $('cCount').textContent = rows.length + ' क्लाइंट';
-  $('cBody').innerHTML = rows.map(function (r) {
+  $('cBody').innerHTML = rows.map(function (r, i) {
     var c = r.client;
-    return '<tr class="rowc" onclick="openClient(\'' + c.gstin + '\')"><td><b>' + esc(c.trade) + '</b><div class="mute">' + esc(c.legal || '') + (c.owner ? ' • ' + esc(c.owner) : '') + '</div></td><td>' + esc(c.gstin) + '<div class="mute">' + esc(c.state) + '</div></td><td>' + esc(c.mobile) + '</td>' +
+    return '<tr class="rowc" onclick="openClient(\'' + c.gstin + '\')"><td class="mute">' + (i + 1) + '</td>' +
+      '<td><b>' + esc(c.fullName) + '</b>' + (isNewClient(c) ? ' <span class="pill PARTIAL">नया</span>' : '') + '<div class="mute">' + nameParts(c) + '</div></td>' +
+      '<td>' + esc(c.gstin) + '<div class="mute">' + esc(c.state) + '</div></td><td>' + esc(c.mobile) + '</td>' +
       '<td>' + (c.pin ? '<b>' + esc(c.pin) + '</b>' : '<span class="mute">–</span>') + (c.pinReqAt ? ' <span class="pill CLAIM">माँगा</span>' : '') + '</td>' +
-      '<td>' + (c.freq === 'Q' ? 'Quarterly' : 'Monthly') + '</td><td>' + plats(c) + '</td><td>' + (c.verified ? '✅' : '<span class="pill PARTIAL">बाकी</span>') + (c.status === 'BLOCKED' ? ' <span class="pill NONE">Blocked</span>' : '') + '</td>' +
-      '<td>' + (c.push ? '🔔' : '–') + '</td><td class="mute">' + fmtDate(c.createdAt) + '</td><td>' + (r.totalDue > 0 ? '<b style="color:var(--bad)">' + rupee(r.totalDue) + '</b>' : '–') + '</td></tr>';
-  }).join('') || '<tr><td colspan="10" class="mute" style="padding:30px;text-align:center">अभी कोई क्लाइंट नहीं. क्लाइंट को ऐप का लिंक भेजें – वो खुद रजिस्टर करेंगे.</td></tr>';
+      '<td>' + (c.freq === 'Q' ? 'Quarterly' : 'Monthly') + '</td><td>' + plats(c) + '</td>' +
+      '<td class="mute">' + fmtDate(c.createdAt) + (c.lastLogin ? '<br>लॉगिन: ' + fmtDate(c.lastLogin) : '') + '</td>' +
+      '<td>' + (c.verified ? '<span class="pill COMPLETE">✓ Verified</span>' : '<span class="pill PARTIAL">Verify बाकी</span>') + (c.status === 'BLOCKED' ? ' <span class="pill NONE">Blocked</span>' : '') + (c.push ? ' 🔔' : '') + '</td>' +
+      '<td>' + (r.totalDue > 0 ? '<b style="color:var(--bad)">' + rupee(r.totalDue) + '</b>' : '–') + '</td>' +
+      '<td onclick="event.stopPropagation()"><a class="btn wa sm" target="_blank" rel="noopener" href="https://wa.me/91' + esc(c.mobile) + '">WA</a></td></tr>';
+  }).join('') || '<tr><td colspan="11" class="mute" style="padding:30px;text-align:center">कोई क्लाइंट नहीं. क्लाइंट को ऐप का लिंक भेजें – वो खुद रजिस्टर करेंगे.</td></tr>';
 }
+function download(name, text, type) { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: type })); a.download = name; a.click(); }
+function csvLine(r) { return r.map(function (v) { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(','); }
+function exportClients() {
+  var rows = [['Name (Contact Legal Trade)', 'Contact person', 'GST holder (Legal)', 'Firm (Trade)', 'GSTIN', 'PAN', 'State', 'Mobile', 'Email', 'Return', 'Platforms', 'Registered', 'Verified', 'Drive folder']];
+  clientRows().forEach(function (r) { var c = r.client; rows.push([c.fullName, c.owner, c.legal, c.trade, c.gstin, c.pan, c.state, c.mobile, c.email, c.freq, c.platforms.join(' '), (c.createdAt || '').slice(0, 10), c.verified ? 'Yes' : 'No', c.folder]); });
+  download('VAS_Clients_' + today() + '.csv', '﻿' + rows.map(csvLine).join('\r\n'), 'text/csv');
+}
+function vcard(c) {
+  var v = function (s) { return String(s || '').replace(/[,;\\]/g, ' ').trim(); };
+  return ['BEGIN:VCARD', 'VERSION:3.0', 'FN:' + v(c.fullName), 'N:' + v(c.fullName) + ';;;;', 'ORG:' + v(c.trade), 'TEL;TYPE=CELL:+91' + c.mobile, c.email ? 'EMAIL:' + v(c.email) : '', 'NOTE:GSTIN ' + c.gstin + ' • GST holder ' + v(c.legal) + ' • VAS client', 'END:VCARD'].filter(Boolean).join('\r\n');
+}
+function vcardAll() { var list = clientRows().map(function (r) { return vcard(r.client); }); if (!list.length) return toast('कोई क्लाइंट नहीं'); download('VAS_Contacts_' + today() + '.vcf', list.join('\r\n') + '\r\n', 'text/vcard'); toast(list.length + ' कॉन्टैक्ट – फोन / Google Contacts में Import करें'); }
+function vcardOne(g) { var r = LIST.rows.filter(function (x) { return x.client.gstin === g; })[0]; if (r) download(r.client.fullName.replace(/[\\\/:*?"<>|]/g, ' ') + '.vcf', vcard(r.client) + '\r\n', 'text/vcard'); }
+function copyText(t, msg) { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast(msg || 'कॉपी हो गया ✓'); }, function () { prompt('कॉपी करें:', t); }); }
+function quickVerify(g, on) { after(A('aUpdateClient', { gstin: g, fields: { verified: on } }), on ? 'Verified ✓' : 'Verify हटाया'); }
+
+/* ---------- app content (learning / news / services / FAQ) ---------- */
+var CONTENT = null, CKIND = 'learn';
+function loadContent() { return A('aContent').then(function (d) { CONTENT = d; renderContent(); renderLeads(); leadBadge(); }).catch(function (e) { toast(e.message); }); }
+function leadBadge() { var n = CONTENT ? CONTENT.leads.filter(function (l) { return l.status === 'NEW'; }).length : 0; $('leadBadge').textContent = n; $('leadBadge').classList.toggle('hide', !n); }
+function renderContent() {
+  if (!CONTENT) return;
+  $('kindTabs').innerHTML = Object.keys(Core.KINDS).map(function (k) {
+    var n = CONTENT.content.filter(function (x) { return x.kind === k; }).length;
+    return '<button class="btn sm ' + (CKIND === k ? '' : 'sec') + '" onclick="CKIND=\'' + k + '\';renderContent()">' + Core.KINDS[k] + ' (' + n + ')</button>';
+  }).join('') + '<span class="grow"></span><button class="btn sm ok" onclick="editItem()">+ नया जोड़ें</button>';
+  var list = CONTENT.content.filter(function (x) { return x.kind === CKIND; }).sort(function (a, b) { return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (CKIND === 'news' || CKIND === 'learn' ? (b.at || '').localeCompare(a.at || '') : (a.order || 0) - (b.order || 0)); });
+  $('contentList').innerHTML = list.map(function (x) {
+    var leads = CONTENT.leads.filter(function (l) { return l.itemId === x.id; }).length;
+    return '<div class="card" style="display:flex;gap:12px;align-items:flex-start;opacity:' + (x.active ? 1 : .55) + '">' +
+      (x.img ? '<img src="' + esc(x.img) + '" style="width:90px;height:64px;object-fit:cover;border-radius:8px;flex:none">' : '<div style="font-size:30px;width:44px;text-align:center;flex:none">' + esc(x.icon || '📌') + '</div>') +
+      '<div class="grow"><b>' + esc(x.title) + '</b> ' + (x.pinned ? '<span class="pill CLAIM">📌 ऊपर</span> ' : '') + (x.active ? '' : '<span class="pill NONE">छुपा</span> ') + (x.partner ? '<span class="pill FILED">' + esc(x.partner) + '</span> ' : '') + (x.price ? '<span class="pill COMPLETE">' + esc(x.price) + '</span>' : '') +
+      '<div class="mute" style="white-space:pre-line;max-height:3.2em;overflow:hidden">' + esc(x.body) + '</div>' +
+      '<div class="mute">' + fmtDate(x.at) + (x.notifiedAt ? ' • 🔔 सबको भेजा ' + fmtDate(x.notifiedAt) : '') + (leads ? ' • 🙋 ' + leads + ' पूछताछ' : '') + '</div></div>' +
+      '<div class="row"><button class="btn sec sm" onclick="editItem(\'' + x.id + '\')">बदलें</button><button class="btn sec sm" onclick="toggleItem(\'' + x.id + '\')">' + (x.active ? 'छुपाएँ' : 'दिखाएँ') + '</button><button class="btn bad sm" onclick="delItem(\'' + x.id + '\')">✕</button></div></div>';
+  }).join('') || '<div class="card mute" style="text-align:center;padding:30px">अभी कुछ नहीं – "+ नया जोड़ें" दबाएँ.</div>';
+}
+var IMG_DATA = null;
+function editItem(id) {
+  var x = id ? CONTENT.content.filter(function (i) { return i.id === id; })[0] : { kind: CKIND, active: true, cta: CKIND === 'service' ? 'पूछताछ करें' : CKIND === 'learn' ? 'और जानें' : '' };
+  IMG_DATA = null; OPEN = null;
+  var f = function (k, l, v, ph) { return '<label>' + l + '<input class="i" id="ci_' + k + '" value="' + esc(v == null ? '' : v) + '" placeholder="' + esc(ph || '') + '"></label>'; };
+  $('dTitle').innerHTML = '<b style="font-size:16px">' + (id ? 'बदलें' : 'नया') + ' – ' + Core.KINDS[x.kind] + '</b>';
+  $('dBody').innerHTML = '<div class="per"><div class="grid2">' +
+    '<label>प्रकार<select class="i" id="ci_kind">' + Object.keys(Core.KINDS).map(function (k) { return '<option value="' + k + '"' + (k === x.kind ? ' selected' : '') + '>' + Core.KINDS[k] + '</option>'; }).join('') + '</select></label>' +
+    f('icon', 'आइकन (इमोजी)', x.icon, '🎓') + '</div>' +
+    '<label style="font-size:12px;font-weight:600;display:block;margin-top:8px">शीर्षक *<input class="i" id="ci_title" style="width:100%" value="' + esc(x.title || '') + '"></label>' +
+    '<label style="font-size:12px;font-weight:600;display:block;margin-top:8px">पूरी जानकारी<textarea class="i" id="ci_body" rows="6" style="width:100%">' + esc(x.body || '') + '</textarea></label>' +
+    '<div class="grid2" style="margin-top:8px">' + f('price', 'कीमत / ऑफर', x.price, '₹999 या 30% छूट') + f('partner', 'पार्टनर का नाम', x.partner, 'जैसे XYZ Academy') +
+    f('cta', 'बटन पर लिखा', x.cta, 'और जानें / पूछताछ करें') + f('link', 'बटन का लिंक (खाली = हमारा WhatsApp)', x.link, 'https://…') + f('order', 'क्रम (छोटा पहले)', x.order, '') + '</div>' +
+    '<div style="margin-top:10px"><label style="font-size:12px;font-weight:600">फोटो / बैनर (वैकल्पिक)</label><div class="row" style="margin-top:4px"><input type="file" accept="image/*" onchange="pickImg(this)"><input class="i" id="ci_img" placeholder="या फोटो का लिंक" value="' + esc(x.img || '') + '" style="flex:1"></div><img id="ci_prev" src="' + esc(x.img || '') + '" style="max-width:100%;max-height:180px;margin-top:6px;border-radius:8px;' + (x.img ? '' : 'display:none') + '"></div>' +
+    '<div class="row" style="margin-top:10px"><label><input type="checkbox" id="ci_pinned"' + (x.pinned ? ' checked' : '') + '> 📌 सबसे ऊपर रखें</label><label><input type="checkbox" id="ci_active"' + (x.active !== false ? ' checked' : '') + '> ऐप में दिखाएँ</label>' +
+    '<label><input type="checkbox" id="ci_notify"' + (!id && (x.kind === 'news' || x.kind === 'learn') ? ' checked' : '') + '> 🔔 सभी क्लाइंट्स को नोटिफिकेशन भेजें</label></div>' +
+    '<div class="row" style="margin-top:14px"><button class="btn ok" onclick="saveItem(\'' + (id || '') + '\')">सेव करें</button><button class="btn sec" onclick="closeDrawer()">रद्द</button></div></div>';
+  $('drawer').classList.add('on'); $('shade').classList.add('on');
+}
+function pickImg(inp) {
+  var file = inp.files[0]; if (!file) return;
+  var img = new Image(), fr = new FileReader();
+  fr.onload = function () { img.src = fr.result; };
+  img.onload = function () {   // shrink to max 1000px JPEG so phones load it fast
+    var s = Math.min(1, 1000 / Math.max(img.width, img.height)), cv = document.createElement('canvas');
+    cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    IMG_DATA = cv.toDataURL('image/jpeg', 0.82);
+    $('ci_prev').src = IMG_DATA; $('ci_prev').style.display = '';
+  };
+  fr.readAsDataURL(file);
+}
+function saveItem(id) {
+  var item = { id: id || undefined, kind: $('ci_kind').value, icon: $('ci_icon').value, title: $('ci_title').value, body: $('ci_body').value, price: $('ci_price').value, partner: $('ci_partner').value,
+    cta: $('ci_cta').value, link: $('ci_link').value, order: $('ci_order').value, img: $('ci_img').value, pinned: $('ci_pinned').checked, active: $('ci_active').checked };
+  var notify = $('ci_notify').checked;
+  if (notify && !confirm('सभी क्लाइंट्स को नोटिफिकेशन जाएगा. ठीक है?')) return;
+  (IMG_DATA ? A('aContentImage', { b64: IMG_DATA.split(',')[1], mime: 'image/jpeg', name: 'banner.jpg' }).then(function (d) { item.img = d.url; }) : Promise.resolve())
+    .then(function () { return A('aContentSave', { item: item, notify: notify }); })
+    .then(function (d) { toast('सेव ✓' + (d.sent ? ' – ' + d.sent + ' क्लाइंट्स को नोटिफिकेशन गया' : '')); closeDrawer(); CKIND = item.kind; return loadContent(); })
+    .catch(function (e) { toast(e.message, 4000); });
+}
+function toggleItem(id) { var x = CONTENT.content.filter(function (i) { return i.id === id; })[0]; x.active = !x.active; A('aContentSave', { item: x }).then(loadContent).catch(function (e) { toast(e.message); }); }
+function delItem(id) { if (confirm('ये हमेशा के लिए हटाएँ?')) A('aContentDelete', { id: id }).then(loadContent).catch(function (e) { toast(e.message); }); }
+
+/* ---------- leads ---------- */
+var LEAD_TXT = { NEW: ['नई', 'DUE'], TALKED: ['बात हुई', 'PROCESS'], WON: ['काम मिला ✓', 'COMPLETE'], CLOSED: ['बंद', 'NONE'] };
+function renderLeads() {
+  if (!CONTENT) return;
+  var f = $('leadF').value, list = CONTENT.leads.filter(function (l) { return f === 'open' ? (l.status === 'NEW' || l.status === 'TALKED') : !f || l.status === f; });
+  $('leadBody').innerHTML = list.map(function (l) {
+    var n = CONTENT.names[l.gstin] || { name: l.gstin, mobile: '' }, st = LEAD_TXT[l.status] || LEAD_TXT.NEW;
+    var wa = 'https://wa.me/91' + n.mobile + '?text=' + encodeURIComponent('नमस्ते ' + n.name + ', आपने ऐप में "' + l.title + '" के बारे में पूछा था. – Vishal Accounting Services');
+    return '<tr><td class="mute">' + fmtDate(l.at) + '</td><td><b class="rowc" style="cursor:pointer" onclick="openClient(\'' + l.gstin + '\')">' + esc(n.name) + '</b><div class="mute">' + esc(n.mobile) + ' • ' + esc(l.gstin) + '</div></td>' +
+      '<td>' + esc(l.title) + '<div class="mute">' + esc(Core.KINDS[l.kind] || '') + '</div></td>' +
+      '<td><select class="i" onchange="leadSet(\'' + l.id + '\',this.value)">' + Object.keys(LEAD_TXT).map(function (k) { return '<option value="' + k + '"' + (k === l.status ? ' selected' : '') + '>' + LEAD_TXT[k][0] + '</option>'; }).join('') + '</select></td>' +
+      '<td><input class="i" value="' + esc(l.note) + '" placeholder="नोट" onchange="leadSet(\'' + l.id + '\',null,this.value)"></td>' +
+      '<td><a class="btn wa sm" target="_blank" rel="noopener" href="' + wa + '">WA</a> <a class="btn sec sm" href="tel:+91' + esc(n.mobile) + '">📞</a></td></tr>';
+  }).join('') || '<tr><td colspan="6" class="mute" style="padding:30px;text-align:center">कोई पूछताछ नहीं</td></tr>';
+}
+function leadSet(id, status, note) { A('aLeadUpdate', { id: id, status: status || undefined, note: note == null ? undefined : note }).then(function () { return loadContent(); }).then(function () { toast('सेव ✓'); }).catch(function (e) { toast(e.message); }); }
 
 /* ---------- inbox ---------- */
-var KIND = { REG: ['नया क्लाइंट', 'PARTIAL'], NIL: ['NIL', 'NIL'], COMPLETE: ['डेटा पूरा', 'COMPLETE'], SUBMIT: ['डेटा भेजा', 'SUBMITTED'], PAYCLAIM: ['पेमेंट', 'CLAIM'], PROFILE: ['प्रोफाइल', 'FILED'], TICK: ['रिमाइंडर', 'PROCESS'], PIN: ['PIN भूले', 'CLAIM'] };
+var KIND = { LEAD: ['पूछताछ', 'COMPLETE'], REG: ['नया क्लाइंट', 'PARTIAL'], NIL: ['NIL', 'NIL'], COMPLETE: ['डेटा पूरा', 'COMPLETE'], SUBMIT: ['डेटा भेजा', 'SUBMITTED'], PAYCLAIM: ['पेमेंट', 'CLAIM'], PROFILE: ['प्रोफाइल', 'FILED'], TICK: ['रिमाइंडर', 'PROCESS'], PIN: ['PIN भूले', 'CLAIM'] };
 function loadInbox() {
   A('aInbox').then(function (d) {
     INBOX = d.inbox;

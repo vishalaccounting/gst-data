@@ -93,6 +93,16 @@ function makeCtx() {
     return { fileId: f.getId(), url: f.getUrl() };
   };
   ctx.deleteFile = function (id) { if (!id) return; try { DriveApp.getFileById(id).setTrashed(true); } catch (e) {} };
+  ctx.renameFolder = function (oldName, newName) {
+    var it = rootFolder().getFoldersByName(oldName);
+    if (it.hasNext()) it.next().setName(newName);
+  };
+  // pictures for the app's learning / news / services cards: public "anyone with link" so phones can show them
+  ctx.saveImage = function (b64, mime, name) {
+    var f = subFolder(rootFolder(), '_app_images').createFile(Utilities.newBlob(Utilities.base64Decode(b64), mime, name));
+    f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return 'https://drive.google.com/thumbnail?id=' + f.getId() + '&sz=w1000';
+  };
   ctx.push = function (tokens, title, body) { ctx._push.push({ tokens: tokens.slice(), title: title, body: body }); };
   ctx.notifyAdmin = function (kind, title, body) { if (kind !== 'TICK') ctx._mail.push({ title: title, body: body }); };
   return ctx;

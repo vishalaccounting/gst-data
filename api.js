@@ -38,6 +38,8 @@ var API = (function () {
         return { fileId: id, url: 'demo:' + id };
       },
       deleteFile: function (id) { if (id) pending.push(idbDo('readwrite', function (st) { return st.delete(id); })); },
+      renameFolder: function (a, b) { console.log('[demo] folder rename', a, '→', b); },
+      saveImage: function (b64, mime) { return 'data:' + mime + ';base64,' + b64; },
       push: function (tokens, title, body) { console.log('[demo push]', title, body); },
       notifyAdmin: function (kind, title, body) { console.log('[demo admin]', kind, title, body); },
       adminKeyOk: function (k) { return k === 'admin'; }

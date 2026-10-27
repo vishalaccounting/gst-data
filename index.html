@@ -87,6 +87,32 @@ input.i:focus,select.i:focus{border-color:var(--pri2)}
 .tabs button.on{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.1)}
 .hide{display:none!important}
 .foot{text-align:center;font-size:11.5px;color:var(--mute);margin-top:18px}
+.wrap{padding-bottom:180px}
+.bar{bottom:calc(60px + env(safe-area-inset-bottom));padding-bottom:12px}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:center;padding:4px 4px calc(env(safe-area-inset-bottom) + 4px)}
+.tabbar button{flex:1;max-width:112px;border:0;background:none;padding:5px 2px;font-size:11.5px;font-weight:600;color:var(--mute);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;position:relative}
+.tabbar button span{font-size:20px;filter:grayscale(1);opacity:.7}
+.tabbar button.on{color:var(--pri)}.tabbar button.on span{filter:none;opacity:1}
+.tabbar .dot{position:absolute;top:4px;right:calc(50% - 16px);width:9px;height:9px;border-radius:50%;background:#f43f5e}
+.post{overflow:hidden;padding:0}
+.post .pimg{width:100%;max-height:260px;object-fit:cover;display:block;background:#eef2f7}
+.post .pb{padding:14px 16px 16px}
+.post .pt{display:flex;gap:10px;align-items:flex-start}
+.post .ic{font-size:26px;line-height:1;flex:none}
+.post .body{white-space:pre-line;font-size:14px;color:#374151;margin-top:6px}
+.price{font-weight:800;font-size:17px;color:var(--ok);margin-top:8px}
+.partner{display:inline-block;font-size:11px;font-weight:700;background:#eef2ff;color:#4338ca;border-radius:12px;padding:2px 8px;margin-top:4px}
+.pinned{display:inline-block;font-size:11px;font-weight:700;background:#fef3c7;color:#92400e;border-radius:12px;padding:2px 8px}
+details.faq{background:#fff;border-radius:14px;margin:8px 0;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+details.faq summary{padding:14px 16px;font-weight:600;cursor:pointer;list-style:none;display:flex;gap:10px}
+details.faq summary::-webkit-details-marker{display:none}
+details.faq summary:after{content:'＋';margin-left:auto;color:var(--mute)}details.faq[open] summary:after{content:'－'}
+details.faq div{padding:0 16px 14px 48px;font-size:14px;color:#374151;white-space:pre-line}
+.svc{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.svc .card{margin:0;display:flex;flex-direction:column;gap:6px}
+.svc .ic{font-size:28px}
+.svc b{font-size:14px}.svc .mute{flex:1}
+.empty{text-align:center;color:var(--mute);padding:40px 20px}
 </style>
 </head>
 <body>
@@ -111,12 +137,13 @@ input.i:focus,select.i:focus{border-color:var(--pri2)}
     <label class="f">GSTIN *</label>
     <input class="i" id="rGstin" maxlength="15" required style="text-transform:uppercase" oninput="gstinCheck()">
     <div id="rGstinHelp" class="help"></div>
+    <label class="f">GST किसके नाम पर है? * <span class="mute">(लीगल नाम – PAN वाला)</span></label>
+    <input class="i" id="rLegal" required>
     <label class="f">फर्म / ट्रेड नाम * <span class="mute">(GST सर्टिफिकेट वाला)</span></label>
     <input class="i" id="rTrade" required>
-    <label class="f">लीगल नाम <span class="mute">(PAN वाला नाम)</span></label>
-    <input class="i" id="rLegal">
-    <label class="f">आपका नाम</label>
-    <input class="i" id="rOwner">
+    <label class="f">आपका नाम * <span class="mute">(जो ऑफिस से बात करेंगे)</span></label>
+    <input class="i" id="rOwner" required>
+    <div class="mute" style="margin-top:4px">जैसे GST पत्नी के नाम पर है और बात पति करते हैं, तो यहाँ पति का नाम.</div>
     <label class="f">मोबाइल नंबर *</label>
     <input class="i" id="rMobile" inputmode="numeric" maxlength="10" required>
     <label class="f">ईमेल</label>
@@ -152,10 +179,20 @@ input.i:focus,select.i:focus{border-color:var(--pri2)}
     <div id="installBar" class="banner hide"><span class="grow">📲 ऐप को फोन में इंस्टॉल करें – रिमाइंडर सीधे मिलेंगे.</span><button class="btn sm" onclick="doInstall()">इंस्टॉल</button></div>
     <div id="iosBar" class="banner hide"><span class="grow">📲 iPhone पर: नीचे Share ⬆️ → "Add to Home Screen" दबाएँ.</span><button class="x" onclick="hideIos()">✕</button></div>
     <div id="pushBar" class="banner hide"><span class="grow">🔔 नोटिफिकेशन चालू करें ताकि डेटा और फीस के रिमाइंडर मिलें.</span><button class="btn sm" onclick="enablePush()">चालू करें</button></div>
-    <div class="chips" id="hPeriods"></div>
-    <div id="hBody"></div>
+    <div id="tabHome">
+      <div class="chips" id="hPeriods"></div>
+      <div id="hBody"></div>
+    </div>
+    <div id="tabOther" class="hide"></div>
   </div>
   <div class="bar" id="hBar"><div class="in" id="hBarIn"></div></div>
+  <nav class="tabbar" id="tabbar">
+    <button data-t="home" class="on" onclick="showTab('home')"><span>📤</span>डेटा</button>
+    <button data-t="learn" onclick="showTab('learn')"><span>🎓</span>सीखें<i class="dot hide"></i></button>
+    <button data-t="news" onclick="showTab('news')"><span>📰</span>न्यूज़<i class="dot hide"></i></button>
+    <button data-t="service" onclick="showTab('service')"><span>💼</span>सेवाएँ</button>
+    <button data-t="faq" onclick="showTab('faq')"><span>❓</span>मदद</button>
+  </nav>
 </div>
 
 <!-- ============ SHEETS ============ -->
@@ -375,6 +412,8 @@ function render() {
   else if (sm.data === 'SUBMITTED') bar = '<div class="done">डेटा भेज दिया ✓ ' + fmtDate(sm.submittedAt) + ' <button class="btn ghost sm" onclick="unsubmit()">बदलें</button></div>';
   else bar = '<button class="btn block ok" onclick="submitData()" ' + (sm.files ? '' : 'disabled') + '>✔ डेटा पूरा भेज दिया' + (sm.missing.length && sm.files ? ' (' + sm.missing.length + ' बाकी)' : '') + '</button>';
   $('hBarIn').innerHTML = bar;
+  if (S.tab !== 'home') renderTab(S.tab);
+  updateDots();
 }
 function filesOf(slotId) { return S.st.files.filter(function (f) { return f.slot === slotId || (f.covers || []).indexOf(slotId) >= 0; }); }
 function toggleHint(b) { b.closest('.slot').classList.toggle('open'); }
@@ -497,6 +536,60 @@ function claimPaid(pid) {
   if (note === null) return;
   busy(true);
   call('claimPaid', { pid: pid, note: note }).then(function () { toast('धन्यवाद! ऑफिस जाँच कर कन्फर्म करेगा.'); return load(S.pid, true); }).catch(function (e) { toast(e.message); }).finally(function () { busy(false); });
+}
+
+/* ---------- tabs: learn / news / services / FAQ (content comes from the office dashboard) ---------- */
+S.tab = 'home';
+var TAB_HEAD = {
+  learn: ['🎓 सीखें और ऑफर', 'E-commerce कोर्स, बिज़नेस आइडिया और खास ऑफर – हमारे पार्टनर्स के साथ.'],
+  news: ['📰 GST और E-commerce न्यूज़', 'नए नियम, रेट में बदलाव और सेलर्स के लिए ज़रूरी अपडेट.'],
+  service: ['💼 हमारी सेवाएँ', 'Vishal Accounting Services से ये सब काम करवाएँ – एक टैप में पूछताछ करें.'],
+  faq: ['❓ मदद – सवाल-जवाब', 'ऐप इस्तेमाल करने से जुड़े आम सवाल.']
+};
+function itemsOf(kind) { return ((S.st && S.st.content) || []).filter(function (x) { return x.kind === kind; }); }
+function showTab(t) {
+  S.tab = t;
+  document.querySelectorAll('#tabbar button').forEach(function (b) { b.classList.toggle('on', b.dataset.t === t); });
+  $('tabHome').classList.toggle('hide', t !== 'home'); $('tabOther').classList.toggle('hide', t === 'home');
+  $('hBar').classList.toggle('hide', t !== 'home');
+  if (t !== 'home') { renderTab(t); var top = itemsOf(t)[0]; if (top) store('vas_seen_' + t, itemsOf(t).reduce(function (m, x) { return x.at > m ? x.at : m; }, '')); }
+  updateDots();
+  window.scrollTo(0, 0);
+}
+function updateDots() {
+  ['learn', 'news'].forEach(function (k) {
+    var seen = store('vas_seen_' + k) || '', fresh = itemsOf(k).some(function (x) { return x.at > seen; });
+    var d = document.querySelector('#tabbar button[data-t="' + k + '"] .dot'); if (d) d.classList.toggle('hide', !fresh || S.tab === k);
+  });
+}
+function renderTab(t) {
+  var list = itemsOf(t), h = '<div style="padding:14px 2px 4px"><h2 style="margin:0">' + TAB_HEAD[t][0] + '</h2><div class="mute">' + TAB_HEAD[t][1] + '</div></div>';
+  if (t === 'faq') {
+    h += list.map(function (x) { return '<details class="faq"><summary><span>' + esc(x.icon || '❔') + '</span><span>' + esc(x.title) + '</span></summary><div>' + esc(x.body) + '</div></details>'; }).join('');
+    h += '<div class="card" style="text-align:center"><b>जवाब नहीं मिला?</b><div class="mute" style="margin:4px 0 10px">हमें सीधे WhatsApp करें</div><a class="btn" target="_blank" rel="noopener" href="' + waOffice('नमस्ते, मुझे ऐप के बारे में एक सवाल पूछना है:') + '">💬 WhatsApp करें</a></div>';
+  } else if (t === 'service') {
+    h += '<div class="svc">' + list.map(function (x) {
+      return '<div class="card"><div class="ic">' + esc(x.icon || '📌') + '</div><b>' + esc(x.title) + '</b><div class="mute">' + esc(x.body) + '</div>' + (x.price ? '<div class="price" style="font-size:14px;margin:0">' + esc(x.price) + '</div>' : '') +
+        '<button class="btn sm" onclick="askLead(\'' + x.id + '\')">' + esc(x.cta || 'पूछताछ करें') + '</button></div>';
+    }).join('') + '</div>';
+  } else {
+    h += list.map(function (x) {
+      return '<div class="card post">' + (x.img ? '<img class="pimg" loading="lazy" src="' + esc(x.img) + '" alt="">' : '') + '<div class="pb"><div class="pt">' + (x.img ? '' : '<span class="ic">' + esc(x.icon || (t === 'news' ? '📰' : '🎓')) + '</span>') +
+        '<div style="flex:1"><b style="font-size:15.5px">' + esc(x.title) + '</b><div>' + (x.pinned ? '<span class="pinned">📌 खास</span> ' : '') + (x.partner ? '<span class="partner">' + esc(x.partner) + '</span> ' : '') + '<span class="mute">' + fmtDate(x.at).split(' ').slice(0, 2).join(' ') + '</span></div></div></div>' +
+        (x.body ? '<div class="body">' + esc(x.body) + '</div>' : '') + (x.price ? '<div class="price">' + esc(x.price) + '</div>' : '') +
+        (x.cta || x.link ? '<button class="btn block" style="margin-top:12px" onclick="askLead(\'' + x.id + '\')">' + esc(x.cta || 'और जानें') + '</button>' : '') + '</div></div>';
+    }).join('');
+  }
+  if (!list.length) h += '<div class="empty">अभी यहाँ कुछ नहीं है – जल्द नई जानकारी आएगी.</div>';
+  $('tabOther').innerHTML = h;
+}
+function waOffice(text) { return 'https://wa.me/91' + ((S.st && S.st.settings.phone) || CONFIG.OFFICE_PHONE) + '?text=' + encodeURIComponent(text); }
+function askLead(id) {
+  var x = ((S.st && S.st.content) || []).filter(function (i) { return i.id === id; })[0]; if (!x) return;
+  // open first (inside the tap so the browser allows it), tell the office in the background
+  var who = S.st.client.fullName || S.st.client.trade;
+  window.open(x.link || waOffice('नमस्ते, मुझे "' + x.title + '" के बारे में जानकारी चाहिए. – ' + who + ' (' + S.st.client.gstin + ')'), '_blank');
+  call('lead', { id: id }).then(function () { toast('धन्यवाद! हमारी टीम आपसे संपर्क करेगी 🙏', 3500); }).catch(function () {});
 }
 
 /* ---------- inbox / profile ---------- */
