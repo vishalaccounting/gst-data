@@ -5,7 +5,15 @@
    No DOM, no async, no modules – plain ES2019.
    ============================================================ */
 var Core = (function () {
-  var VERSION = '1.4.1';
+  var VERSION = '1.6.0';
+
+  /* ---------- language: client picks हिंदी or English (q.lang per request, c.lang for notifications).
+     T(hi, en) returns the text for the current LANG. The office / admin side always stays Hindi. ---------- */
+  var LANG = 'hi';
+  function setLang(l) { LANG = l === 'en' ? 'en' : 'hi'; return LANG; }
+  function T(hi, en) { return LANG === 'en' && en != null ? en : hi; }
+  // run fn with the client's own language (notifications, reminders), then restore
+  function asClient(c, fn) { var was = LANG; setLang(c && c.lang); try { return fn(); } finally { LANG = was; } }
 
   /* ---------- Platforms and the reports each one must send ----------
      perMonth:true  -> one report per month (quarterly client = 3 slots)
@@ -16,59 +24,66 @@ var Core = (function () {
       label: 'Meesho', group: 'online', color: '#c2187a',
       reports: [
         { key: 'tcs_sales', name: 'TCS Sales Report', perMonth: true, accept: '.xlsx,.xls,.csv,.zip', detect: 'MEESHO_SALE',
-          hint: 'Meesho Supplier Panel → GST Report डाउनलोड करें (महीना चुनें). पूरी ZIP (gst_…zip) डाल दें – tcs_sales और tcs_sales_return दोनों अपने आप सही खाने में चली जाएँगी.' },
+          hint: 'Meesho Supplier Panel → GST Report डाउनलोड करें (महीना चुनें). पूरी ZIP (gst_…zip) डाल दें – tcs_sales और tcs_sales_return दोनों अपने आप सही खाने में चली जाएँगी.',
+          hintEn: 'Meesho Supplier Panel → download the GST Report (choose the month). Upload the whole ZIP (gst_…zip) – tcs_sales and tcs_sales_return go to the right boxes by themselves.' },
         { key: 'tcs_return', name: 'TCS Sales Return Report', perMonth: true, accept: '.xlsx,.xls,.csv,.zip', detect: 'MEESHO_RET',
-          hint: 'उसी GST Report ZIP की tcs_sales_return फाइल.' },
+          hint: 'उसी GST Report ZIP की tcs_sales_return फाइल.', hintEn: 'The tcs_sales_return file from the same GST Report ZIP.' },
         { key: 'tax_invoice', name: 'Tax Invoice Details', perMonth: true, accept: '.xlsx,.xls,.csv,.zip', detect: 'MEESHO_INV',
-          hint: 'Meesho → Tax Invoice डाउनलोड करें (…_TAX_INVOICE.zip). पूरी ZIP या उसमें की Tax_invoice_details.xlsx डालें.' }
+          hint: 'Meesho → Tax Invoice डाउनलोड करें (…_TAX_INVOICE.zip). पूरी ZIP या उसमें की Tax_invoice_details.xlsx डालें.',
+          hintEn: 'Meesho → download Tax Invoice (…_TAX_INVOICE.zip). Upload the whole ZIP or the Tax_invoice_details.xlsx inside it.' }
       ]
     },
     amazon: {
       label: 'Amazon', group: 'online', color: '#e88a00',
       reports: [
         { key: 'mtr_b2c', name: 'MTR B2C Report', perMonth: true, accept: '.csv,.xlsx,.xls,.zip', detect: 'AMZ_B2C',
-          hint: 'Seller Central → Reports → Tax Document Library → GST MTR (B2C), महीना चुनें. CSV या ZIP दोनों चलेंगी.' },
+          hint: 'Seller Central → Reports → Tax Document Library → GST MTR (B2C), महीना चुनें. CSV या ZIP दोनों चलेंगी.',
+          hintEn: 'Seller Central → Reports → Tax Document Library → GST MTR (B2C), choose the month. CSV or ZIP both work.' },
         { key: 'mtr_b2b', name: 'MTR B2B Report', perMonth: true, accept: '.csv,.xlsx,.xls,.zip', detect: 'AMZ_B2B',
-          hint: 'उसी जगह से GST MTR (B2B). B2B सेल नहीं है तो भी खाली रिपोर्ट डाल दें.' },
+          hint: 'उसी जगह से GST MTR (B2B). B2B सेल नहीं है तो भी खाली रिपोर्ट डाल दें.',
+          hintEn: 'GST MTR (B2B) from the same place. Upload it even if it is empty (no B2B sales).' },
         { key: 'gstr1', name: 'GST Report (GSTR-1)', perMonth: true, accept: '.xlsx,.xls,.zip', detect: 'AMZ_GSTR1',
-          hint: 'Seller Central → Reports → Tax Document Library → GST Report (Ready to file GSTR-1). फाइल का नाम GSTR1-महीना-… होता है.' }
+          hint: 'Seller Central → Reports → Tax Document Library → GST Report (Ready to file GSTR-1). फाइल का नाम GSTR1-महीना-… होता है.',
+          hintEn: 'Seller Central → Reports → Tax Document Library → GST Report (Ready to file GSTR-1). The file name looks like GSTR1-MONTH-….' }
       ]
     },
     flipkart: {
       label: 'Flipkart', group: 'online', color: '#2874f0',
       reports: [
         { key: 'sales', name: 'Sales Report', perMonth: true, accept: '.xlsx,.xls,.csv,.zip', detect: 'FK_SALES',
-          hint: 'Seller Hub → Reports → Tax Reports → Sales Report, महीना चुनें.' },
+          hint: 'Seller Hub → Reports → Tax Reports → Sales Report, महीना चुनें.', hintEn: 'Seller Hub → Reports → Tax Reports → Sales Report, choose the month.' },
         { key: 'gst', name: 'GSTR Return Report', perMonth: true, accept: '.xlsx,.xls,.zip', detect: 'FK_GST',
-          hint: 'Seller Hub → Reports → Tax Reports → GST Report (GSTR-1 & GSTR-8 वाली), महीना चुनें.' }
+          hint: 'Seller Hub → Reports → Tax Reports → GST Report (GSTR-1 & GSTR-8 वाली), महीना चुनें.',
+          hintEn: 'Seller Hub → Reports → Tax Reports → GST Report (the GSTR-1 & GSTR-8 one), choose the month.' }
       ]
     },
     vyapar: {
       label: 'Vyapar', group: 'offline', color: '#e53935',
       reports: [
         { key: 'gstr1', name: 'GSTR-1 Report (Excel)', perMonth: false, accept: '.xlsx,.xls,.csv,.pdf,.json',
-          hint: 'Vyapar → Reports → GSTR-1 → पूरी अवधि चुनकर Excel में Export करें.' }
+          hint: 'Vyapar → Reports → GSTR-1 → पूरी अवधि चुनकर Excel में Export करें.', hintEn: 'Vyapar → Reports → GSTR-1 → choose the full period and Export to Excel.' }
       ]
     },
     tool: {
-      label: 'हमारा GST Billing टूल', group: 'offline', color: '#00897b',
+      label: 'हमारा GST Billing टूल', labelEn: 'Our GST Billing tool', group: 'offline', color: '#00897b',
       reports: [
         { key: 'export', name: 'GST Excel / JSON / XML', perMonth: false, accept: '.xlsx,.xls,.csv,.json,.xml,.zip',
-          hint: 'GST Billing → GSTR-1 पेज → Excel या JSON डाउनलोड करके यहाँ डालें.' }
+          hint: 'GST Billing → GSTR-1 पेज → Excel या JSON डाउनलोड करके यहाँ डालें.', hintEn: 'GST Billing → GSTR-1 page → download Excel or JSON and upload it here.' }
       ]
     },
     pdf: {
-      label: 'ऑफलाइन बिल (PDF)', group: 'offline', color: '#5d4037',
+      label: 'ऑफलाइन बिल (PDF)', labelEn: 'Offline bills (PDF)', group: 'offline', color: '#5d4037',
       reports: [
-        { key: 'bills', name: 'सारे बिल – PDF / फोटो', perMonth: false, multi: true, accept: '.pdf,.jpg,.jpeg,.png,.zip',
-          hint: 'इस अवधि के सारे सेल बिल. एक PDF में या अलग-अलग – जितने हों सब डालें.' }
+        { key: 'bills', name: 'सारे बिल – PDF / फोटो', nameEn: 'All bills – PDF / photo', perMonth: false, multi: true, accept: '.pdf,.jpg,.jpeg,.png,.zip',
+          hint: 'इस अवधि के सारे सेल बिल. एक PDF में या अलग-अलग – जितने हों सब डालें.', hintEn: 'All sale bills of this period – in one PDF or separate files. Upload all of them.' }
       ]
     },
     other: {
-      label: 'अन्य फाइलें', group: 'offline', color: '#6b7280',
+      label: 'अन्य फाइलें', labelEn: 'Other files', group: 'offline', color: '#6b7280',
       reports: [
-        { key: 'files', name: 'कोई और डेटा (Excel / PDF / फोटो)', perMonth: false, multi: true, optional: true, accept: '.pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.json,.zip',
-          hint: 'जो ऊपर किसी खाने में नहीं आता – जैसे दूसरी वेबसाइट की रिपोर्ट, खरीद बिल, या ऑफिस ने जो माँगा हो.' }
+        { key: 'files', name: 'कोई और डेटा (Excel / PDF / फोटो)', nameEn: 'Any other data (Excel / PDF / photo)', perMonth: false, multi: true, optional: true, accept: '.pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.json,.zip',
+          hint: 'जो ऊपर किसी खाने में नहीं आता – जैसे दूसरी वेबसाइट की रिपोर्ट, खरीद बिल, या ऑफिस ने जो माँगा हो.',
+          hintEn: 'Anything that does not fit a box above – e.g. another website\'s report, purchase bills, or what the office asked for.' }
       ]
     }
   };
@@ -157,8 +172,8 @@ var Core = (function () {
         list.forEach(function (mid) {
           out.push({
             id: pk + '.' + r.key + (mid ? '.' + mid : ''), plat: pk, key: r.key, month: mid,
-            name: r.name + (mid && months.length > 1 ? ' (' + monthLabel(mid).slice(0, 3) + ')' : ''),
-            optional: !!r.optional, multi: !!r.multi, accept: r.accept, hint: r.hint, detect: r.detect || ''
+            name: T(r.name, r.nameEn) + (mid && months.length > 1 ? ' (' + monthLabel(mid).slice(0, 3) + ')' : ''),
+            optional: !!r.optional, multi: !!r.multi, accept: r.accept, hint: T(r.hint, r.hintEn), detect: r.detect || ''
           });
         });
       });
@@ -201,8 +216,9 @@ var Core = (function () {
   function missingText(sm) {
     var by = {};
     sm.missing.forEach(function (m) { (by[m.plat] = by[m.plat] || []).push(m.name); });
-    return Object.keys(by).map(function (k) { return PLATFORMS[k].label + ': ' + by[k].join(', '); }).join(' | ');
+    return Object.keys(by).map(function (k) { return platLabel(k) + ': ' + by[k].join(', '); }).join(' | ');
   }
+  function platLabel(k) { var P = PLATFORMS[k]; return P ? T(P.label, P.labelEn) : k; }
 
   /* ---------- SHA-256 (pure JS, sync – same result in browser and Apps Script) ---------- */
   function sha256(input) {
@@ -299,18 +315,21 @@ var Core = (function () {
   function dataReminder(c, sm, settings) {
     var who = c.owner || displayName(c);
     var body = sm.files
-      ? 'नमस्ते ' + who + ', ' + sm.label + ' के GST रिटर्न के लिए ' + sm.missing.length + ' रिपोर्ट अभी बाकी हैं – ' + missingText(sm) + '. सब डालकर "डेटा भेज दिया" दबाएँ.'
-      : 'नमस्ते ' + who + ', ' + sm.label + ' का GST डेटा (Meesho / Amazon / Flipkart रिपोर्ट या बिल) ऐप में अपलोड करें. इस अवधि में कोई सेल नहीं थी तो "NIL" चुनें.';
-    return { title: sm.label + ' का GST डेटा भेजें', body: body };
+      ? T('नमस्ते ' + who + ', ' + sm.label + ' के GST रिटर्न के लिए ' + sm.missing.length + ' रिपोर्ट अभी बाकी हैं – ' + missingText(sm) + '. सब डालकर "डेटा भेज दिया" दबाएँ.',
+        'Hello ' + who + ', ' + sm.missing.length + ' report(s) are still pending for your ' + sm.label + ' GST return – ' + missingText(sm) + '. Upload them all and tap "Data sent".')
+      : T('नमस्ते ' + who + ', ' + sm.label + ' का GST डेटा (Meesho / Amazon / Flipkart रिपोर्ट या बिल) ऐप में अपलोड करें. इस अवधि में कोई सेल नहीं थी तो "NIL" चुनें.',
+        'Hello ' + who + ', please upload your ' + sm.label + ' GST data (Meesho / Amazon / Flipkart reports or bills) in the app. If there were no sales in this period, choose "NIL".');
+    return { title: T(sm.label + ' का GST डेटा भेजें', 'Send your ' + sm.label + ' GST data'), body: body };
   }
   function payReminder(c, sm) {
-    return { title: 'फीस बाकी: ₹' + sm.due, body: sm.label + ' का GST रिटर्न फाइल हो चुका है. कृपया ₹' + sm.due + ' का भुगतान करें. भुगतान कर दिया हो तो ऐप में "मैंने पेमेंट कर दिया" दबाएँ.' };
+    return { title: T('फीस बाकी: ₹', 'Fee due: ₹') + sm.due, body: T(sm.label + ' का GST रिटर्न फाइल हो चुका है. कृपया ₹' + sm.due + ' का भुगतान करें. भुगतान कर दिया हो तो ऐप में "मैंने पेमेंट कर दिया" दबाएँ.',
+      'Your ' + sm.label + ' GST return has been filed. Please pay ₹' + sm.due + '. If you have already paid, tap "I have paid" in the app.') };
   }
 
   /* ---------- auth ---------- */
   function byToken(db, token) {
     token = str(token, 80);
-    if (!token) fail('लॉगिन करें');
+    if (!token) fail(T('लॉगिन करें', 'Please log in'));
     for (var g in db.clients) { if ((db.clients[g].tokens || []).indexOf(token) >= 0) return db.clients[g]; }
     fail('SESSION_EXPIRED');
   }
@@ -325,49 +344,49 @@ var Core = (function () {
   var A = {};
   A.register = function (db, q, ctx) {
     var g = str(q.gstin, 15).toUpperCase();
-    if (!gstinValid(g)) fail('GSTIN सही नहीं है – दोबारा जाँचें');
-    if (db.clients[g]) fail('यह GSTIN पहले से रजिस्टर है – लॉगिन करें');
+    if (!gstinValid(g)) fail(T('GSTIN सही नहीं है – दोबारा जाँचें', 'This GSTIN is not valid – please check it'));
+    if (db.clients[g]) fail(T('यह GSTIN पहले से रजिस्टर है – लॉगिन करें', 'This GSTIN is already registered – please log in'));
     var mobile = str(q.mobile, 10);
-    if (!/^[6-9]\d{9}$/.test(mobile)) fail('10 अंकों का मोबाइल नंबर डालें');
+    if (!/^[6-9]\d{9}$/.test(mobile)) fail(T('10 अंकों का मोबाइल नंबर डालें', 'Enter a 10-digit mobile number'));
     var pin = str(q.pin, 6);
-    if (!/^\d{4,6}$/.test(pin)) fail('PIN 4 से 6 अंकों का रखें');
+    if (!/^\d{4,6}$/.test(pin)) fail(T('PIN 4 से 6 अंकों का रखें', 'PIN must be 4 to 6 digits'));
     var trade = str(q.trade, 100);
-    if (!trade) fail('फर्म / ट्रेड नाम डालें');
-    if (!str(q.legal, 100)) fail('GST में जिसका नाम है (लीगल नाम) वो डालें');
-    if (!str(q.owner, 80)) fail('आपका नाम डालें (जो ऑफिस से बात करेंगे)');
+    if (!trade) fail(T('फर्म / ट्रेड नाम डालें', 'Enter the firm / trade name'));
+    if (!str(q.legal, 100)) fail(T('GST में जिसका नाम है (लीगल नाम) वो डालें', 'Enter the GST holder\'s (legal) name'));
+    if (!str(q.owner, 80)) fail(T('आपका नाम डालें (जो ऑफिस से बात करेंगे)', 'Enter your name (the person who talks to the office)'));
     var salt = ctx.uuid().slice(0, 8);
     var c = {
       gstin: g, trade: trade, legal: str(q.legal, 100), owner: str(q.owner, 80), mobile: mobile, email: str(q.email, 100),
       freq: q.freq === 'Q' ? 'Q' : 'M', platforms: cleanPlatforms(q.platforms), status: 'ACTIVE', verified: false,
       salt: salt, pinHash: pinHash(pin, salt), pin: pin, tokens: [], pushTokens: [], inbox: [], defaultFee: null, notes: '',
-      createdAt: ctx.now.toISOString()
+      createdAt: ctx.now.toISOString(), lang: LANG
     };
     c.folder = newFolderName(c);
     var ref = byRef(db, q.ref);
     if (ref) c.referredBy = ref.gstin;
     db.clients[g] = c;
     if (ref) {
-      notifyClient(db, ctx, ref, '🎉 आपके रेफरल से नया क्लाइंट जुड़ा', fullName(c) + ' आपके लिंक से जुड़े. धन्यवाद! ' + (db.settings.refReward || ''));
+      asClient(ref, function () { notifyClient(db, ctx, ref, T('🎉 आपके रेफरल से नया क्लाइंट जुड़ा', '🎉 A new client joined through your referral'), fullName(c) + T(' आपके लिंक से जुड़े. धन्यवाद! ', ' joined through your link. Thank you! ') + (db.settings.refReward || '')); });
       notifyAdmin(db, ctx, 'REF', 'रेफरल: ' + fullName(c) + ' ← ' + fullName(ref), 'नया क्लाइंट ' + fullName(ref) + ' के रेफरल से आया', g);
     }
-    notifyClient(db, ctx, c, 'स्वागत है 🙏', db.settings.firm + ' के ऐप में आपका स्वागत है. हर महीने/तिमाही डेटा भेजने का रिमाइंडर यहीं आएगा.');
-    notifyAdmin(db, ctx, 'REG', 'नया क्लाइंट: ' + fullName(c), g + ' • ' + mobile + ' • ' + (c.freq === 'Q' ? 'Quarterly' : 'Monthly') + ' • ' + (c.platforms.map(function (p) { return PLATFORMS[p].label; }).join(', ') || 'कोई प्लेटफॉर्म नहीं'), g);
+    notifyClient(db, ctx, c, T('स्वागत है 🙏', 'Welcome 🙏'), T(db.settings.firm + ' के ऐप में आपका स्वागत है. हर महीने/तिमाही डेटा भेजने का रिमाइंडर यहीं आएगा.', 'Welcome to the ' + db.settings.firm + ' app. Your monthly/quarterly data reminders will come here.'));
+    notifyAdmin(db, ctx, 'REG', 'नया क्लाइंट: ' + fullName(c), g + ' • ' + mobile + ' • ' + (c.freq === 'Q' ? 'Quarterly' : 'Monthly') + ' • ' + (c.platforms.map(function (p) { return PLATFORMS[p].label; }).join(', ') || 'कोई प्लेटफॉर्म नहीं') + (c.lang === 'en' ? ' • English' : ''), g);
     return { sessions: [newSession(c, ctx)] };
   };
   A.login = function (db, q, ctx) {
     var id = str(q.id, 15).toUpperCase(), pin = str(q.pin, 6), out = [];
     Object.keys(db.clients).forEach(function (g) {
       var c = db.clients[g];
-      if ((c.gstin === id || c.mobile === id) && c.pinHash === pinHash(pin, c.salt) && c.status !== 'BLOCKED') { c.pin = pin; c.pinReqAt = ''; c.lastLogin = ctx.now.toISOString(); out.push(newSession(c, ctx)); }
+      if ((c.gstin === id || c.mobile === id) && c.pinHash === pinHash(pin, c.salt) && c.status !== 'BLOCKED') { c.pin = pin; c.pinReqAt = ''; c.lastLogin = ctx.now.toISOString(); if (q.lang) c.lang = LANG; out.push(newSession(c, ctx)); }
     });
-    if (!out.length) fail('GSTIN / मोबाइल या PIN गलत है');
+    if (!out.length) fail(T('GSTIN / मोबाइल या PIN गलत है', 'Wrong GSTIN / mobile or PIN'));
     return { sessions: out };
   };
   // "PIN भूल गए?" – tells the office (dashboard + email). Max once per 10 minutes per client.
   A.forgotPin = function (db, q, ctx) {
     var id = str(q.id, 15).toUpperCase(), list = [];
     Object.keys(db.clients).forEach(function (g) { var c = db.clients[g]; if (c.gstin === id || c.mobile === id) list.push(c); });
-    if (!list.length) fail('ये GSTIN / मोबाइल रजिस्टर नहीं है – पहले "नया रजिस्ट्रेशन" करें');
+    if (!list.length) fail(T('ये GSTIN / मोबाइल रजिस्टर नहीं है – पहले "नया रजिस्ट्रेशन" करें', 'This GSTIN / mobile is not registered – please use "New registration" first'));
     list.forEach(function (c) {
       if (c.pinReqAt && ctx.now - new Date(c.pinReqAt) < 600000) return;
       c.pinReqAt = ctx.now.toISOString();
@@ -392,16 +411,17 @@ var Core = (function () {
       inbox: (c.inbox || []).slice(0, 30), unread: (c.inbox || []).filter(function (n) { return !n.read; }).length,
       dues: dues, settings: { upi: db.settings.upi, payeeName: db.settings.payeeName, phone: db.settings.phone, firm: db.settings.firm },
       due: duesFor(db, c, ctx.now, 5, 60).slice(0, 8),
-      docs: (c.docs || []).map(function (d) { var v = docView(d); delete v.url; delete v.fileId; return v; }), docReq: c.docReq || null, docTypes: DOC_TYPES,
+      docs: (c.docs || []).map(function (d) { var v = docView(d); delete v.url; delete v.fileId; return v; }), docReq: c.docReq || null, docTypes: docTypes(),
       refCode: refCode(c), referrals: referralsOf(db, c).length, refReward: db.settings.refReward || '',
       fyTurnover: fyTurnover(db, c, +fyOf(lastMonth(ctx.now)).slice(0, 4)),
-      content: contentFor(db).map(function (x) { return { id: x.id, kind: x.kind, icon: x.icon, title: x.title, body: x.body, img: x.img, price: x.price, partner: x.partner, cta: x.cta, link: x.link, pinned: x.pinned, at: x.at }; })
+      // English fields are optional: an item without them shows its Hindi text in both languages
+      content: contentFor(db).map(function (x) { return { id: x.id, kind: x.kind, icon: x.icon, title: T(x.title, x.titleEn || null), body: T(x.body, x.bodyEn || null), img: x.img, price: T(x.price, x.priceEn || null), partner: x.partner, cta: T(x.cta, x.ctaEn || null), link: x.link, pinned: x.pinned, at: x.at }; })
     };
   };
   function editableRec(db, c, pid) {
-    if (!isPid(pid)) fail('अवधि सही नहीं');
+    if (!isPid(pid)) fail(T('अवधि सही नहीं', 'Wrong period'));
     var rec = getRec(db, c.gstin, pid, true);
-    if (rec.work === 'FILED') fail('इस अवधि का रिटर्न फाइल हो चुका है – बदलाव के लिए ऑफिस से बात करें');
+    if (rec.work === 'FILED') fail(T('इस अवधि का रिटर्न फाइल हो चुका है – बदलाव के लिए ऑफिस से बात करें', 'The return for this period is already filed – talk to the office for any change'));
     return rec;
   }
   function checkComplete(db, ctx, c, pid, rec) {
@@ -414,12 +434,12 @@ var Core = (function () {
   A.upload = function (db, q, ctx) {
     var c = byToken(db, q.token), pid = str(q.pid, 10), rec = editableRec(db, c, pid);
     var slot = slotsFor(c, pid).filter(function (s) { return s.id === q.slot; })[0];
-    if (!slot) fail('यह रिपोर्ट आपकी प्रोफाइल में नहीं है');
+    if (!slot) fail(T('यह रिपोर्ट आपकी प्रोफाइल में नहीं है', 'This report is not in your profile'));
     var name = str(q.name, 150).replace(/[\\\/:*?"<>|]/g, '_') || 'file';
-    if (!q.b64) fail('फाइल खाली है');
+    if (!q.b64) fail(T('फाइल खाली है', 'The file is empty'));
     var size = Math.round(String(q.b64).length * 0.75);
-    if (size > 30 * 1048576) fail('फाइल 30 MB से बड़ी है');
-    if (rec.files.some(function (x) { return x.slot === slot.id && x.name === name && Math.abs(x.size - size) < 4; })) fail('ये फाइल ' + slot.name + ' में पहले से अपलोड है');
+    if (size > 30 * 1048576) fail(T('फाइल 30 MB से बड़ी है', 'The file is larger than 30 MB'));
+    if (rec.files.some(function (x) { return x.slot === slot.id && x.name === name && Math.abs(x.size - size) < 4; })) fail(T('ये फाइल ' + slot.name + ' में पहले से अपलोड है', 'This file is already uploaded in ' + slot.name));
     var P = PLATFORMS[slot.plat];
     // GST REPORT TOOL layout: <client>\<FY>\<PERIOD>\INPUT\  (the tool reads every report in INPUT by its columns)
     var pd = periodDirs(pid);
@@ -445,7 +465,7 @@ var Core = (function () {
   A.deleteFile = function (db, q, ctx) {
     var c = byToken(db, q.token), rec = editableRec(db, c, str(q.pid, 10));
     var f = rec.files.filter(function (x) { return x.id === q.id; })[0];
-    if (!f) fail('फाइल नहीं मिली');
+    if (!f) fail(T('फाइल नहीं मिली', 'File not found'));
     rec.files = rec.files.filter(function (x) { return x.id !== q.id; });
     ctx.deleteFile(f.fileId);
     if (rec.completeNotified && summary(c, q.pid, rec).data !== 'COMPLETE') rec.completeNotified = '';
@@ -453,7 +473,7 @@ var Core = (function () {
   };
   A.setNil = function (db, q, ctx) {
     var c = byToken(db, q.token), pid = str(q.pid, 10), rec = editableRec(db, c, pid);
-    if (q.nil && rec.files.length) fail('इस अवधि में फाइलें अपलोड हैं. NIL के लिए पहले उन्हें हटाएँ.');
+    if (q.nil && rec.files.length) fail(T('इस अवधि में फाइलें अपलोड हैं. NIL के लिए पहले उन्हें हटाएँ.', 'Files are uploaded for this period. Remove them first to mark NIL.'));
     rec.nil = !!q.nil;
     rec.submittedAt = rec.nil ? ctx.now.toISOString() : '';
     if (rec.nil) notifyAdmin(db, ctx, 'NIL', 'NIL रिटर्न: ' + displayName(c) + ' – ' + periodLabel(pid), c.gstin + ' ने बताया कि इस अवधि में कोई सेल नहीं है. पहले फाइल करें.', c.gstin);
@@ -462,7 +482,7 @@ var Core = (function () {
   A.submit = function (db, q, ctx) {
     var c = byToken(db, q.token), pid = str(q.pid, 10), rec = editableRec(db, c, pid);
     var sm = summary(c, pid, rec);
-    if (!rec.files.length) fail('पहले रिपोर्ट अपलोड करें, या कोई सेल नहीं थी तो NIL चुनें');
+    if (!rec.files.length) fail(T('पहले रिपोर्ट अपलोड करें, या कोई सेल नहीं थी तो NIL चुनें', 'Upload your reports first, or choose NIL if there were no sales'));
     if (sm.missing.length && !q.force) return { needConfirm: true, missing: sm.missing };
     rec.submittedAt = ctx.now.toISOString();
     rec.completeNotified = rec.completeNotified || rec.submittedAt;
@@ -471,12 +491,13 @@ var Core = (function () {
   };
   A.unsubmit = function (db, q, ctx) {
     var c = byToken(db, q.token), rec = editableRec(db, c, str(q.pid, 10));
-    if (rec.nil) fail('NIL हटाने के लिए NIL वाला टिक हटाएँ');
+    if (rec.nil) fail(T('NIL हटाने के लिए NIL वाला टिक हटाएँ', 'To remove NIL, switch off the NIL toggle'));
     rec.submittedAt = '';
     return {};
   };
   A.profile = function (db, q, ctx) {
     var c = byToken(db, q.token), changes = [];
+    if (q.lang) c.lang = LANG;   // app language (notifications follow it); not an office-visible change
     if (q.platforms) { var p = cleanPlatforms(q.platforms); if (p.join() !== (c.platforms || []).join()) { c.platforms = p; changes.push('प्लेटफॉर्म: ' + p.map(function (k) { return PLATFORMS[k].label; }).join(', ')); } }
     if (q.owner != null && str(q.owner, 80) !== c.owner) { c.owner = str(q.owner, 80); changes.push('नाम: ' + c.owner); }
     if (q.email != null && str(q.email, 100) !== c.email) { c.email = str(q.email, 100); changes.push('ईमेल: ' + c.email); }
@@ -486,8 +507,8 @@ var Core = (function () {
   };
   A.changePin = function (db, q, ctx) {
     var c = byToken(db, q.token);
-    if (c.pinHash !== pinHash(str(q.old, 6), c.salt)) fail('पुराना PIN गलत है');
-    if (!/^\d{4,6}$/.test(str(q.pin, 6))) fail('PIN 4 से 6 अंकों का रखें');
+    if (c.pinHash !== pinHash(str(q.old, 6), c.salt)) fail(T('पुराना PIN गलत है', 'The old PIN is wrong'));
+    if (!/^\d{4,6}$/.test(str(q.pin, 6))) fail(T('PIN 4 से 6 अंकों का रखें', 'PIN must be 4 to 6 digits'));
     c.pinHash = pinHash(str(q.pin, 6), c.salt); c.pin = str(q.pin, 6);
     return {};
   };
@@ -500,7 +521,7 @@ var Core = (function () {
   A.claimPaid = function (db, q, ctx) {
     var c = byToken(db, q.token), pid = str(q.pid, 10), rec = getRec(db, c.gstin, pid, false);
     var sm = summary(c, pid, rec);
-    if (!(sm.due > 0)) fail('इस अवधि की कोई फीस बाकी नहीं');
+    if (!(sm.due > 0)) fail(T('इस अवधि की कोई फीस बाकी नहीं', 'No fee is due for this period'));
     rec.payClaim = { at: ctx.now.toISOString(), note: str(q.note, 150) };
     notifyAdmin(db, ctx, 'PAYCLAIM', displayName(c) + ' ने पेमेंट किया (जाँचें)', sm.label + ' • ₹' + sm.due + (rec.payClaim.note ? ' • ' + rec.payClaim.note : ''), c.gstin);
     return {};
@@ -570,21 +591,23 @@ var Core = (function () {
     if (q.turnover !== undefined) rec.turnover = q.turnover === '' || q.turnover == null ? null : num(q.turnover);
     if (rec.filed.gstr1) rec.work = 'FILED';
     var label = periodLabel(pid);
-    if (rec.work === 'PROCESS' && q.work === 'PROCESS' && !rec.processNotified) {
-      rec.processNotified = ctx.now.toISOString();
-      notifyClient(db, ctx, c, label + ': फाइलिंग शुरू', 'आपका ' + label + ' का डेटा मिल गया है, रिटर्न तैयार किया जा रहा है.');
-    }
-    if (rec.work === 'FILED' && !wasFiled) {
-      if (rec.fee == null) rec.fee = c.defaultFee != null ? c.defaultFee : (num(db.settings.defaultFee) || null);
-      var sm = summary(c, pid, rec), txt = (rec.nil ? 'NIL ' : '') + 'GSTR-1 फाइल हो गया ✓' + (rec.filed.gstr1 && rec.filed.gstr1.arn ? ' ARN: ' + rec.filed.gstr1.arn : '');
-      if (sm.due > 0) txt += '. फीस ₹' + sm.due + ' – कृपया भुगतान करें.';
-      notifyClient(db, ctx, c, label + ' का रिटर्न फाइल हो गया', txt);
-      rec.payRemindAt = ctx.now.toISOString();
-    }
-    if (rec.filed.gstr3b && !rec.r3bNotified) {
-      rec.r3bNotified = ctx.now.toISOString();
-      notifyClient(db, ctx, c, label + ': GSTR-3B फाइल हो गया ✓', rec.filed.gstr3b.arn ? 'ARN: ' + rec.filed.gstr3b.arn : 'GSTR-3B भी फाइल हो गया.');
-    }
+    asClient(c, function () {
+      if (rec.work === 'PROCESS' && q.work === 'PROCESS' && !rec.processNotified) {
+        rec.processNotified = ctx.now.toISOString();
+        notifyClient(db, ctx, c, label + T(': फाइलिंग शुरू', ': filing started'), T('आपका ' + label + ' का डेटा मिल गया है, रिटर्न तैयार किया जा रहा है.', 'We have received your ' + label + ' data. Your return is being prepared.'));
+      }
+      if (rec.work === 'FILED' && !wasFiled) {
+        if (rec.fee == null) rec.fee = c.defaultFee != null ? c.defaultFee : (num(db.settings.defaultFee) || null);
+        var sm = summary(c, pid, rec), txt = (rec.nil ? 'NIL ' : '') + T('GSTR-1 फाइल हो गया ✓', 'GSTR-1 filed ✓') + (rec.filed.gstr1 && rec.filed.gstr1.arn ? ' ARN: ' + rec.filed.gstr1.arn : '');
+        if (sm.due > 0) txt += T('. फीस ₹' + sm.due + ' – कृपया भुगतान करें.', '. Fee ₹' + sm.due + ' – please pay.');
+        notifyClient(db, ctx, c, T(label + ' का रिटर्न फाइल हो गया', label + ' return filed'), txt);
+        rec.payRemindAt = ctx.now.toISOString();
+      }
+      if (rec.filed.gstr3b && !rec.r3bNotified) {
+        rec.r3bNotified = ctx.now.toISOString();
+        notifyClient(db, ctx, c, label + T(': GSTR-3B फाइल हो गया ✓', ': GSTR-3B filed ✓'), rec.filed.gstr3b.arn ? 'ARN: ' + rec.filed.gstr3b.arn : T('GSTR-3B भी फाइल हो गया.', 'GSTR-3B is filed too.'));
+      }
+    });
     checkTurnover(db, ctx, c);
     return { summary: summary(c, pid, rec) };
   };
@@ -602,7 +625,7 @@ var Core = (function () {
     rec.payments.push({ id: ctx.uuid(), amt: amt, mode: str(q.mode, 20) || 'UPI', note: str(q.note, 100), date: str(q.date, 10) || ist(ctx.now).iso, at: ctx.now.toISOString() });
     rec.payClaim = null;
     var sm = summary(c, pid, rec);
-    notifyClient(db, ctx, c, '₹' + amt + ' भुगतान मिला 🙏', sm.label + ' की फीस का ₹' + amt + ' मिल गया' + (sm.due > 0 ? '. बाकी ₹' + sm.due : '. धन्यवाद!'));
+    asClient(c, function () { notifyClient(db, ctx, c, '₹' + amt + T(' भुगतान मिला 🙏', ' payment received 🙏'), T(sm.label + ' की फीस का ₹' + amt + ' मिल गया' + (sm.due > 0 ? '. बाकी ₹' + sm.due : '. धन्यवाद!'), 'Received ₹' + amt + ' for the ' + sm.label + ' fee' + (sm.due > 0 ? '. Balance ₹' + sm.due : '. Thank you!'))); });
     return { summary: sm };
   };
   A.aDeletePayment = function (db, q) {
@@ -613,7 +636,7 @@ var Core = (function () {
   A.aRejectClaim = function (db, q, ctx) {
     var c = client(db, q.gstin), pid = str(q.pid, 10), rec = getRec(db, c.gstin, pid, true);
     rec.payClaim = null;
-    notifyClient(db, ctx, c, 'पेमेंट नहीं मिला', periodLabel(pid) + ' की फीस का पेमेंट अभी हमें नहीं मिला है. कृपया जाँच लें.');
+    asClient(c, function () { notifyClient(db, ctx, c, T('पेमेंट नहीं मिला', 'Payment not received'), T(periodLabel(pid) + ' की फीस का पेमेंट अभी हमें नहीं मिला है. कृपया जाँच लें.', 'We have not received the payment for the ' + periodLabel(pid) + ' fee yet. Please check.')); });
     return {};
   };
   A.aMessage = function (db, q, ctx) {
@@ -626,6 +649,7 @@ var Core = (function () {
     var month = /^\d{4}-\d{2}$/.test(q.month || '') ? q.month : lastMonth(ctx.now), sent = 0;
     (q.gstins || []).forEach(function (g) {
       var c = client(db, g);
+      asClient(c, function () {
       if (q.kind === 'pay') {
         var all = db.periods[c.gstin] || {};
         Object.keys(all).forEach(function (p) {
@@ -636,6 +660,7 @@ var Core = (function () {
         var pid = pidFor(c.freq, month), sm = summary(c, pid, getRec(db, c.gstin, pid, false));
         if (sm.data === 'NONE' || sm.data === 'PARTIAL') { var m2 = dataReminder(c, sm, db.settings); notifyClient(db, ctx, c, m2.title, m2.body); sent++; }
       }
+      });
     });
     return { sent: sent };
   };
@@ -688,30 +713,30 @@ var Core = (function () {
   var X_STATES = ['22', '23', '24', '25', '26', '27', '29', '30', '31', '32', '33', '34', '35', '36', '37'];
   function p2(n) { return (n < 10 ? '0' : '') + n; }
   function ymd(y, m, d) { while (m > 12) { m -= 12; y++; } return y + '-' + p2(m) + '-' + p2(d); }
-  function crore(n) { return '₹' + (n / 1e7).toFixed(2) + ' करोड़'; }
+  function crore(n) { return '₹' + (n / 1e7).toFixed(2) + T(' करोड़', ' Cr'); }
   function rawDues(db, c, fromMid, toMid) {
     var out = [], x = c.gstin.slice(0, 2), mid = fromMid;
     function add(key, type, title, date, desc, pid) { out.push({ key: key, type: type, title: title, date: (db.settings.dueExt || {})[key] || date, desc: desc, pid: pid || '' }); }
     while (mid <= toMid) {
       var y = +mid.slice(0, 4), m = +mid.slice(5, 7), lab = monthLabel(mid);
       if (c.freq !== 'Q') {
-        add('GSTR1:' + mid, 'GSTR1', 'GSTR-1 (' + lab + ')', ymd(y, m + 1, 11), 'बिक्री का रिटर्न – डेटा पहले भेजें', mid);
-        add('GSTR3B:' + mid, 'GSTR3B', 'GSTR-3B (' + lab + ')', ymd(y, m + 1, 20), 'टैक्स भरने का रिटर्न – टैक्स बना हो तो पेमेंट तैयार रखें', mid);
+        add('GSTR1:' + mid, 'GSTR1', 'GSTR-1 (' + lab + ')', ymd(y, m + 1, 11), T('बिक्री का रिटर्न – डेटा पहले भेजें', 'Sales return – send your data before this'), mid);
+        add('GSTR3B:' + mid, 'GSTR3B', 'GSTR-3B (' + lab + ')', ymd(y, m + 1, 20), T('टैक्स भरने का रिटर्न – टैक्स बना हो तो पेमेंट तैयार रखें', 'Tax payment return – keep the payment ready if tax is due'), mid);
       } else {
         var q = quarterOf(mid), qm = monthsOf(q);
         if (qm[2] === mid) {
-          add('GSTR1:' + q, 'GSTR1', 'GSTR-1 (' + periodLabel(q) + ')', ymd(y, m + 1, 13), 'तिमाही बिक्री का रिटर्न – डेटा पहले भेजें', q);
-          add('GSTR3B:' + q + ':' + (X_STATES.indexOf(x) >= 0 ? 'X' : 'Y'), 'GSTR3B', 'GSTR-3B (' + periodLabel(q) + ')', ymd(y, m + 1, X_STATES.indexOf(x) >= 0 ? 22 : 24), 'तिमाही टैक्स रिटर्न', q);
-        } else add('PMT06:' + mid, 'PMT06', 'PMT-06 टैक्स जमा (' + lab + ')', ymd(y, m + 1, 25), 'QRMP – इस महीने का टैक्स 25 तारीख तक जमा करें (टैक्स बना हो तो)', '');
+          add('GSTR1:' + q, 'GSTR1', 'GSTR-1 (' + periodLabel(q) + ')', ymd(y, m + 1, 13), T('तिमाही बिक्री का रिटर्न – डेटा पहले भेजें', 'Quarterly sales return – send your data before this'), q);
+          add('GSTR3B:' + q + ':' + (X_STATES.indexOf(x) >= 0 ? 'X' : 'Y'), 'GSTR3B', 'GSTR-3B (' + periodLabel(q) + ')', ymd(y, m + 1, X_STATES.indexOf(x) >= 0 ? 22 : 24), T('तिमाही टैक्स रिटर्न', 'Quarterly tax return'), q);
+        } else add('PMT06:' + mid, 'PMT06', T('PMT-06 टैक्स जमा (', 'PMT-06 tax payment (') + lab + ')', ymd(y, m + 1, 25), T('QRMP – इस महीने का टैक्स 25 तारीख तक जमा करें (टैक्स बना हो तो)', 'QRMP – pay this month\'s tax by the 25th (if any tax is due)'), '');
       }
-      if (c.tds) add('TDSPAY:' + mid, 'TDS', 'TDS जमा (' + lab + ')', m === 3 ? ymd(y, 4, 30) : ymd(y, m + 1, 7), 'काटा हुआ TDS सरकार को जमा करें', '');
-      if (c.tds && [6, 9, 12, 3].indexOf(m) >= 0) add('TDSRET:' + mid, 'TDS', 'TDS रिटर्न (24Q/26Q) – तिमाही ' + lab, m === 12 ? ymd(y + 1, 1, 31) : m === 3 ? ymd(y, 5, 31) : ymd(y, m + 1, 31), 'तिमाही TDS रिटर्न', '');
-      if (c.advtax && [6, 9, 12, 3].indexOf(m) >= 0) add('ADV:' + mid, 'ADV', 'एडवांस टैक्स किस्त (' + lab + ')', ymd(y, m, 15), 'इनकम टैक्स की एडवांस किस्त', '');
-      if (m === 7) add('ITR:' + y, 'ITR', 'ITR – FY ' + (y - 1) + '-' + p2(y % 100), ymd(y, 7, 31), 'इनकम टैक्स रिटर्न (बिना ऑडिट वाले) – डॉक्यूमेंट तिजोरी में बैंक स्टेटमेंट डालें', '');
+      if (c.tds) add('TDSPAY:' + mid, 'TDS', T('TDS जमा (', 'TDS payment (') + lab + ')', m === 3 ? ymd(y, 4, 30) : ymd(y, m + 1, 7), T('काटा हुआ TDS सरकार को जमा करें', 'Deposit the TDS you deducted with the government'), '');
+      if (c.tds && [6, 9, 12, 3].indexOf(m) >= 0) add('TDSRET:' + mid, 'TDS', T('TDS रिटर्न (24Q/26Q) – तिमाही ', 'TDS return (24Q/26Q) – quarter ') + lab, m === 12 ? ymd(y + 1, 1, 31) : m === 3 ? ymd(y, 5, 31) : ymd(y, m + 1, 31), T('तिमाही TDS रिटर्न', 'Quarterly TDS return'), '');
+      if (c.advtax && [6, 9, 12, 3].indexOf(m) >= 0) add('ADV:' + mid, 'ADV', T('एडवांस टैक्स किस्त (', 'Advance tax instalment (') + lab + ')', ymd(y, m, 15), T('इनकम टैक्स की एडवांस किस्त', 'Income tax advance instalment'), '');
+      if (m === 7) add('ITR:' + y, 'ITR', 'ITR – FY ' + (y - 1) + '-' + p2(y % 100), ymd(y, 7, 31), T('इनकम टैक्स रिटर्न (बिना ऑडिट वाले) – डॉक्यूमेंट तिजोरी में बैंक स्टेटमेंट डालें', 'Income tax return (non-audit) – put your bank statement in the document vault'), '');
       if (m === 12) {
         var fy = fyTurnover(db, c, y - 1);
-        if (fy.total >= 2e7 || c.annual) add('GSTR9:' + (y - 1), 'GSTR9', 'GSTR-9 सालाना रिटर्न – FY ' + fy.fy, ymd(y, 12, 31), 'टर्नओवर ₹2 करोड़ से ऊपर – सालाना रिटर्न ज़रूरी', '');
-        if (fy.total >= 5e7) add('GSTR9C:' + (y - 1), 'GSTR9', 'GSTR-9C – FY ' + fy.fy, ymd(y, 12, 31), 'टर्नओवर ₹5 करोड़ से ऊपर – reconciliation statement ज़रूरी', '');
+        if (fy.total >= 2e7 || c.annual) add('GSTR9:' + (y - 1), 'GSTR9', T('GSTR-9 सालाना रिटर्न – FY ', 'GSTR-9 annual return – FY ') + fy.fy, ymd(y, 12, 31), T('टर्नओवर ₹2 करोड़ से ऊपर – सालाना रिटर्न ज़रूरी', 'Turnover above ₹2 Cr – annual return required'), '');
+        if (fy.total >= 5e7) add('GSTR9C:' + (y - 1), 'GSTR9', 'GSTR-9C – FY ' + fy.fy, ymd(y, 12, 31), T('टर्नओवर ₹5 करोड़ से ऊपर – reconciliation statement ज़रूरी', 'Turnover above ₹5 Cr – reconciliation statement required'), '');
       }
       mid = addMonth(mid, 1);
     }
@@ -743,8 +768,8 @@ var Core = (function () {
     return { fy: fyStart + '-' + p2((fyStart + 1) % 100), total: num(total), months: months, projected: months ? num(total / months * 12) : null };
   }
   var LIMITS = [
-    { lim: 2e7, key: 'gstr9', text: 'GSTR-9 (सालाना रिटर्न) ज़रूरी हो जाएगा – 31 दिसंबर तक.' },
-    { lim: 5e7, key: 'gstr9c', text: 'GSTR-9C ज़रूरी, e-invoice ज़रूरी, और अगले साल से Quarterly (QRMP) नहीं चलेगा – Monthly रिटर्न.' }
+    { lim: 2e7, key: 'gstr9', text: 'GSTR-9 (सालाना रिटर्न) ज़रूरी हो जाएगा – 31 दिसंबर तक.', textEn: 'GSTR-9 (annual return) becomes required – by 31 December.' },
+    { lim: 5e7, key: 'gstr9c', text: 'GSTR-9C ज़रूरी, e-invoice ज़रूरी, और अगले साल से Quarterly (QRMP) नहीं चलेगा – Monthly रिटर्न.', textEn: 'GSTR-9C and e-invoicing become required, and from next year Quarterly (QRMP) is not allowed – Monthly returns.' }
   ];
   function checkTurnover(db, ctx, c) {
     var fs = +fyOf(lastMonth(ctx.now)).slice(0, 4), t = fyTurnover(db, c, fs);
@@ -754,9 +779,9 @@ var Core = (function () {
       var actual = t.total >= L.lim, proj = !actual && t.months >= 3 && t.projected >= L.lim;
       if (!actual && !proj) return;
       c.alerts[k] = ctx.now.toISOString();
-      var head = (actual ? 'टर्नओवर ' + crore(t.total) : 'साल का अनुमानित टर्नओवर ' + crore(t.projected)) + ' (FY ' + t.fy + ', ' + crore(L.lim).replace('.00', '') + ' से ऊपर)';
-      notifyAdmin(db, ctx, 'TURNOVER', fullName(c) + ': ' + head, L.text, c.gstin);
-      notifyClient(db, ctx, c, '📈 आपका टर्नओवर बढ़ रहा है', head + '. ' + L.text + ' हम आपको समय पर याद दिलाएँगे.');
+      function head() { return (actual ? T('टर्नओवर ', 'Turnover ') + crore(t.total) : T('साल का अनुमानित टर्नओवर ', 'Expected yearly turnover ') + crore(t.projected)) + ' (FY ' + t.fy + ', ' + T('', 'above ') + crore(L.lim).replace('.00', '') + T(' से ऊपर', '') + ')'; }
+      asClient({ lang: 'hi' }, function () { notifyAdmin(db, ctx, 'TURNOVER', fullName(c) + ': ' + head(), L.text, c.gstin); });
+      asClient(c, function () { notifyClient(db, ctx, c, T('📈 आपका टर्नओवर बढ़ रहा है', '📈 Your turnover is growing'), head() + '. ' + T(L.text + ' हम आपको समय पर याद दिलाएँगे.', L.textEn + ' We will remind you in time.')); });
     });
     return t;
   }
@@ -772,13 +797,19 @@ var Core = (function () {
     bank: 'बैंक पासबुक / कैंसल चेक', address: 'दुकान / ऑफिस का एड्रेस प्रूफ (बिजली बिल / रेंट एग्रीमेंट)', msme: 'उद्यम (MSME) सर्टिफिकेट',
     fssai: 'फूड लाइसेंस (FSSAI)', bank_stmt: 'बैंक स्टेटमेंट (पूरे साल का – ITR के लिए)', form16: 'फॉर्म 16 (नौकरी है तो)', other: 'कोई और डॉक्यूमेंट'
   };
-  function docView(d) { return { id: d.id, type: d.type, label: DOC_TYPES[d.type] || d.type, name: d.name, size: d.size, at: d.at, url: d.url || '', fileId: d.fileId }; }
+  var DOC_TYPES_EN = {
+    pan: 'PAN card', aadhaar: 'Aadhaar card (front and back)', gst_cert: 'GST certificate', photo: 'Passport size photo',
+    bank: 'Bank passbook / cancelled cheque', address: 'Shop / office address proof (electricity bill / rent agreement)', msme: 'Udyam (MSME) certificate',
+    fssai: 'Food licence (FSSAI)', bank_stmt: 'Bank statement (full year – for ITR)', form16: 'Form 16 (if salaried)', other: 'Any other document'
+  };
+  function docTypes() { return LANG === 'en' ? DOC_TYPES_EN : DOC_TYPES; }
+  function docView(d) { return { id: d.id, type: d.type, label: docTypes()[d.type] || d.type, name: d.name, size: d.size, at: d.at, url: d.url || '', fileId: d.fileId }; }
   A.docUpload = function (db, q, ctx) {
     var c = byToken(db, q.token), type = DOC_TYPES[q.type] ? q.type : 'other';
-    if (!q.b64) fail('फाइल खाली है');
+    if (!q.b64) fail(T('फाइल खाली है', 'The file is empty'));
     var name = str(q.name, 120).replace(/[\\\/:*?"<>|]/g, '_') || 'document';
     var size = Math.round(String(q.b64).length * 0.75);
-    if (size > 20 * 1048576) fail('फाइल 20 MB से बड़ी है');
+    if (size > 20 * 1048576) fail(T('फाइल 20 MB से बड़ी है', 'The file is larger than 20 MB'));
     var st = ctx.saveFile({ folders: [folderName(c), 'KYC DOCUMENTS'], name: DOC_TYPES[type].replace(/[\\\/:*?"<>|()]/g, ' ').trim() + ' - ' + name, mime: str(q.mime, 100) || 'application/octet-stream' }, q.b64);
     c.docs = c.docs || [];
     c.docs.push({ id: ctx.uuid(), type: type, name: name, size: size, mime: str(q.mime, 100), at: ctx.now.toISOString(), fileId: st.fileId, url: st.url || '' });
@@ -791,7 +822,7 @@ var Core = (function () {
   };
   A.docDelete = function (db, q, ctx) {
     var c = byToken(db, q.token), d = (c.docs || []).filter(function (x) { return x.id === q.id; })[0];
-    if (!d) fail('नहीं मिला');
+    if (!d) fail(T('नहीं मिला', 'Not found'));
     c.docs = c.docs.filter(function (x) { return x.id !== q.id; }); ctx.deleteFile(d.fileId);
     return {};
   };
@@ -799,7 +830,7 @@ var Core = (function () {
     var c = client(db, q.gstin), types = (q.types || []).filter(function (t) { return DOC_TYPES[t]; });
     if (!types.length) { c.docReq = null; return {}; }
     c.docReq = { types: types, note: str(q.note, 300), at: ctx.now.toISOString() };
-    notifyClient(db, ctx, c, '📁 ये डॉक्यूमेंट भेजें', (c.docReq.note ? c.docReq.note + ': ' : '') + types.map(function (t) { return DOC_TYPES[t]; }).join(', ') + '. ऐप में "डॉक्यूमेंट तिजोरी" में अपलोड करें.');
+    asClient(c, function () { notifyClient(db, ctx, c, T('📁 ये डॉक्यूमेंट भेजें', '📁 Please send these documents'), (c.docReq.note ? c.docReq.note + ': ' : '') + types.map(function (t) { return docTypes()[t]; }).join(', ') + T('. ऐप में "डॉक्यूमेंट तिजोरी" में अपलोड करें.', '. Upload them in the app\'s "Document vault".')); });
     return {};
   };
 
@@ -818,7 +849,7 @@ var Core = (function () {
     rec.filed = rec.filed || {};
     if (kind === 'GSTR3B' && !rec.filed.gstr3b) rec.filed.gstr3b = { arn: str(q.arn, 30), date: ist(ctx.now).iso };
     if (kind === 'GSTR3B') rec.r3bNotified = rec.r3bNotified || ctx.now.toISOString();
-    notifyClient(db, ctx, c, periodLabel(pid) + ': ' + (kind === 'GSTR3B' ? 'GSTR-3B फाइल हो गया ✓' : kind === 'GSTR1' ? 'GSTR-1 की कॉपी' : 'नया डॉक्यूमेंट'), 'PDF ऐप में आ गई है – होम पर "' + periodLabel(pid) + '" खोलकर डाउनलोड करें.');
+    asClient(c, function () { notifyClient(db, ctx, c, periodLabel(pid) + ': ' + (kind === 'GSTR3B' ? T('GSTR-3B फाइल हो गया ✓', 'GSTR-3B filed ✓') : kind === 'GSTR1' ? T('GSTR-1 की कॉपी', 'GSTR-1 copy') : T('नया डॉक्यूमेंट', 'New document')), T('PDF ऐप में आ गई है – होम पर "' + periodLabel(pid) + '" खोलकर डाउनलोड करें.', 'The PDF is in the app – open "' + periodLabel(pid) + '" on the home screen to download it.')); });
     return { summary: summary(c, pid, rec) };
   };
   A.aReturnDelete = function (db, q, ctx) {
@@ -831,7 +862,7 @@ var Core = (function () {
   A.fileGet = function (db, q, ctx) {
     var c = byToken(db, q.token), f = (c.docs || []).filter(function (x) { return x.id === q.id; })[0];
     if (!f) { var all = db.periods[c.gstin] || {}; Object.keys(all).forEach(function (p) { (all[p].returns || []).forEach(function (r) { if (r.id === q.id) f = r; }); }); }
-    if (!f) fail('फाइल नहीं मिली');
+    if (!f) fail(T('फाइल नहीं मिली', 'File not found'));
     return { name: f.name, mime: f.mime || 'application/pdf', fileId: f.fileId, b64: ctx.readFile ? ctx.readFile(f.fileId) : null };
   };
 
@@ -864,15 +895,16 @@ var Core = (function () {
     Object.keys(db.clients).forEach(function (g) {
       var c = db.clients[g]; if (c.status !== 'ACTIVE') return;
       c.dueSent = c.dueSent || {};
-      duesFor(db, c, ctx.now, 0, 31).forEach(function (d) {
+      // office digest in Hindi, the client's reminder in the client's language
+      asClient({ lang: 'hi' }, function () { duesFor(db, c, ctx.now, 0, 31).forEach(function (d) { if (!d.done && d.days <= 3) { var k = d.title + '|' + d.date; (soon[k] = soon[k] || []).push(fullName(c)); } }); });
+      asClient(c, function () { duesFor(db, c, ctx.now, 0, 31).forEach(function (d) {
         if (d.done) return;
-        if (d.days <= 3) { var k = d.title + '|' + d.date; (soon[k] = soon[k] || []).push(fullName(c)); }
         if ((OFF[d.type] || [0]).indexOf(d.days) < 0 || c.dueSent[d.key + ':' + d.days]) return;
         if (d.type === 'GSTR1') { var sm = summary(c, d.pid, getRec(db, g, d.pid, false)); if (sm.data === 'NIL' || sm.data === 'SUBMITTED' || sm.data === 'COMPLETE') return; }
         c.dueSent[d.key + ':' + d.days] = ctx.now.toISOString();
-        notifyClient(db, ctx, c, '📅 ' + d.title + ' – ' + (d.days ? d.days + ' दिन बाकी' : 'आज आखिरी तारीख'), d.desc + ' (आखिरी तारीख ' + d.date.split('-').reverse().join('-') + ')');
+        notifyClient(db, ctx, c, '📅 ' + d.title + ' – ' + (d.days ? d.days + T(' दिन बाकी', ' day(s) left') : T('आज आखिरी तारीख', 'last date today')), d.desc + T(' (आखिरी तारीख ', ' (last date ') + d.date.split('-').reverse().join('-') + ')');
         sent++;
-      });
+      }); });
       checkTurnover(db, ctx, c);
     });
     var lines = Object.keys(soon).sort().map(function (k) { return k.split('|')[0] + ' – ' + k.split('|')[1].split('-').reverse().join('-') + ': ' + soon[k].length + ' क्लाइंट बाकी'; });
@@ -885,33 +917,65 @@ var Core = (function () {
   var KINDS = { learn: 'सीखें / ऑफर', news: 'न्यूज़ / अपडेट', service: 'हमारी सेवाएँ', faq: 'सवाल-जवाब' };
   function seedContent() {
     var t = '2026-10-28T00:00:00.000Z', o = 0;
-    function it(kind, icon, title, body, cta) { o++; return { id: 'seed-' + kind + '-' + o, kind: kind, icon: icon, title: title, body: body, img: '', price: '', partner: '', cta: cta || '', link: '', pinned: false, active: true, order: o, at: t }; }
+    function it(kind, icon, title, body, cta, en) {
+      o++;
+      return { id: 'seed-' + kind + '-' + o, kind: kind, icon: icon, title: title, body: body, img: '', price: '', partner: '', cta: cta || '', link: '', pinned: false, active: true, order: o, at: t,
+        titleEn: en[0], bodyEn: en[1], ctaEn: cta ? 'Enquire' : '', priceEn: '' };
+    }
+    var ASK = 'पूछताछ करें';
     return [
-      it('service', '🧾', 'GST रजिस्ट्रेशन', 'नया GST नंबर – कागज़ात से लेकर सर्टिफिकेट तक सब हम करेंगे.', 'पूछताछ करें'),
-      it('service', '📅', 'GST रिटर्न फाइलिंग', 'GSTR-1, GSTR-3B, Meesho / Amazon / Flipkart का TCS मिलान, NIL रिटर्न – हर महीने / तिमाही.', 'पूछताछ करें'),
-      it('service', '💰', 'इनकम टैक्स रिटर्न (ITR)', 'बिज़नेस, नौकरी या दोनों – सही ITR फॉर्म, रिफंड और नोटिस का जवाब.', 'पूछताछ करें'),
-      it('service', '🏭', 'MSME / उद्यम रजिस्ट्रेशन', 'उद्यम सर्टिफिकेट – लोन, सब्सिडी और सरकारी योजनाओं के लिए ज़रूरी.', 'पूछताछ करें'),
-      it('service', '🍲', 'फूड लाइसेंस (FSSAI)', 'खाने-पीने का सामान बेचते हैं? Basic / State / Central FSSAI लाइसेंस.', 'पूछताछ करें'),
-      it('service', '🏢', 'प्राइवेट लिमिटेड कंपनी रजिस्ट्रेशन', 'नई कंपनी – नाम, DIN, DSC, MOA/AOA, PAN/TAN सब शामिल.', 'पूछताछ करें'),
-      it('service', '🤝', 'LLP रजिस्ट्रेशन', 'पार्टनरशिप बिज़नेस के लिए LLP – कम खर्च, कम झंझट.', 'पूछताछ करें'),
-      it('service', '™️', 'ट्रेडमार्क रजिस्ट्रेशन', 'अपने ब्रांड का नाम / लोगो सुरक्षित करें – Amazon Brand Registry के लिए भी.', 'पूछताछ करें'),
-      it('service', '📒', 'अकाउंटिंग और बुककीपिंग', 'खरीद-बिक्री, स्टॉक, P&L – पूरा हिसाब हम रखेंगे.', 'पूछताछ करें'),
-      it('faq', '🔐', 'ऐप में लॉगिन कैसे करें?', 'लॉगिन पेज पर अपना GSTIN या मोबाइल नंबर और PIN डालें. पहली बार हैं तो "नया रजिस्ट्रेशन" करें. फोन "Password सेव करें?" पूछे तो Save दबाएँ – अगली बार अपने आप भर जाएगा.'),
-      it('faq', '🔑', 'PIN भूल गया तो क्या करूँ?', 'लॉगिन पेज पर "PIN भूल गए?" दबाएँ – ऑफिस को WhatsApp चला जाएगा और हम आपको PIN बता देंगे.'),
-      it('faq', '🛍️', 'Meesho की रिपोर्ट कहाँ से डाउनलोड करें?', 'Meesho Supplier Panel → GST Report से महीने की ZIP (gst_…zip) और Tax Invoice ZIP डाउनलोड करें. दोनों ZIP सीधे Meesho सेक्शन में डाल दें – ऐप अंदर की फाइलें खुद सही खाने में डाल देगा.'),
-      it('faq', '📦', 'Amazon की रिपोर्ट कहाँ से डाउनलोड करें?', 'Seller Central → Reports → Tax Document Library से MTR B2C, MTR B2B और GST Report (GSTR1-महीना) डाउनलोड करें. CSV या ZIP दोनों चलेंगी.'),
-      it('faq', '🛒', 'Flipkart की रिपोर्ट कहाँ से डाउनलोड करें?', 'Seller Hub → Reports → Tax Reports से Sales Report और GST (GSTR Return) Report – दोनों उसी महीने की डाउनलोड करें.'),
-      it('faq', '❌', 'मेरी फाइल क्यों नहीं ली गई?', 'ऐप हर फाइल अंदर से जाँचता है. गलत प्लेटफॉर्म की रिपोर्ट (जैसे Meesho की फाइल Flipkart में), गलत महीने की रिपोर्ट या पहले से डाली हुई फाइल नहीं ली जाती. जो कारण लिखा आए उसके हिसाब से सही फाइल डालें. फाइल के अंदर कुछ न बदलें.'),
-      it('faq', '🧾', 'ऑफलाइन बिल, Vyapar या कोई और फाइल कैसे भेजूँ?', 'होम पर नीचे "कुछ और भी भेजना है?" में Vyapar, ऑफलाइन बिल (PDF) या "अन्य फाइलें" जोड़ें, फिर उसमें फाइल / फोटो अपलोड करें.'),
-      it('faq', '0️⃣', 'इस महीने कोई सेल नहीं हुई तो?', 'होम पर "इस अवधि में कोई सेल नहीं हुई?" वाला टिक चालू करें. हम आपका NIL रिटर्न सबसे पहले फाइल करेंगे.'),
-      it('faq', '⏰', 'डेटा कब तक भेजना है?', 'हर महीने 1 से 8 तारीख तक पिछले महीने का डेटा भेजें. Quarterly वाले तिमाही खत्म होने के बाद वाले महीने में (जैसे Jul–Sep का डेटा अक्टूबर में). सब डालकर "डेटा पूरा भेज दिया" दबाएँ.'),
-      it('faq', '✅', 'रिटर्न फाइल हुआ, कैसे पता चलेगा?', 'फाइल होते ही ऐप में सूचना आएगी और होम पर ARN नंबर दिखेगा.'),
-      it('faq', '💳', 'फीस कैसे भरें?', 'रिटर्न फाइल होने के बाद होम पर फीस दिखेगी – "UPI से पे करें" दबाएँ. पेमेंट कर दिया हो तो "मैंने पेमेंट कर दिया" दबाएँ.'),
-      it('faq', '🏬', 'मेरे पास एक से ज़्यादा GST नंबर हैं?', 'हर GST नंबर का अलग रजिस्ट्रेशन करें. ☰ मेनू → "दूसरी फर्म जोड़ें" से एक ही फोन में सब फर्म रख सकते हैं.'),
-      it('faq', '📲', 'ऐप इंस्टॉल और अपडेट कैसे करें?', 'लिंक Chrome में खोलें → "इंस्टॉल" (iPhone: Share → Add to Home Screen). अपडेट अपने आप आते हैं, कुछ नहीं करना.')
+      it('service', '🧾', 'GST रजिस्ट्रेशन', 'नया GST नंबर – कागज़ात से लेकर सर्टिफिकेट तक सब हम करेंगे.', ASK, ['GST registration', 'A new GST number – we handle everything from documents to the certificate.']),
+      it('service', '📅', 'GST रिटर्न फाइलिंग', 'GSTR-1, GSTR-3B, Meesho / Amazon / Flipkart का TCS मिलान, NIL रिटर्न – हर महीने / तिमाही.', ASK, ['GST return filing', 'GSTR-1, GSTR-3B, Meesho / Amazon / Flipkart TCS matching, NIL returns – every month / quarter.']),
+      it('service', '💰', 'इनकम टैक्स रिटर्न (ITR)', 'बिज़नेस, नौकरी या दोनों – सही ITR फॉर्म, रिफंड और नोटिस का जवाब.', ASK, ['Income tax return (ITR)', 'Business, salary or both – the right ITR form, refunds and replies to notices.']),
+      it('service', '🏭', 'MSME / उद्यम रजिस्ट्रेशन', 'उद्यम सर्टिफिकेट – लोन, सब्सिडी और सरकारी योजनाओं के लिए ज़रूरी.', ASK, ['MSME / Udyam registration', 'Udyam certificate – needed for loans, subsidies and government schemes.']),
+      it('service', '🍲', 'फूड लाइसेंस (FSSAI)', 'खाने-पीने का सामान बेचते हैं? Basic / State / Central FSSAI लाइसेंस.', ASK, ['Food licence (FSSAI)', 'Selling food items? Basic / State / Central FSSAI licence.']),
+      it('service', '🏢', 'प्राइवेट लिमिटेड कंपनी रजिस्ट्रेशन', 'नई कंपनी – नाम, DIN, DSC, MOA/AOA, PAN/TAN सब शामिल.', ASK, ['Private limited company registration', 'A new company – name, DIN, DSC, MOA/AOA, PAN/TAN all included.']),
+      it('service', '🤝', 'LLP रजिस्ट्रेशन', 'पार्टनरशिप बिज़नेस के लिए LLP – कम खर्च, कम झंझट.', ASK, ['LLP registration', 'LLP for partnership businesses – low cost, little paperwork.']),
+      it('service', '™️', 'ट्रेडमार्क रजिस्ट्रेशन', 'अपने ब्रांड का नाम / लोगो सुरक्षित करें – Amazon Brand Registry के लिए भी.', ASK, ['Trademark registration', 'Protect your brand name / logo – also needed for Amazon Brand Registry.']),
+      it('service', '📒', 'अकाउंटिंग और बुककीपिंग', 'खरीद-बिक्री, स्टॉक, P&L – पूरा हिसाब हम रखेंगे.', ASK, ['Accounting and bookkeeping', 'Purchases, sales, stock, P&L – we keep all your accounts.']),
+      it('faq', '🔐', 'ऐप में लॉगिन कैसे करें?', 'लॉगिन पेज पर अपना GSTIN या मोबाइल नंबर और PIN डालें. पहली बार हैं तो "नया रजिस्ट्रेशन" करें. फोन "Password सेव करें?" पूछे तो Save दबाएँ – अगली बार अपने आप भर जाएगा.', '',
+        ['How do I log in?', 'On the login page enter your GSTIN or mobile number and your PIN. First time? Use "New registration". If the phone asks "Save password?", tap Save – it fills in by itself next time.']),
+      it('faq', '🔑', 'PIN भूल गया तो क्या करूँ?', 'लॉगिन पेज पर "PIN भूल गए?" दबाएँ – ऑफिस को WhatsApp चला जाएगा और हम आपको PIN बता देंगे.', '',
+        ['I forgot my PIN. What now?', 'Tap "Forgot PIN?" on the login page – a WhatsApp goes to the office and we will tell you your PIN.']),
+      it('faq', '🛍️', 'Meesho की रिपोर्ट कहाँ से डाउनलोड करें?', 'Meesho Supplier Panel → GST Report से महीने की ZIP (gst_…zip) और Tax Invoice ZIP डाउनलोड करें. दोनों ZIP सीधे Meesho सेक्शन में डाल दें – ऐप अंदर की फाइलें खुद सही खाने में डाल देगा.', '',
+        ['Where do I download Meesho reports?', 'Meesho Supplier Panel → GST Report: download the month\'s ZIP (gst_…zip) and the Tax Invoice ZIP. Upload both ZIPs straight into the Meesho section – the app puts the files inside into the right boxes.']),
+      it('faq', '📦', 'Amazon की रिपोर्ट कहाँ से डाउनलोड करें?', 'Seller Central → Reports → Tax Document Library से MTR B2C, MTR B2B और GST Report (GSTR1-महीना) डाउनलोड करें. CSV या ZIP दोनों चलेंगी.', '',
+        ['Where do I download Amazon reports?', 'Seller Central → Reports → Tax Document Library: download MTR B2C, MTR B2B and the GST Report (GSTR1-MONTH). CSV or ZIP both work.']),
+      it('faq', '🛒', 'Flipkart की रिपोर्ट कहाँ से डाउनलोड करें?', 'Seller Hub → Reports → Tax Reports से Sales Report और GST (GSTR Return) Report – दोनों उसी महीने की डाउनलोड करें.', '',
+        ['Where do I download Flipkart reports?', 'Seller Hub → Reports → Tax Reports: download the Sales Report and the GST (GSTR Return) Report, both for the same month.']),
+      it('faq', '❌', 'मेरी फाइल क्यों नहीं ली गई?', 'ऐप हर फाइल अंदर से जाँचता है. गलत प्लेटफॉर्म की रिपोर्ट (जैसे Meesho की फाइल Flipkart में), गलत महीने की रिपोर्ट या पहले से डाली हुई फाइल नहीं ली जाती. जो कारण लिखा आए उसके हिसाब से सही फाइल डालें. फाइल के अंदर कुछ न बदलें.', '',
+        ['Why was my file not accepted?', 'The app checks every file inside. A report of the wrong platform (e.g. a Meesho file in Flipkart), of the wrong month, or a file already uploaded is not taken. Follow the reason shown and upload the right file. Do not change anything inside the file.']),
+      it('faq', '🧾', 'ऑफलाइन बिल, Vyapar या कोई और फाइल कैसे भेजूँ?', 'होम पर नीचे "कुछ और भी भेजना है?" में Vyapar, ऑफलाइन बिल (PDF) या "अन्य फाइलें" जोड़ें, फिर उसमें फाइल / फोटो अपलोड करें.', '',
+        ['How do I send offline bills, Vyapar or other files?', 'At the bottom of the home screen, under "Anything else to send?", add Vyapar, Offline bills (PDF) or "Other files", then upload the file / photo there.']),
+      it('faq', '0️⃣', 'इस महीने कोई सेल नहीं हुई तो?', 'होम पर "इस अवधि में कोई सेल नहीं हुई?" वाला टिक चालू करें. हम आपका NIL रिटर्न सबसे पहले फाइल करेंगे.', '',
+        ['No sales this month?', 'Switch on "No sales in this period?" on the home screen. We file NIL returns first.']),
+      it('faq', '⏰', 'डेटा कब तक भेजना है?', 'हर महीने 1 से 8 तारीख तक पिछले महीने का डेटा भेजें. Quarterly वाले तिमाही खत्म होने के बाद वाले महीने में (जैसे Jul–Sep का डेटा अक्टूबर में). सब डालकर "डेटा पूरा भेज दिया" दबाएँ.', '',
+        ['By when should I send my data?', 'Send last month\'s data between the 1st and 8th of every month. Quarterly clients send in the month after the quarter ends (e.g. Jul–Sep data in October). Upload everything and tap "All data sent".']),
+      it('faq', '✅', 'रिटर्न फाइल हुआ, कैसे पता चलेगा?', 'फाइल होते ही ऐप में सूचना आएगी और होम पर ARN नंबर दिखेगा.', '',
+        ['How will I know my return is filed?', 'You get a notification in the app as soon as it is filed, and the ARN shows on the home screen.']),
+      it('faq', '💳', 'फीस कैसे भरें?', 'रिटर्न फाइल होने के बाद होम पर फीस दिखेगी – "UPI से पे करें" दबाएँ. पेमेंट कर दिया हो तो "मैंने पेमेंट कर दिया" दबाएँ.', '',
+        ['How do I pay the fee?', 'After the return is filed the fee shows on the home screen – tap "Pay by UPI". If you have already paid, tap "I have paid".']),
+      it('faq', '🏬', 'मेरे पास एक से ज़्यादा GST नंबर हैं?', 'हर GST नंबर का अलग रजिस्ट्रेशन करें. ☰ मेनू → "दूसरी फर्म जोड़ें" से एक ही फोन में सब फर्म रख सकते हैं.', '',
+        ['I have more than one GST number?', 'Register each GST number separately. With ☰ menu → "Add another firm" you can keep all firms on one phone.']),
+      it('faq', '📲', 'ऐप इंस्टॉल और अपडेट कैसे करें?', 'लिंक Chrome में खोलें → "इंस्टॉल" (iPhone: Share → Add to Home Screen). अपडेट अपने आप आते हैं, कुछ नहीं करना.', '',
+        ['How do I install and update the app?', 'Open the link in Chrome → "Install" (iPhone: Share → Add to Home Screen). Updates come by themselves, nothing to do.']),
+      it('faq', '📎', 'WhatsApp पर आई रिपोर्ट कैसे भेजूँ?', 'WhatsApp में फाइल को दबाकर रखें → Share → "Vishal GST" चुनें. ऐप खुलेगा, Meesho / Amazon / Flipkart की रिपोर्ट अपने आप सही खाने में जाएगी, बाकी फाइल के लिए खाना चुनें और अपलोड दबाएँ. (Android फोन पर)', '',
+        ['How do I send a report I got on WhatsApp?', 'In WhatsApp, press and hold the file → Share → choose "Vishal GST". The app opens; Meesho / Amazon / Flipkart reports go to the right box by themselves, for other files pick the box and tap Upload. (Android phones)'])
     ];
   }
-  function ensure(db) { if (!db.content) db.content = seedContent(); if (!db.leads) db.leads = []; }
+  function ensure(db) {
+    if (!db.content) db.content = seedContent();
+    if (!db.leads) db.leads = [];
+    // v1.6: give the default items their English text (only if the office has not edited the Hindi), and add new default FAQs
+    if (!db.meta.seedEn) {
+      db.meta.seedEn = 1;
+      seedContent().forEach(function (s) {
+        var x = db.content.filter(function (i) { return i.id === s.id; })[0];
+        if (!x) { if (s.icon === '📎') db.content.push(s); return; }
+        if (!x.titleEn && x.title === s.title && x.body === s.body) { x.titleEn = s.titleEn; x.bodyEn = s.bodyEn; x.ctaEn = x.cta === s.cta ? s.ctaEn : ''; }
+      });
+    }
+  }
   function contentFor(db) {
     return db.content.filter(function (x) { return x.active; }).sort(function (a, b) {
       return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (a.kind === 'news' || a.kind === 'learn' ? (b.at || '').localeCompare(a.at || '') : (a.order || 0) - (b.order || 0));
@@ -919,7 +983,7 @@ var Core = (function () {
   }
   A.lead = function (db, q, ctx) {
     var c = byToken(db, q.token), item = db.content.filter(function (x) { return x.id === q.id; })[0];
-    if (!item) fail('ये जानकारी अब उपलब्ध नहीं है');
+    if (!item) fail(T('ये जानकारी अब उपलब्ध नहीं है', 'This item is no longer available'));
     var dup = db.leads.filter(function (l) { return l.gstin === c.gstin && l.itemId === item.id && ctx.now - new Date(l.at) < 86400000; })[0];
     if (!dup) {
       db.leads.unshift({ id: ctx.uuid(), at: ctx.now.toISOString(), gstin: c.gstin, itemId: item.id, kind: item.kind, title: item.title, status: 'NEW', note: '' });
@@ -941,13 +1005,16 @@ var Core = (function () {
     if (!it) { it = { id: ctx.uuid(), at: ctx.now.toISOString(), order: db.content.length + 1 }; db.content.push(it); }
     it.kind = kind; it.title = str(f.title, 150); it.body = str(f.body, 3000); it.icon = str(f.icon, 8);
     it.img = str(f.img, 600); it.price = str(f.price, 60); it.partner = str(f.partner, 80); it.cta = str(f.cta, 40);
+    // optional English text for clients who use the app in English
+    if (f.titleEn !== undefined) { it.titleEn = str(f.titleEn, 150); it.bodyEn = str(f.bodyEn, 3000); it.ctaEn = str(f.ctaEn, 40); it.priceEn = str(f.priceEn, 60); }
     it.link = /^https?:\/\//i.test(str(f.link, 500)) ? str(f.link, 500) : ''; it.pinned = !!f.pinned; it.active = f.active !== false;
     if (f.order != null && f.order !== '') it.order = num(f.order);
     var sent = 0;
     if (q.notify && it.active) {
       Object.keys(db.clients).forEach(function (g) {
         var c = db.clients[g]; if (c.status !== 'ACTIVE') return;
-        notifyClient(db, ctx, c, (kind === 'news' ? '📰 ' : kind === 'learn' ? '🎓 ' : '') + it.title, it.body.slice(0, 160)); sent++;
+        var en = c.lang === 'en' && it.titleEn;
+        notifyClient(db, ctx, c, (kind === 'news' ? '📰 ' : kind === 'learn' ? '🎓 ' : '') + (en ? it.titleEn : it.title), (en ? it.bodyEn || it.body : it.body).slice(0, 160)); sent++;
       });
       it.notifiedAt = ctx.now.toISOString();
     }
@@ -972,6 +1039,7 @@ var Core = (function () {
   /* ---------- daily reminders (Apps Script time trigger / admin button) ---------- */
   function tick(db, ctx, force) {
     var t = ist(ctx.now), s = db.settings, dataSent = 0, paySent = 0;
+    setLang('hi');   // office side; each client's texts switch with asClient
     if (db.meta.lastTick === t.iso && !force) return { skipped: true };
     db.meta.lastTick = t.iso;
     var dataDay = (s.remindDays || []).indexOf(t.d) >= 0;
@@ -983,7 +1051,7 @@ var Core = (function () {
         if (isCollectionMonth(c.freq, pid, ctx.now)) {
           var rec = getRec(db, g, pid, false), sm = summary(c, pid, rec);
           if ((sm.data === 'NONE' || sm.data === 'PARTIAL') && rec.work !== 'FILED') {
-            var m = dataReminder(c, sm, s); notifyClient(db, ctx, c, m.title, m.body); dataSent++;
+            asClient(c, function () { var m = dataReminder(c, summary(c, pid, rec), s); notifyClient(db, ctx, c, m.title, m.body); }); dataSent++;
           }
         }
       }
@@ -992,7 +1060,7 @@ var Core = (function () {
         var r = all[p], sm2 = summary(c, p, r);
         if (sm2.due > 0 && r.work === 'FILED') {
           var days = r.payRemindAt ? (ctx.now - new Date(r.payRemindAt)) / 86400000 : 999;
-          if (days >= (s.payEveryDays || 3) - 0.05) { var m3 = payReminder(c, sm2); notifyClient(db, ctx, c, m3.title, m3.body); r.payRemindAt = ctx.now.toISOString(); paySent++; }
+          if (days >= (s.payEveryDays || 3) - 0.05) { asClient(c, function () { var m3 = payReminder(c, summary(c, p, r)); notifyClient(db, ctx, c, m3.title, m3.body); }); r.payRemindAt = ctx.now.toISOString(); paySent++; }
         }
       });
     });
@@ -1006,6 +1074,7 @@ var Core = (function () {
              push(tokens,title,body,gstin), notifyAdmin(kind,title,body), adminKeyOk(key) } */
   function handle(db, q, ctx) {
     var action = String(q && q.action || '');
+    setLang(q && q.lang);
     try {
       if (!A[action]) fail('Unknown action: ' + action);
       ensure(db);
@@ -1022,7 +1091,8 @@ var Core = (function () {
     newDb: newDb, handle: handle, tick: tick,
     gstinValid: gstinValid, gstinInfo: gstinInfo, sha256: sha256,
     monthsOf: monthsOf, monthLabel: monthLabel, periodLabel: periodLabel, currentPid: currentPid, pidFor: pidFor,
-    lastMonth: lastMonth, quarterOf: quarterOf, addMonth: addMonth, slotsFor: slotsFor, summary: summary, missingText: missingText
+    lastMonth: lastMonth, quarterOf: quarterOf, addMonth: addMonth, slotsFor: slotsFor, summary: summary, missingText: missingText,
+    setLang: setLang, T: T, platLabel: platLabel
   };
 })();
 if (typeof module !== 'undefined') module.exports = Core;

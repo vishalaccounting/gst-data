@@ -14,7 +14,7 @@ var Detect = (function () {
     MEESHO_INV: ['meesho', 'tax_invoice', 'Meesho – Tax Invoice Details'],
     AMZ_B2C: ['amazon', 'mtr_b2c', 'Amazon – MTR B2C'],
     AMZ_B2B: ['amazon', 'mtr_b2b', 'Amazon – MTR B2B'],
-    AMZ_GSTR1: ['amazon', 'gstr1', 'Amazon – GSTR-1 (मासिक GST) Report'],
+    AMZ_GSTR1: ['amazon', 'gstr1', 'Amazon – GSTR-1 (monthly GST) Report'],
     FK_SALES: ['flipkart', 'sales', 'Flipkart – Sales Report'],
     FK_GST: ['flipkart', 'gst', 'Flipkart – GSTR Return Report']
   };
@@ -23,7 +23,7 @@ var Detect = (function () {
   function load(src) {
     if (!loading[src]) loading[src] = new Promise(function (res, rej) {
       var s = document.createElement('script'); s.src = src; s.onload = res;
-      s.onerror = function () { delete loading[src]; rej(new Error('फाइल जाँचने का टूल लोड नहीं हुआ – इंटरनेट जाँचें')); };
+      s.onerror = function () { delete loading[src]; rej(new Error(window.UI_LANG === 'en' ? 'The file-check tool did not load – check your internet' : 'फाइल जाँचने का टूल लोड नहीं हुआ – इंटरनेट जाँचें')); };
       document.head.appendChild(s);
     });
     return loading[src];

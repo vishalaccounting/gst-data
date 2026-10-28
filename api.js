@@ -57,13 +57,16 @@ var API = (function () {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // simple request → no CORS preflight
       body: JSON.stringify(q)
     }).then(function (r) {
-      if (!r.ok) throw new Error('सर्वर से जवाब नहीं मिला (' + r.status + ')');
+      if (!r.ok) throw new Error(tx('सर्वर से जवाब नहीं मिला (', 'No reply from the server (') + r.status + ')');
       return r.json();
-    }, function () { throw new Error('इंटरनेट कनेक्शन जाँचें'); });
+    }, function () { throw new Error(tx('इंटरनेट कनेक्शन जाँचें', 'Check your internet connection')); });
   }
+  // client app sets window.UI_LANG ('hi' | 'en'); the office dashboard leaves it unset (Hindi)
+  function tx(hi, en) { return typeof window !== 'undefined' && window.UI_LANG === 'en' ? en : hi; }
 
   function call(action, params) {
     var q = Object.assign({ action: action }, params || {});
+    if (!q.lang && typeof window !== 'undefined' && window.UI_LANG) q.lang = window.UI_LANG;
     return (DEMO ? demoCall(q) : remoteCall(q)).then(function (out) {
       if (!out.ok) { var e = new Error(out.error); e.code = out.error; throw e; }
       return out.data;
@@ -73,7 +76,7 @@ var API = (function () {
   // demo only: get an uploaded file back as a Blob (real mode uses Google Drive links)
   function demoFile(id) {
     return idbDo('readonly', function (st) { return st.get(id); }).then(function (rec) {
-      if (!rec) throw new Error('फाइल नहीं मिली');
+      if (!rec) throw new Error(tx('फाइल नहीं मिली', 'File not found'));
       var bin = atob(rec.b64), arr = new Uint8Array(bin.length);
       for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
       return { name: rec.meta.name, blob: new Blob([arr], { type: rec.meta.mime }) };
@@ -84,7 +87,7 @@ var API = (function () {
     return new Promise(function (res, rej) {
       var fr = new FileReader();
       fr.onload = function () { var s = String(fr.result); res(s.slice(s.indexOf(',') + 1)); };
-      fr.onerror = function () { rej(new Error('फाइल पढ़ी नहीं जा सकी')); };
+      fr.onerror = function () { rej(new Error(tx('फाइल पढ़ी नहीं जा सकी', 'Could not read the file'))); };
       fr.readAsDataURL(file);
     });
   }

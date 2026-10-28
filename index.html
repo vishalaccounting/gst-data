@@ -113,60 +113,68 @@ details.faq div{padding:0 16px 14px 48px;font-size:14px;color:#374151;white-spac
 .svc .ic{font-size:28px}
 .svc b{font-size:14px}.svc .mute{flex:1}
 .empty{text-align:center;color:var(--mute);padding:40px 20px}
+.tabbar button b{font-weight:600}
+.langsw{display:flex;justify-content:flex-end;gap:4px;margin:-14px 0 6px}
+.langsw button,.langrow button{border:1.5px solid var(--line);background:#fff;border-radius:20px;padding:5px 12px;font-size:13px;font-weight:600;color:var(--pri);cursor:pointer}
+.langsw button.on,.langrow button.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.langrow{display:flex;gap:8px}.langrow button{flex:1;padding:10px}
 </style>
 </head>
 <body>
 
 <!-- ============ AUTH ============ -->
+<!-- Static text: the Hindi is in the markup, the English in data-en (applyLang swaps them). -->
 <div id="vAuth" class="auth hide">
+  <div class="langsw"><button data-l="hi" onclick="setLang('hi')">हिंदी</button><button data-l="en" onclick="setLang('en')">English</button></div>
   <img src="icon-192.png" class="logo" alt="">
-  <div style="text-align:center"><b style="font-size:19px">Vishal Accounting Services</b><div class="mute">GST डेटा भेजने का ऐप</div></div>
-  <div id="demoNote" class="banner hide"><span class="grow">डेमो मोड – डेटा सिर्फ इसी ब्राउज़र में है.</span></div>
-  <div class="tabs"><button id="tLogin" class="on" onclick="authTab('login')">लॉगिन</button><button id="tReg" onclick="authTab('reg')">नया रजिस्ट्रेशन</button></div>
+  <div style="text-align:center"><b style="font-size:19px">Vishal Accounting Services</b><div class="mute" data-en="App to send your GST data">GST डेटा भेजने का ऐप</div></div>
+  <div id="demoNote" class="banner hide"><span class="grow" data-en="Demo mode – data stays in this browser only.">डेमो मोड – डेटा सिर्फ इसी ब्राउज़र में है.</span></div>
+  <div id="shareNote" class="banner hide"><span class="grow"></span></div>
+  <div class="tabs"><button id="tLogin" class="on" onclick="authTab('login')" data-en="Login">लॉगिन</button><button id="tReg" onclick="authTab('reg')" data-en="New registration">नया रजिस्ट्रेशन</button></div>
 
   <form id="fLogin" class="card" onsubmit="doLogin(event)">
-    <label class="f">GSTIN या मोबाइल नंबर</label>
+    <label class="f" data-en="GSTIN or mobile number">GSTIN या मोबाइल नंबर</label>
     <input class="i" id="lId" autocomplete="username" required style="text-transform:uppercase">
     <label class="f">PIN</label>
     <input class="i" id="lPin" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password" required>
-    <button class="btn block" style="margin-top:16px">लॉगिन करें</button>
-    <button type="button" class="btn ghost block" style="margin-top:6px" onclick="forgotPin()">🔑 PIN भूल गए?</button>
+    <button class="btn block" style="margin-top:16px" data-en="Log in">लॉगिन करें</button>
+    <button type="button" class="btn ghost block" style="margin-top:6px" onclick="forgotPin()" data-en="🔑 Forgot PIN?">🔑 PIN भूल गए?</button>
   </form>
 
   <form id="fReg" class="card hide" onsubmit="doRegister(event)">
     <label class="f">GSTIN *</label>
     <input class="i" id="rGstin" maxlength="15" required style="text-transform:uppercase" oninput="gstinCheck()">
     <div id="rGstinHelp" class="help"></div>
-    <label class="f">GST किसके नाम पर है? * <span class="mute">(लीगल नाम – PAN वाला)</span></label>
+    <label class="f" data-en='Whose name is the GST in? * &lt;span class="mute"&gt;(legal name – as on PAN)&lt;/span&gt;'>GST किसके नाम पर है? * <span class="mute">(लीगल नाम – PAN वाला)</span></label>
     <input class="i" id="rLegal" required>
-    <label class="f">फर्म / ट्रेड नाम * <span class="mute">(GST सर्टिफिकेट वाला)</span></label>
+    <label class="f" data-en='Firm / trade name * &lt;span class="mute"&gt;(as on the GST certificate)&lt;/span&gt;'>फर्म / ट्रेड नाम * <span class="mute">(GST सर्टिफिकेट वाला)</span></label>
     <input class="i" id="rTrade" required>
-    <label class="f">आपका नाम * <span class="mute">(जो ऑफिस से बात करेंगे)</span></label>
+    <label class="f" data-en='Your name * &lt;span class="mute"&gt;(the person who talks to the office)&lt;/span&gt;'>आपका नाम * <span class="mute">(जो ऑफिस से बात करेंगे)</span></label>
     <input class="i" id="rOwner" required>
-    <div class="mute" style="margin-top:4px">जैसे GST पत्नी के नाम पर है और बात पति करते हैं, तो यहाँ पति का नाम.</div>
-    <label class="f">मोबाइल नंबर *</label>
+    <div class="mute" style="margin-top:4px" data-en="E.g. if the GST is in the wife's name and the husband talks to us, write the husband's name here.">जैसे GST पत्नी के नाम पर है और बात पति करते हैं, तो यहाँ पति का नाम.</div>
+    <label class="f" data-en="Mobile number *">मोबाइल नंबर *</label>
     <input class="i" id="rMobile" inputmode="numeric" maxlength="10" required>
-    <label class="f">ईमेल</label>
+    <label class="f" data-en="Email">ईमेल</label>
     <input class="i" id="rEmail" type="email">
-    <label class="f">रिटर्न कैसे भरते हैं?</label>
+    <label class="f" data-en="How do you file returns?">रिटर्न कैसे भरते हैं?</label>
     <div class="pick">
-      <label><input type="radio" name="rFreq" value="M" checked> हर महीने (Monthly)</label>
-      <label><input type="radio" name="rFreq" value="Q"> तिमाही (Quarterly)</label>
+      <label><input type="radio" name="rFreq" value="M" checked> <span data-en="Every month (Monthly)">हर महीने (Monthly)</span></label>
+      <label><input type="radio" name="rFreq" value="Q"> <span data-en="Every quarter (Quarterly)">तिमाही (Quarterly)</span></label>
     </div>
-    <label class="f">आप कहाँ बेचते हैं? <span class="mute">(जितने हों सब चुनें)</span></label>
-    <div class="mute" style="margin:2px 0 6px">ऑनलाइन (E-commerce)</div>
+    <label class="f" data-en='Where do you sell? &lt;span class="mute"&gt;(choose all that apply)&lt;/span&gt;'>आप कहाँ बेचते हैं? <span class="mute">(जितने हों सब चुनें)</span></label>
+    <div class="mute" style="margin:2px 0 6px" data-en="Online (E-commerce)">ऑनलाइन (E-commerce)</div>
     <div class="pick" id="rOnline"></div>
-    <div class="mute" style="margin:10px 0 6px">ऑफलाइन</div>
+    <div class="mute" style="margin:10px 0 6px" data-en="Offline">ऑफलाइन</div>
     <div class="pick" id="rOffline"></div>
-    <label class="f">PIN बनाएँ * <span class="mute">(4–6 अंक)</span></label>
+    <label class="f" data-en='Create a PIN * &lt;span class="mute"&gt;(4–6 digits)&lt;/span&gt;'>PIN बनाएँ * <span class="mute">(4–6 अंक)</span></label>
     <input class="i" id="rPin" type="password" inputmode="numeric" maxlength="6" required autocomplete="new-password">
-    <label class="f">PIN दोबारा</label>
+    <label class="f" data-en="PIN again">PIN दोबारा</label>
     <input class="i" id="rPin2" type="password" inputmode="numeric" maxlength="6" required autocomplete="new-password">
-    <div class="mute" style="margin-top:6px">⚠ ATM / बैंक वाला PIN न रखें. PIN भूल जाने पर ऑफिस आपको बता सकता है.</div>
-    <label class="f">रेफरल कोड <span class="mute">(किसी ने बताया हो तो – वैकल्पिक)</span></label>
+    <div class="mute" style="margin-top:6px" data-en="⚠ Do not use your ATM / bank PIN. If you forget the PIN, the office can tell you.">⚠ ATM / बैंक वाला PIN न रखें. PIN भूल जाने पर ऑफिस आपको बता सकता है.</div>
+    <label class="f" data-en='Referral code &lt;span class="mute"&gt;(if someone referred you – optional)&lt;/span&gt;'>रेफरल कोड <span class="mute">(किसी ने बताया हो तो – वैकल्पिक)</span></label>
     <input class="i" id="rRef" maxlength="6" style="text-transform:uppercase">
-    <button class="btn block" style="margin-top:16px">रजिस्टर करें</button>
-    <div class="mute" style="margin-top:10px">आपका नाम और GSTIN ऑफिस द्वारा GST पोर्टल से मिलाया जाएगा.</div>
+    <button class="btn block" style="margin-top:16px" data-en="Register">रजिस्टर करें</button>
+    <div class="mute" style="margin-top:10px" data-en="The office will match your name and GSTIN with the GST portal.">आपका नाम और GSTIN ऑफिस द्वारा GST पोर्टल से मिलाया जाएगा.</div>
   </form>
 </div>
 
@@ -174,13 +182,13 @@ details.faq div{padding:0 16px 14px 48px;font-size:14px;color:#374151;white-spac
 <div id="vHome" class="hide">
   <header class="top"><div class="row">
     <div class="grow"><div class="firm">VISHAL ACCOUNTING SERVICES</div><div class="who" id="hWho"></div></div>
-    <button class="iconbtn" onclick="openInbox()" aria-label="सूचनाएँ">🔔<span id="hBadge" class="badge hide"></span></button>
-    <button class="iconbtn" onclick="openProfile()" aria-label="प्रोफाइल">☰</button>
+    <button class="iconbtn" onclick="openInbox()" aria-label="Notifications">🔔<span id="hBadge" class="badge hide"></span></button>
+    <button class="iconbtn" onclick="openProfile()" aria-label="Profile">☰</button>
   </div></header>
   <div class="wrap">
-    <div id="installBar" class="banner hide"><span class="grow">📲 ऐप को फोन में इंस्टॉल करें – रिमाइंडर सीधे मिलेंगे.</span><button class="btn sm" onclick="doInstall()">इंस्टॉल</button></div>
-    <div id="iosBar" class="banner hide"><span class="grow">📲 iPhone पर: नीचे Share ⬆️ → "Add to Home Screen" दबाएँ.</span><button class="x" onclick="hideIos()">✕</button></div>
-    <div id="pushBar" class="banner hide"><span class="grow">🔔 नोटिफिकेशन चालू करें ताकि डेटा और फीस के रिमाइंडर मिलें.</span><button class="btn sm" onclick="enablePush()">चालू करें</button></div>
+    <div id="installBar" class="banner hide"><span class="grow" data-en="📲 Install the app on your phone – get reminders directly.">📲 ऐप को फोन में इंस्टॉल करें – रिमाइंडर सीधे मिलेंगे.</span><button class="btn sm" onclick="doInstall()" data-en="Install">इंस्टॉल</button></div>
+    <div id="iosBar" class="banner hide"><span class="grow" data-en='📲 On iPhone: tap Share ⬆️ below → "Add to Home Screen".'>📲 iPhone पर: नीचे Share ⬆️ → "Add to Home Screen" दबाएँ.</span><button class="x" onclick="hideIos()">✕</button></div>
+    <div id="pushBar" class="banner hide"><span class="grow" data-en="🔔 Turn on notifications to get data and fee reminders.">🔔 नोटिफिकेशन चालू करें ताकि डेटा और फीस के रिमाइंडर मिलें.</span><button class="btn sm" onclick="enablePush()" data-en="Turn on">चालू करें</button></div>
     <div id="tabHome">
       <div class="chips" id="hPeriods"></div>
       <div id="hBody"></div>
@@ -189,39 +197,43 @@ details.faq div{padding:0 16px 14px 48px;font-size:14px;color:#374151;white-spac
   </div>
   <div class="bar" id="hBar"><div class="in" id="hBarIn"></div></div>
   <nav class="tabbar" id="tabbar">
-    <button data-t="home" class="on" onclick="showTab('home')"><span>📤</span>डेटा</button>
-    <button data-t="learn" onclick="showTab('learn')"><span>🎓</span>सीखें<i class="dot hide"></i></button>
-    <button data-t="news" onclick="showTab('news')"><span>📰</span>न्यूज़<i class="dot hide"></i></button>
-    <button data-t="service" onclick="showTab('service')"><span>💼</span>सेवाएँ</button>
-    <button data-t="faq" onclick="showTab('faq')"><span>❓</span>मदद</button>
+    <button data-t="home" class="on" onclick="showTab('home')"><span>📤</span><b data-en="Data">डेटा</b></button>
+    <button data-t="learn" onclick="showTab('learn')"><span>🎓</span><b data-en="Learn">सीखें</b><i class="dot hide"></i></button>
+    <button data-t="news" onclick="showTab('news')"><span>📰</span><b data-en="News">न्यूज़</b><i class="dot hide"></i></button>
+    <button data-t="service" onclick="showTab('service')"><span>💼</span><b data-en="Services">सेवाएँ</b></button>
+    <button data-t="faq" onclick="showTab('faq')"><span>❓</span><b data-en="Help">मदद</b></button>
   </nav>
 </div>
 
 <!-- ============ SHEETS ============ -->
 <div class="sheet" id="sInbox" onclick="if(event.target===this)closeSheet(this)"><div class="pane">
-  <div class="hd"><h2 style="margin:0">सूचनाएँ</h2><button class="btn ghost" onclick="closeSheet(sInbox)">बंद ✕</button></div>
+  <div class="hd"><h2 style="margin:0" data-en="Notifications">सूचनाएँ</h2><button class="btn ghost" onclick="closeSheet(sInbox)" data-en="Close ✕">बंद ✕</button></div>
   <div id="inboxList"></div>
 </div></div>
 
 <div class="sheet" id="sProfile" onclick="if(event.target===this)closeSheet(this)"><div class="pane">
-  <div class="hd"><h2 style="margin:0">मेरी प्रोफाइल</h2><button class="btn ghost" onclick="closeSheet(sProfile)">बंद ✕</button></div>
+  <div class="hd"><h2 style="margin:0" data-en="My profile">मेरी प्रोफाइल</h2><button class="btn ghost" onclick="closeSheet(sProfile)" data-en="Close ✕">बंद ✕</button></div>
   <div id="profBody"></div>
 </div></div>
 
 <div class="sheet" id="sResult" onclick="if(event.target===this)closeSheet(this)"><div class="pane">
-  <div class="hd"><h2 style="margin:0" id="resultHead"></h2><button class="btn ghost" onclick="closeSheet(sResult)">ठीक है ✕</button></div>
+  <div class="hd"><h2 style="margin:0" id="resultHead"></h2><button class="btn ghost" onclick="closeSheet(sResult)" data-en="OK ✕">ठीक है ✕</button></div>
   <div id="resultList"></div>
 </div></div>
 
 <div class="sheet" id="sDocs" onclick="if(event.target===this)closeSheet(this)"><div class="pane">
-  <div class="hd"><h2 style="margin:0">📁 डॉक्यूमेंट तिजोरी</h2><button class="btn ghost" onclick="closeSheet(sDocs)">बंद ✕</button></div>
+  <div class="hd"><h2 style="margin:0" data-en="📁 Document vault">📁 डॉक्यूमेंट तिजोरी</h2><button class="btn ghost" onclick="closeSheet(sDocs)" data-en="Close ✕">बंद ✕</button></div>
   <div id="docsBody"></div>
+</div></div>
+<div class="sheet" id="sShare" onclick="if(event.target===this)closeSheet(this)"><div class="pane">
+  <div class="hd"><h2 style="margin:0" data-en="📎 Shared files">📎 शेयर की हुई फाइल</h2><button class="btn ghost" onclick="closeSheet(sShare)" data-en="Close ✕">बंद ✕</button></div>
+  <div id="shareBody"></div>
 </div></div>
 <input type="file" id="docPick" class="hide" multiple accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.zip" onchange="docChosen(this)">
 
 <input type="file" id="filePick" class="hide" multiple onchange="filesChosen(this)">
 <div id="toast"></div>
-<div id="busy"><div id="busyTxt">रुकिए…</div></div>
+<div id="busy"><div id="busyTxt"></div></div>
 
 <script src="config.js"></script>
 <script src="core.js"></script>
@@ -229,22 +241,46 @@ details.faq div{padding:0 16px 14px 48px;font-size:14px;color:#374151;white-spac
 <script src="detect.js"></script>
 <script>
 'use strict';
-var S = { sessions: [], active: null, st: null, pid: null, uploadSlot: null, uploading: 0 };
+var S = { sessions: [], active: null, st: null, pid: null, uploadSlot: null, uploading: 0, shared: [], shareInfo: null, shareAuto: false, lang: 'hi' };
 var $ = function (id) { return document.getElementById(id); };
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || 'null'); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
 function toast(m, ms) { var t = $('toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(function () { t.style.display = 'none'; }, ms || 2800); }
-function busy(on, txt) { $('busy').style.display = on ? 'grid' : 'none'; $('busyTxt').textContent = txt || 'रुकिए…'; }
+function busy(on, txt) { $('busy').style.display = on ? 'grid' : 'none'; $('busyTxt').textContent = txt || L('रुकिए…', 'Please wait…'); }
 function fmtSize(b) { return b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB'; }
 function fmtDate(iso) { if (!iso) return ''; var d = new Date(iso); return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }); }
 function rupee(n) { return '₹' + Number(n || 0).toLocaleString('en-IN'); }
-var DATA_TXT = { NONE: 'डेटा नहीं भेजा', PARTIAL: 'अधूरा', COMPLETE: 'सब अपलोड ✓', SUBMITTED: 'भेज दिया ✓', NIL: 'NIL (कोई सेल नहीं)' };
 var DOT = { NONE: '#dc2626', PARTIAL: '#d97706', COMPLETE: '#16a34a', SUBMITTED: '#16a34a', NIL: '#7c3aed' };
+
+/* ---------- language: हिंदी (default) or English, chosen by the client, saved on the phone (vas_lang)
+   and on the server (client.lang, so notifications come in the same language).
+   L(hi, en) picks the text; static markup carries its English in data-en. ---------- */
+function L(hi, en) { return S.lang === 'en' ? en : hi; }
+function dataTxt(k) { return { NONE: L('डेटा नहीं भेजा', 'Data not sent'), PARTIAL: L('अधूरा', 'Incomplete'), COMPLETE: L('सब अपलोड ✓', 'All uploaded ✓'), SUBMITTED: L('भेज दिया ✓', 'Sent ✓'), NIL: L('NIL (कोई सेल नहीं)', 'NIL (no sales)') }[k]; }
+function applyLang() {
+  document.documentElement.lang = S.lang; window.UI_LANG = S.lang; Core.setLang(S.lang);
+  document.querySelectorAll('[data-en]').forEach(function (el) {
+    if (el.dataset.hi == null) el.dataset.hi = el.innerHTML;
+    el.innerHTML = S.lang === 'en' ? el.dataset.en : el.dataset.hi;
+  });
+  document.querySelectorAll('.langsw button, .langrow button').forEach(function (b) { b.classList.toggle('on', b.dataset.l === S.lang); });
+}
+function setLang(l) {
+  l = l === 'en' ? 'en' : 'hi';
+  if (l === S.lang) return;
+  S.lang = l; store('vas_lang', l); applyLang();
+  buildPick(); shareNote(); if ($('rGstin').value) gstinCheck();
+  if (S.active && S.st) {
+    var prof = $('sProfile').classList.contains('on');
+    // tell the server (notifications follow it), then reload the screen in the new language
+    call('profile', { lang: l }).catch(function () {}).then(function () { return load(S.pid, true); }).then(function () { if (prof) openProfile(); });
+  }
+}
 
 function call(action, params) {
   var q = Object.assign({ token: S.active && S.active.token }, params || {});
   return API.call(action, q).catch(function (e) {
-    if (e.code === 'SESSION_EXPIRED') { dropSession(S.active && S.active.gstin); toast('दोबारा लॉगिन करें'); }
+    if (e.code === 'SESSION_EXPIRED') { dropSession(S.active && S.active.gstin); toast(L('दोबारा लॉगिन करें', 'Please log in again')); }
     throw e;
   });
 }
@@ -255,35 +291,35 @@ function authTab(t) {
   $('fLogin').classList.toggle('hide', t !== 'login'); $('fReg').classList.toggle('hide', t !== 'reg');
 }
 function buildPick() {
-  var on = '', off = '';
+  var on = '', off = '', picked = Array.prototype.map.call(document.querySelectorAll('input[name=rPlat]:checked'), function (x) { return x.value; });
   Core.PLATFORM_ORDER.forEach(function (k) {
-    var P = Core.PLATFORMS[k], h = '<label><input type="checkbox" name="rPlat" value="' + k + '"> ' + esc(P.label) + '</label>';
+    var P = Core.PLATFORMS[k], h = '<label><input type="checkbox" name="rPlat" value="' + k + '"' + (picked.indexOf(k) >= 0 ? ' checked' : '') + '> ' + esc(Core.platLabel(k)) + '</label>';
     if (P.group === 'online') on += h; else off += h;
   });
   $('rOnline').innerHTML = on; $('rOffline').innerHTML = off;
 }
 function gstinCheck() {
   var g = $('rGstin').value.trim().toUpperCase(), h = $('rGstinHelp');
-  if (g.length < 15) { h.className = 'help'; h.textContent = g ? (15 - g.length) + ' अक्षर और' : ''; return; }
-  if (Core.gstinValid(g)) { var inf = Core.gstinInfo(g); h.className = 'help ok'; h.textContent = '✓ सही GSTIN • ' + inf.state + ' • PAN ' + inf.pan; }
-  else { h.className = 'help bad'; h.textContent = '✗ यह GSTIN सही नहीं लग रहा – दोबारा जाँचें'; }
+  if (g.length < 15) { h.className = 'help'; h.textContent = g ? (15 - g.length) + L(' अक्षर और', ' more characters') : ''; return; }
+  if (Core.gstinValid(g)) { var inf = Core.gstinInfo(g); h.className = 'help ok'; h.textContent = L('✓ सही GSTIN • ', '✓ Valid GSTIN • ') + inf.state + ' • PAN ' + inf.pan; }
+  else { h.className = 'help bad'; h.textContent = L('✗ यह GSTIN सही नहीं लग रहा – दोबारा जाँचें', '✗ This GSTIN does not look right – please check'); }
 }
 function doRegister(e) {
   e.preventDefault();
-  if ($('rPin').value !== $('rPin2').value) return toast('दोनों PIN एक जैसे नहीं हैं');
+  if ($('rPin').value !== $('rPin2').value) return toast(L('दोनों PIN एक जैसे नहीं हैं', 'The two PINs do not match'));
   var plats = Array.prototype.map.call(document.querySelectorAll('input[name=rPlat]:checked'), function (x) { return x.value; });
-  if (!plats.length && !confirm('कोई प्लेटफॉर्म नहीं चुना. फिर भी आगे बढ़ें? (बाद में प्रोफाइल से बदल सकते हैं)')) return;
-  busy(true, 'रजिस्टर हो रहा है…');
+  if (!plats.length && !confirm(L('कोई प्लेटफॉर्म नहीं चुना. फिर भी आगे बढ़ें? (बाद में प्रोफाइल से बदल सकते हैं)', 'No platform selected. Continue anyway? (You can change it later in your profile)'))) return;
+  busy(true, L('रजिस्टर हो रहा है…', 'Registering…'));
   API.call('register', {
     gstin: $('rGstin').value, trade: $('rTrade').value, legal: $('rLegal').value, owner: $('rOwner').value,
     mobile: $('rMobile').value, email: $('rEmail').value, pin: $('rPin').value,
     freq: document.querySelector('input[name=rFreq]:checked').value, platforms: plats, ref: $('rRef').value.trim()
-  }).then(function (d) { savePin($('rGstin').value.trim().toUpperCase(), $('rPin').value, $('rTrade').value); addSessions(d.sessions); toast('रजिस्ट्रेशन हो गया ✓'); }).catch(function (er) { toast(er.message, 4000); }).finally(function () { busy(false); });
+  }).then(function (d) { savePin($('rGstin').value.trim().toUpperCase(), $('rPin').value, $('rTrade').value); addSessions(d.sessions); toast(L('रजिस्ट्रेशन हो गया ✓', 'Registered ✓')); }).catch(function (er) { toast(er.message, 4000); }).finally(function () { busy(false); });
 }
 function doLogin(e) {
   e.preventDefault();
   var id = $('lId').value.trim().toUpperCase(), pin = $('lPin').value;
-  busy(true, 'लॉगिन…');
+  busy(true, L('लॉगिन…', 'Logging in…'));
   API.call('login', { id: id, pin: pin })
     .then(function (d) { savePin(id, pin, d.sessions[0].trade); addSessions(d.sessions); }).catch(function (er) { toast(er.message, 4000); }).finally(function () { busy(false); });
 }
@@ -294,11 +330,11 @@ function savePin(id, pin, name) {
   } catch (e) {}
 }
 function forgotPin() {
-  var id = $('lId').value.trim().toUpperCase() || (prompt('अपना GSTIN या मोबाइल नंबर डालें:') || '').trim().toUpperCase();
+  var id = $('lId').value.trim().toUpperCase() || (prompt(L('अपना GSTIN या मोबाइल नंबर डालें:', 'Enter your GSTIN or mobile number:')) || '').trim().toUpperCase();
   if (!id) return;
   // WhatsApp opens right away (inside the tap, so it is not blocked); the office dashboard is told in the background
-  if (CONFIG.OFFICE_PHONE) window.open('https://wa.me/91' + CONFIG.OFFICE_PHONE + '?text=' + encodeURIComponent('नमस्ते, मैं Vishal GST ऐप का PIN भूल गया हूँ. मेरा GSTIN / मोबाइल: ' + id + ' – कृपया PIN बता दें.'), '_blank');
-  API.call('forgotPin', { id: id }).then(function () { toast('ऑफिस को बता दिया ✓ – WhatsApp पर PIN मिल जाएगा', 4000); })
+  if (CONFIG.OFFICE_PHONE) window.open('https://wa.me/91' + CONFIG.OFFICE_PHONE + '?text=' + encodeURIComponent(L('नमस्ते, मैं Vishal GST ऐप का PIN भूल गया हूँ. मेरा GSTIN / मोबाइल: ' + id + ' – कृपया PIN बता दें.', 'Hello, I forgot my Vishal GST app PIN. My GSTIN / mobile: ' + id + ' – please tell me my PIN.')), '_blank');
+  API.call('forgotPin', { id: id }).then(function () { toast(L('ऑफिस को बता दिया ✓ – WhatsApp पर PIN मिल जाएगा', 'Office informed ✓ – you will get your PIN on WhatsApp'), 4000); })
     .catch(function (er) { toast(er.message, 4500); });
 }
 function addSessions(list) {
@@ -318,7 +354,7 @@ function dropSession(g) {
   useSession(S.sessions[0] && S.sessions[0].gstin);
 }
 function logout() {
-  if (!confirm('लॉगआउट करें?')) return;
+  if (!confirm(L('लॉगआउट करें?', 'Log out?'))) return;
   var g = S.active.gstin;
   call('logout').catch(function () {}).finally(function () { closeSheet(sProfile); dropSession(g); });
 }
@@ -331,7 +367,7 @@ function route() {
 
 /* ---------- home ---------- */
 function load(pid, quiet) {
-  if (!quiet) busy(true, 'लोड हो रहा है…');
+  if (!quiet) busy(true, L('लोड हो रहा है…', 'Loading…'));
   return call('state', { pid: pid || S.pid }).then(function (st) {
     S.st = st; S.pid = st.pid;
     if (S.active.trade !== st.client.trade) { S.active.trade = st.client.trade; store('vas_sessions', S.sessions); }
@@ -344,58 +380,59 @@ function render() {
   $('hBadge').textContent = st.unread; $('hBadge').classList.toggle('hide', !st.unread);
   $('hPeriods').innerHTML = st.periods.map(function (p) {
     var d = p.work === 'FILED' ? '#0369a1' : DOT[p.data];
-    return '<button class="chip' + (p.pid === st.pid ? ' on' : '') + '" onclick="load(\'' + p.pid + '\')"><span class="d" style="background:' + d + '"></span>' + esc(p.label) + (p.running ? ' (चालू)' : '') + '</button>';
+    return '<button class="chip' + (p.pid === st.pid ? ' on' : '') + '" onclick="load(\'' + p.pid + '\')"><span class="d" style="background:' + d + '"></span>' + esc(p.label) + (p.running ? L(' (चालू)', ' (running)') : '') + '</button>';
   }).join('');
   var filed = sm.work === 'FILED', locked = filed;
   var html = '';
+  if (S.shared.length) html += '<div class="banner" style="background:#e0f2fe;color:#075985"><span class="grow">' + L('📎 शेयर की हुई ' + S.shared.length + ' फाइल अभी अपलोड नहीं हुई', '📎 ' + S.shared.length + ' shared file(s) not uploaded yet') + '</span><button class="btn sm" onclick="openShare()">' + L('अपलोड', 'Upload') + '</button></div>';
 
   // dues banner (any period)
   st.dues.forEach(function (d) {
-    var claim = d.payClaim ? '<div class="mute" style="margin-top:6px">✓ आपने ' + fmtDate(d.payClaim.at) + ' को बताया कि पेमेंट कर दिया – ऑफिस जाँच रहा है.</div>' : '';
+    var claim = d.payClaim ? '<div class="mute" style="margin-top:6px">' + L('✓ आपने ' + fmtDate(d.payClaim.at) + ' को बताया कि पेमेंट कर दिया – ऑफिस जाँच रहा है.', '✓ On ' + fmtDate(d.payClaim.at) + ' you told us you have paid – the office is checking.') + '</div>' : '';
     var upi = st.settings.upi ? 'upi://pay?pa=' + encodeURIComponent(st.settings.upi) + '&pn=' + encodeURIComponent(st.settings.payeeName || '') + '&am=' + d.due + '&cu=INR&tn=' + encodeURIComponent('GST fee ' + d.label) : '';
-    html += '<div class="card pay"><h2>💰 फीस बाकी – ' + esc(d.label) + '</h2><div style="font-size:24px;font-weight:800">' + rupee(d.due) + '</div>' +
-      '<div class="mute">रिटर्न फाइल हो चुका है. कृपया भुगतान करें.</div>' + claim +
+    html += '<div class="card pay"><h2>' + L('💰 फीस बाकी – ', '💰 Fee due – ') + esc(d.label) + '</h2><div style="font-size:24px;font-weight:800">' + rupee(d.due) + '</div>' +
+      '<div class="mute">' + L('रिटर्न फाइल हो चुका है. कृपया भुगतान करें.', 'Your return has been filed. Please pay.') + '</div>' + claim +
       '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">' +
-      (upi ? '<a class="btn" href="' + upi + '">UPI से पे करें</a>' : '') +
-      (d.payClaim ? '' : '<button class="btn sec" onclick="claimPaid(\'' + d.pid + '\')">मैंने पेमेंट कर दिया</button>') + '</div></div>';
+      (upi ? '<a class="btn" href="' + upi + '">' + L('UPI से पे करें', 'Pay by UPI') + '</a>' : '') +
+      (d.payClaim ? '' : '<button class="btn sec" onclick="claimPaid(\'' + d.pid + '\')">' + L('मैंने पेमेंट कर दिया', 'I have paid') + '</button>') + '</div></div>';
   });
 
   // status card
   var pct = sm.data === 'NIL' ? 100 : (sm.required ? Math.round(sm.done / sm.required * 100) : 0);
   var col = filed ? '#0369a1' : DOT[sm.data];
   html += '<div class="card"><div class="status"><div class="ring" style="--p:' + pct + ';--c:' + col + '"><b>' + (sm.data === 'NIL' ? 'NIL' : sm.done + '/' + sm.required) + '</b></div>' +
-    '<div class="grow"><div class="mute">' + (c.freq === 'Q' ? 'तिमाही रिटर्न' : 'मासिक रिटर्न') + '</div><h2 style="margin:2px 0 6px">' + esc(sm.label) + '</h2>' +
-    '<span class="pill ' + (filed ? 'FILED' : sm.data) + '">' + (filed ? 'रिटर्न फाइल हो गया ✓' : sm.work === 'PROCESS' ? 'फाइलिंग चल रही है' : DATA_TXT[sm.data]) + '</span></div></div>';
-  if (!filed && sm.data !== 'NIL' && sm.missing.length && sm.files) html += '<div class="miss"><b>' + sm.missing.length + ' रिपोर्ट बाकी:</b><br>' + esc(Core.missingText(sm)).replace(/ \| /g, '<br>') + '</div>';
-  if (!c.platforms.length) html += '<div class="miss">आपकी प्रोफाइल में कोई प्लेटफॉर्म नहीं है. ☰ → प्रोफाइल में जाकर चुनें.</div>';
+    '<div class="grow"><div class="mute">' + (c.freq === 'Q' ? L('तिमाही रिटर्न', 'Quarterly return') : L('मासिक रिटर्न', 'Monthly return')) + '</div><h2 style="margin:2px 0 6px">' + esc(sm.label) + '</h2>' +
+    '<span class="pill ' + (filed ? 'FILED' : sm.data) + '">' + (filed ? L('रिटर्न फाइल हो गया ✓', 'Return filed ✓') : sm.work === 'PROCESS' ? L('फाइलिंग चल रही है', 'Filing in progress') : dataTxt(sm.data)) + '</span></div></div>';
+  if (!filed && sm.data !== 'NIL' && sm.missing.length && sm.files) html += '<div class="miss"><b>' + sm.missing.length + L(' रिपोर्ट बाकी:', ' report(s) pending:') + '</b><br>' + esc(Core.missingText(sm)).replace(/ \| /g, '<br>') + '</div>';
+  if (!c.platforms.length) html += '<div class="miss">' + L('आपकी प्रोफाइल में कोई प्लेटफॉर्म नहीं है. ☰ → प्रोफाइल में जाकर चुनें.', 'No platform in your profile. Go to ☰ → profile and choose.') + '</div>';
   html += '</div>';
 
   if (filed) {
     var f = sm.filed;
-    html += '<div class="card filed"><h2>✅ रिटर्न फाइल हो गया</h2>' +
+    html += '<div class="card filed"><h2>' + L('✅ रिटर्न फाइल हो गया', '✅ Return filed') + '</h2>' +
       (f.gstr1 ? '<div>GSTR-1: ' + esc(f.gstr1.date) + (f.gstr1.arn ? ' • ARN <b>' + esc(f.gstr1.arn) + '</b>' : '') + '</div>' : '') +
-      (f.gstr3b ? '<div>GSTR-3B: ' + esc(f.gstr3b.date) + (f.gstr3b.arn ? ' • ARN <b>' + esc(f.gstr3b.arn) + '</b>' : '') + '</div>' : '<div class="mute">GSTR-3B अभी बाकी है.</div>') +
+      (f.gstr3b ? '<div>GSTR-3B: ' + esc(f.gstr3b.date) + (f.gstr3b.arn ? ' • ARN <b>' + esc(f.gstr3b.arn) + '</b>' : '') + '</div>' : '<div class="mute">' + L('GSTR-3B अभी बाकी है.', 'GSTR-3B is still pending.') + '</div>') +
       retList(sm.returns) + '</div>';
-  } else if (sm.returns && sm.returns.length) html += '<div class="card filed"><h2>📄 आपके रिटर्न की कॉपी</h2>' + retList(sm.returns) + '</div>';
+  } else if (sm.returns && sm.returns.length) html += '<div class="card filed"><h2>' + L('📄 आपके रिटर्न की कॉपी', '📄 Copies of your returns') + '</h2>' + retList(sm.returns) + '</div>';
 
   // next due dates
   if (st.due && st.due.length) {
-    html += '<div class="card"><h2>📅 अगली ड्यू डेट</h2>' + st.due.slice(0, 5).map(function (d) {
-      var tag = d.done ? '<span class="pill FILED">हो गया ✓</span>' : d.days < 0 ? '<span class="pill NONE">' + (-d.days) + ' दिन पहले</span>' : d.days === 0 ? '<span class="pill NONE">आज</span>' : '<span class="pill ' + (d.days <= 3 ? 'PARTIAL' : 'COMPLETE') + '">' + d.days + ' दिन</span>';
+    html += '<div class="card"><h2>' + L('📅 अगली ड्यू डेट', '📅 Upcoming due dates') + '</h2>' + st.due.slice(0, 5).map(function (d) {
+      var tag = d.done ? '<span class="pill FILED">' + L('हो गया ✓', 'Done ✓') + '</span>' : d.days < 0 ? '<span class="pill NONE">' + (-d.days) + L(' दिन पहले', ' days ago') + '</span>' : d.days === 0 ? '<span class="pill NONE">' + L('आज', 'Today') + '</span>' : '<span class="pill ' + (d.days <= 3 ? 'PARTIAL' : 'COMPLETE') + '">' + d.days + L(' दिन', ' days') + '</span>';
       return '<div class="slot" style="padding:9px 0"><div class="sr"><div class="nm">' + esc(d.title) + '<div class="mute" style="font-weight:400">' + esc(d.desc) + '</div></div><div style="text-align:right"><b>' + d.date.split('-').reverse().join('-') + '</b><br>' + tag + '</div></div></div>';
     }).join('') + '</div>';
   }
 
   // document vault + referral
   var req = (st.docReq && st.docReq.types) || [];
-  html += '<div class="card" onclick="openDocs()" style="cursor:pointer;' + (req.length ? 'border:2px solid var(--warn)' : '') + '"><div class="nilbox"><div class="grow"><h3>📁 डॉक्यूमेंट तिजोरी</h3><div class="mute">' +
-    (req.length ? '<b style="color:var(--warn)">⚠ ऑफिस ने ' + req.length + ' डॉक्यूमेंट माँगे हैं</b>' : 'PAN, आधार, GST सर्टिफिकेट, बैंक डिटेल – एक बार डालें, हर काम में काम आएँगे') + '</div></div><span style="font-size:13px" class="mute">' + st.docs.length + ' फाइल ›</span></div></div>';
-  html += '<div class="card" style="background:linear-gradient(135deg,#eef2ff,#f5f3ff)"><h3>🎁 दोस्तों को रेफर करें</h3><div class="mute" style="margin:2px 0 8px">' + (st.refReward ? esc(st.refReward) : 'अपने व्यापारी दोस्तों को हमारे बारे में बताएँ') + (st.referrals ? ' • आपके ' + st.referrals + ' रेफरल जुड़ चुके 🎉' : '') + '</div>' +
-    '<div class="row" style="display:flex;gap:8px;align-items:center"><span class="pill FILED" style="font-size:14px;letter-spacing:1px">कोड: ' + esc(st.refCode) + '</span><button class="btn sm" style="margin-left:auto" onclick="shareRef()">📲 WhatsApp पर भेजें</button></div></div>';
+  html += '<div class="card" onclick="openDocs()" style="cursor:pointer;' + (req.length ? 'border:2px solid var(--warn)' : '') + '"><div class="nilbox"><div class="grow"><h3>' + L('📁 डॉक्यूमेंट तिजोरी', '📁 Document vault') + '</h3><div class="mute">' +
+    (req.length ? '<b style="color:var(--warn)">' + L('⚠ ऑफिस ने ' + req.length + ' डॉक्यूमेंट माँगे हैं', '⚠ The office has asked for ' + req.length + ' document(s)') + '</b>' : L('PAN, आधार, GST सर्टिफिकेट, बैंक डिटेल – एक बार डालें, हर काम में काम आएँगे', 'PAN, Aadhaar, GST certificate, bank details – upload once, useful for every job')) + '</div></div><span style="font-size:13px" class="mute">' + st.docs.length + L(' फाइल ›', ' files ›') + '</span></div></div>';
+  html += '<div class="card" style="background:linear-gradient(135deg,#eef2ff,#f5f3ff)"><h3>' + L('🎁 दोस्तों को रेफर करें', '🎁 Refer your friends') + '</h3><div class="mute" style="margin:2px 0 8px">' + (st.refReward ? esc(st.refReward) : L('अपने व्यापारी दोस्तों को हमारे बारे में बताएँ', 'Tell your business friends about us')) + (st.referrals ? L(' • आपके ' + st.referrals + ' रेफरल जुड़ चुके 🎉', ' • ' + st.referrals + ' of your referrals have joined 🎉') : '') + '</div>' +
+    '<div class="row" style="display:flex;gap:8px;align-items:center"><span class="pill FILED" style="font-size:14px;letter-spacing:1px">' + L('कोड: ', 'Code: ') + esc(st.refCode) + '</span><button class="btn sm" style="margin-left:auto" onclick="shareRef()">' + L('📲 WhatsApp पर भेजें', '📲 Send on WhatsApp') + '</button></div></div>';
 
   // nil
   if (!filed || sm.data === 'NIL') {
-    html += '<div class="card"><div class="nilbox"><div class="grow"><h3>इस अवधि में कोई सेल नहीं हुई?</h3><div class="mute">टिक करें – हम आपका NIL रिटर्न सबसे पहले फाइल करेंगे.</div></div>' +
+    html += '<div class="card"><div class="nilbox"><div class="grow"><h3>' + L('इस अवधि में कोई सेल नहीं हुई?', 'No sales in this period?') + '</h3><div class="mute">' + L('टिक करें – हम आपका NIL रिटर्न सबसे पहले फाइल करेंगे.', 'Switch this on – we file NIL returns first.') + '</div></div>' +
       '<label class="switch"><input type="checkbox" ' + (sm.data === 'NIL' ? 'checked' : '') + (locked ? ' disabled' : '') + ' onchange="setNil(this)"><i></i></label></div></div>';
   }
 
@@ -407,15 +444,15 @@ function render() {
       if (!byPlat[pk]) return;
       var P = Core.PLATFORMS[pk], slots = byPlat[pk];
       var done = slots.filter(function (s) { return !s.optional && filesOf(s.id).length; }).length, req = slots.filter(function (s) { return !s.optional; }).length;
-      html += '<div class="card plat" style="--pc:' + P.color + '"><div class="ph"><h2 style="margin:0">' + esc(P.label) + '</h2><span class="pill ' + (done >= req ? 'COMPLETE' : done ? 'PARTIAL' : 'NONE') + '">' + done + '/' + req + '</span></div>';
+      html += '<div class="card plat" style="--pc:' + P.color + '"><div class="ph"><h2 style="margin:0">' + esc(Core.platLabel(pk)) + '</h2><span class="pill ' + (done >= req ? 'COMPLETE' : done ? 'PARTIAL' : 'NONE') + '">' + done + '/' + req + '</span></div>';
       slots.forEach(function (s) {
         var fs = filesOf(s.id);
         html += '<div class="slot" id="slot-' + s.id.replace(/\./g, '_') + '"><div class="sr"><div class="tick' + (fs.length ? ' y' : '') + '">' + (fs.length ? '✓' : '•') + '</div>' +
-          '<div class="nm">' + esc(s.name) + (s.optional ? ' <span class="mute">(अगर हो)</span>' : '') + ' <button class="btn ghost sm" style="padding:2px 4px" onclick="toggleHint(this)">ⓘ</button></div>' +
-          (locked ? '' : '<button class="btn sm' + (fs.length ? ' sec' : '') + '" onclick="pickFor(\'' + s.id + '\')">' + (fs.length ? (s.multi ? '+ और' : '+ और') : '⬆ अपलोड') + '</button>') + '</div>' +
+          '<div class="nm">' + esc(s.name) + (s.optional ? ' <span class="mute">' + L('(अगर हो)', '(if any)') + '</span>' : '') + ' <button class="btn ghost sm" style="padding:2px 4px" onclick="toggleHint(this)">ⓘ</button></div>' +
+          (locked ? '' : '<button class="btn sm' + (fs.length ? ' sec' : '') + '" onclick="pickFor(\'' + s.id + '\')">' + (fs.length ? L('+ और', '+ More') : L('⬆ अपलोड', '⬆ Upload')) + '</button>') + '</div>' +
           '<div class="hint">' + esc(s.hint) + '</div>' +
           (fs.length ? '<div class="files">' + fs.map(function (f) {
-            return '<div class="file">📄<span>' + esc(f.name) + '</span><small class="mute">' + fmtSize(f.size) + '</small>' + (locked ? '' : '<button class="x" onclick="delFile(\'' + f.id + '\')" aria-label="हटाएँ">✕</button>') + '</div>';
+            return '<div class="file">📄<span>' + esc(f.name) + '</span><small class="mute">' + fmtSize(f.size) + '</small>' + (locked ? '' : '<button class="x" onclick="delFile(\'' + f.id + '\')" aria-label="Remove">✕</button>') + '</div>';
           }).join('') + '</div>' : '') + '</div>';
       });
       html += '</div>';
@@ -423,21 +460,22 @@ function render() {
   }
   var more = Core.PLATFORM_ORDER.filter(function (k) { return c.platforms.indexOf(k) < 0; });
   if (!locked && sm.data !== 'NIL' && more.length) {
-    html += '<div class="card"><h3>कुछ और भी भेजना है?</h3><div class="mute" style="margin:2px 0 10px">ऑफलाइन बिल, Vyapar, हमारा GST टूल या कोई और फाइल – सेक्शन जोड़ें:</div><div class="pick">' +
-      more.map(function (k) { return '<button class="btn sec sm" style="flex:1 1 45%" onclick="addPlatform(\'' + k + '\')">+ ' + esc(Core.PLATFORMS[k].label) + '</button>'; }).join('') + '</div></div>';
+    html += '<div class="card"><h3>' + L('कुछ और भी भेजना है?', 'Anything else to send?') + '</h3><div class="mute" style="margin:2px 0 10px">' + L('ऑफलाइन बिल, Vyapar, हमारा GST टूल या कोई और फाइल – सेक्शन जोड़ें:', 'Offline bills, Vyapar, our GST tool or any other file – add a section:') + '</div><div class="pick">' +
+      more.map(function (k) { return '<button class="btn sec sm" style="flex:1 1 45%" onclick="addPlatform(\'' + k + '\')">+ ' + esc(Core.platLabel(k)) + '</button>'; }).join('') + '</div></div>';
   }
-  html += '<div class="foot">v' + Core.VERSION + (API.DEMO ? ' • डेमो मोड' : '') + ' • ' + esc(st.settings.firm) + '</div>';
+  html += '<div class="foot">v' + Core.VERSION + (API.DEMO ? L(' • डेमो मोड', ' • demo mode') : '') + ' • ' + esc(st.settings.firm) + '</div>';
   $('hBody').innerHTML = html;
 
   // bottom bar
   var bar = '';
-  if (filed) bar = '<div class="done">✅ ' + esc(sm.label) + ' का रिटर्न फाइल हो चुका है</div>';
-  else if (sm.data === 'NIL') bar = '<div class="done" style="background:var(--nilbg);color:var(--nil)">NIL भेज दिया ✓ – हम जल्द फाइल करेंगे</div>';
-  else if (sm.data === 'SUBMITTED') bar = '<div class="done">डेटा भेज दिया ✓ ' + fmtDate(sm.submittedAt) + ' <button class="btn ghost sm" onclick="unsubmit()">बदलें</button></div>';
-  else bar = '<button class="btn block ok" onclick="submitData()" ' + (sm.files ? '' : 'disabled') + '>✔ डेटा पूरा भेज दिया' + (sm.missing.length && sm.files ? ' (' + sm.missing.length + ' बाकी)' : '') + '</button>';
+  if (filed) bar = '<div class="done">✅ ' + L(esc(sm.label) + ' का रिटर्न फाइल हो चुका है', 'The ' + esc(sm.label) + ' return is filed') + '</div>';
+  else if (sm.data === 'NIL') bar = '<div class="done" style="background:var(--nilbg);color:var(--nil)">' + L('NIL भेज दिया ✓ – हम जल्द फाइल करेंगे', 'NIL sent ✓ – we will file it soon') + '</div>';
+  else if (sm.data === 'SUBMITTED') bar = '<div class="done">' + L('डेटा भेज दिया ✓ ', 'Data sent ✓ ') + fmtDate(sm.submittedAt) + ' <button class="btn ghost sm" onclick="unsubmit()">' + L('बदलें', 'Change') + '</button></div>';
+  else bar = '<button class="btn block ok" onclick="submitData()" ' + (sm.files ? '' : 'disabled') + '>' + L('✔ डेटा पूरा भेज दिया', '✔ All data sent') + (sm.missing.length && sm.files ? L(' (' + sm.missing.length + ' बाकी)', ' (' + sm.missing.length + ' pending)') : '') + '</button>';
   $('hBarIn').innerHTML = bar;
   if (S.tab !== 'home') renderTab(S.tab);
   updateDots();
+  if (S.shareAuto && S.shared.length) { S.shareAuto = false; openShare(); }
 }
 function filesOf(slotId) { return S.st.files.filter(function (f) { return f.slot === slotId || (f.covers || []).indexOf(slotId) >= 0; }); }
 function toggleHint(b) { b.closest('.slot').classList.toggle('open'); }
@@ -451,60 +489,70 @@ function pickFor(slotId) {
 /* Every file is checked before upload: a marketplace slot only takes that marketplace's report
    (a ZIP is opened and each report inside goes to its own slot), wrong platform / wrong month is refused,
    and an offline slot refuses marketplace reports. */
-function slotName(s) { return Core.PLATFORMS[s.plat].label + ' – ' + s.name; }
+function slotName(s) { return Core.platLabel(s.plat) + ' – ' + s.name; }
 function planFor(clicked, it, out) {
   var st = S.st, nm = it.file.name;
   if (it.type) {
-    var T = Detect.TYPES[it.type], P = Core.PLATFORMS[T[0]];
+    var T = Detect.TYPES[it.type], P = Core.platLabel(T[0]), CP = Core.platLabel(clicked.plat);
     if (T[0] !== clicked.plat) {
-      var hint = st.client.platforms.indexOf(T[0]) < 0 ? ' (पहले नीचे "+ ' + P.label + '" दबाकर ' + P.label + ' जोड़ें)' : '';
-      return out.bad.push({ name: nm, why: 'ये ' + it.label + ' है – इसे ' + P.label + ' वाले सेक्शन में डालें' + hint });
+      var hint = st.client.platforms.indexOf(T[0]) < 0 ? L(' (पहले नीचे "+ ' + P + '" दबाकर ' + P + ' जोड़ें)', ' (first add ' + P + ' with "+ ' + P + '" below)') : '';
+      return out.bad.push({ name: nm, why: L('ये ' + it.label + ' है – इसे ' + P + ' वाले सेक्शन में डालें', 'This is a ' + it.label + ' – put it in the ' + P + ' section') + hint });
     }
     var cands = st.slots.filter(function (s) { return s.plat === T[0] && s.key === T[1]; });
     var target = null, covers = null;
     if (it.months.length && cands[0] && cands[0].month) {
       var hit = cands.filter(function (s) { return it.months.indexOf(s.month) >= 0; });
-      if (!hit.length) return out.bad.push({ name: nm, why: 'ये ' + it.label + ' ' + it.months.map(Core.monthLabel).join(', ') + ' की है, पर यहाँ ' + st.summary.label + ' का डेटा चाहिए' });
+      if (!hit.length) return out.bad.push({ name: nm, why: L('ये ' + it.label + ' ' + it.months.map(Core.monthLabel).join(', ') + ' की है, पर यहाँ ' + st.summary.label + ' का डेटा चाहिए', 'This ' + it.label + ' is for ' + it.months.map(Core.monthLabel).join(', ') + ', but ' + st.summary.label + ' data is needed here') });
       target = hit[0]; if (hit.length > 1) covers = hit.map(function (s) { return s.id; });
     } else {
       target = cands.filter(function (s) { return s.id === clicked.id; })[0] || cands.filter(function (s) { return s.month === clicked.month; })[0]
         || cands.filter(function (s) { return !filesOf(s.id).length; })[0] || cands[0];
     }
-    if (!target) return out.bad.push({ name: nm, why: 'इस रिपोर्ट का खाना आपकी प्रोफाइल में नहीं है' });
-    if (filesOf(target.id).some(function (f) { return f.name === nm && Math.abs(f.size - it.file.size) < 2; })) return out.bad.push({ name: nm, why: 'ये फाइल ' + target.name + ' में पहले से अपलोड है' });
+    if (!target) return out.bad.push({ name: nm, why: L('इस रिपोर्ट का खाना आपकी प्रोफाइल में नहीं है', 'There is no box for this report in your profile') });
+    if (filesOf(target.id).some(function (f) { return f.name === nm && Math.abs(f.size - it.file.size) < 2; })) return out.bad.push({ name: nm, why: L('ये फाइल ' + target.name + ' में पहले से अपलोड है', 'This file is already uploaded in ' + target.name) });
     return out.ok.push({ it: it, slot: target, covers: covers });
   }
-  if (clicked.detect && !it.plain) return out.bad.push({ name: nm, why: 'ये ' + Core.PLATFORMS[clicked.plat].label + ' की ' + clicked.name.replace(/ \(.*\)$/, '') + ' नहीं लग रही. ' + Core.PLATFORMS[clicked.plat].label + ' से डाउनलोड की हुई असली फाइल डालें (फाइल के अंदर कुछ न बदलें).' });
-  if (clicked.detect) return out.bad.push({ name: nm, why: 'यहाँ सिर्फ ' + Core.PLATFORMS[clicked.plat].label + ' की Excel/CSV रिपोर्ट या उसकी ZIP डालें' });
+  var CL = Core.platLabel(clicked.plat);
+  if (clicked.detect && !it.plain) return out.bad.push({ name: nm, why: L('ये ' + CL + ' की ' + clicked.name.replace(/ \(.*\)$/, '') + ' नहीं लग रही. ' + CL + ' से डाउनलोड की हुई असली फाइल डालें (फाइल के अंदर कुछ न बदलें).', 'This does not look like the ' + CL + ' ' + clicked.name.replace(/ \(.*\)$/, '') + '. Upload the original file downloaded from ' + CL + ' (do not change anything inside it).') });
+  if (clicked.detect) return out.bad.push({ name: nm, why: L('यहाँ सिर्फ ' + CL + ' की Excel/CSV रिपोर्ट या उसकी ZIP डालें', 'Only the ' + CL + ' Excel/CSV report or its ZIP goes here') });
   out.ok.push({ it: it, slot: clicked, covers: null });
 }
 function filesChosen(inp) {
   var list = Array.prototype.slice.call(inp.files || []);
-  if (!list.length) return;
-  var big = list.filter(function (f) { return f.size > CONFIG.MAX_FILE_MB * 1048576; });
-  if (big.length) return toast(big[0].name + ' – ' + CONFIG.MAX_FILE_MB + ' MB से बड़ी फाइल नहीं चलेगी', 4000);
-  var clicked = S.st.slots.filter(function (s) { return s.id === S.uploadSlot; })[0], pid = S.pid;
+  if (list.length) runUpload([{ slot: S.uploadSlot, files: list }]);
+}
+// groups = [{ slot: slotId the files were put in, files: [File] }] – from the file picker or from the share sheet
+function runUpload(groups) {
+  var all = [].concat.apply([], groups.map(function (g) { return g.files; }));
+  var big = all.filter(function (f) { return f.size > CONFIG.MAX_FILE_MB * 1048576; });
+  if (big.length) return toast(big[0].name + L(' – ' + CONFIG.MAX_FILE_MB + ' MB से बड़ी फाइल नहीं चलेगी', ' – files above ' + CONFIG.MAX_FILE_MB + ' MB are not allowed'), 4000);
+  var pid = S.pid, first = null;
   var out = { ok: [], bad: [] };
   S.uploading++;
-  busy(true, 'फाइल जाँच रहे हैं…');
+  busy(true, L('फाइल जाँच रहे हैं…', 'Checking files…'));
   var chain = Promise.resolve();
-  list.forEach(function (f) {
-    chain = chain.then(function () {
-      var isSheet = /\.(xlsx|xls|csv)$/i.test(f.name), isZip = /\.zip$/i.test(f.name);
-      if (!clicked.detect && !isSheet) { out.ok.push({ it: { file: f, type: '', months: [] }, slot: clicked, covers: null }); return; }   // bills, photos, ZIP of PDFs
-      return Detect.inspect(f).then(function (r) {
-        if (r.zip && !r.items.length) return out.bad.push({ name: f.name, why: 'ZIP में कोई Excel/CSV रिपोर्ट नहीं मिली' });
-        if (!clicked.detect && isZip) return out.ok.push({ it: { file: f, type: '', months: [] }, slot: clicked, covers: null });
-        r.items.forEach(function (it) { planFor(clicked, it, out); });
+  groups.forEach(function (g) {
+    var clicked = S.st.slots.filter(function (s) { return s.id === g.slot; })[0];
+    first = first || clicked;
+    g.files.forEach(function (f) {
+      chain = chain.then(function () {
+        var isSheet = /\.(xlsx|xls|csv)$/i.test(f.name), isZip = /\.zip$/i.test(f.name);
+        if (!clicked.detect && !isSheet) { out.ok.push({ it: { file: f, type: '', months: [] }, slot: clicked, covers: null }); return; }   // bills, photos, ZIP of PDFs
+        return Detect.inspect(f).then(function (r) {
+          if (r.zip && !r.items.length) return out.bad.push({ name: f.name, why: L('ZIP में कोई Excel/CSV रिपोर्ट नहीं मिली', 'No Excel/CSV report found in the ZIP') });
+          if (!clicked.detect && isZip) return out.ok.push({ it: { file: f, type: '', months: [] }, slot: clicked, covers: null });
+          r.items.forEach(function (it) { planFor(clicked, it, out); });
+        });
       });
     });
   });
+  var clicked = groups.length > 1 ? null : first;   // several groups = shared files, no single slot was clicked
   chain.then(function () {
     var done = [], i = 0;
     return (function next() {
       if (i >= out.ok.length) return done;
       var p = out.ok[i++], f = p.it.file;
-      busy(true, 'अपलोड ' + i + '/' + out.ok.length + ': ' + f.name);
+      busy(true, L('अपलोड ', 'Uploading ') + i + '/' + out.ok.length + ': ' + f.name);
       return API.fileToB64(f).then(function (b64) {
         return call('upload', { pid: pid, slot: p.slot.id, name: f.name, mime: f.type, b64: b64, ftype: p.it.type || '', fmonths: p.it.months || [], covers: p.covers, taxable: p.it.taxable == null ? '' : p.it.taxable });
       }).then(function () { done.push(p); }, function (e) { out.bad.push({ name: f.name, why: e.message }); }).then(next);
@@ -514,60 +562,168 @@ function filesChosen(inp) {
   }).catch(function (e) { toast(e.message, 5000); }).finally(function () { S.uploading--; busy(false); load(pid, true); });
 }
 function showResult(done, bad, clicked) {
-  if (!bad.length && done.length && done.every(function (p) { return p.slot.id === clicked.id && !p.covers; })) return toast(done.length + ' फाइल अपलोड ✓');
+  if (clicked && !bad.length && done.length && done.every(function (p) { return p.slot.id === clicked.id && !p.covers; })) return toast(done.length + L(' फाइल अपलोड ✓', ' file(s) uploaded ✓'));
   $('resultList').innerHTML =
-    done.map(function (p) { return '<div class="file" style="background:var(--okbg)">✅<span><b>' + esc(slotName(p.slot)) + (p.covers ? ' (पूरी तिमाही)' : '') + '</b><br>' + esc(p.it.file.name) + (p.slot.id !== clicked.id ? ' <small>– सही खाने में डाली</small>' : '') + '</span></div>'; }).join('') +
+    done.map(function (p) { return '<div class="file" style="background:var(--okbg)">✅<span><b>' + esc(slotName(p.slot)) + (p.covers ? L(' (पूरी तिमाही)', ' (whole quarter)') : '') + '</b><br>' + esc(p.it.file.name) + (clicked && p.slot.id !== clicked.id ? ' <small>' + L('– सही खाने में डाली', '– put in the right box') + '</small>' : '') + '</span></div>'; }).join('') +
     bad.map(function (b) { return '<div class="file" style="background:var(--badbg);white-space:normal">❌<span style="white-space:normal"><b>' + esc(b.name) + '</b><br>' + esc(b.why) + '</span></div>'; }).join('');
-  $('resultHead').textContent = bad.length ? (done.length ? done.length + ' अपलोड, ' + bad.length + ' नहीं ली गईं' : 'फाइल नहीं ली गई') : done.length + ' फाइल अपलोड ✓';
+  $('resultHead').textContent = bad.length ? (done.length ? L(done.length + ' अपलोड, ' + bad.length + ' नहीं ली गईं', done.length + ' uploaded, ' + bad.length + ' not accepted') : L('फाइल नहीं ली गई', 'File not accepted')) : done.length + L(' फाइल अपलोड ✓', ' file(s) uploaded ✓');
   openSheet(sResult);
 }
-function addPlatform(k) {
-  var P = Core.PLATFORMS[k];
-  if (!confirm(P.label + ' का सेक्शन जोड़ें?')) return;
+/* ---------- files shared to the app (WhatsApp / File Manager → Share → Vishal GST) ----------
+   sw.js parks them in the 'vas-share' cache. Marketplace reports are recognised and go to their own slot;
+   anything else (bills, Vyapar, photos) waits for the client to pick the slot. */
+function readShared() {
+  if (!('caches' in window)) return Promise.resolve([]);
+  return caches.open('vas-share').then(function (c) {
+    return c.match('share/list').then(function (r) {
+      if (!r) return [];
+      return r.json().then(function (m) {
+        if (Date.now() - m.at > 3 * 86400000) { clearShared(); return []; }
+        return Promise.all(m.files.map(function (x) {
+          return c.match('share/' + x.k).then(function (r2) { return r2 ? r2.blob() : null; })
+            .then(function (b) { return b ? new File([b], x.name, { type: x.type || b.type }) : null; });
+        }));
+      });
+    });
+  }).then(function (l) { return l.filter(Boolean); }).catch(function () { return []; });
+}
+function clearShared() { S.shared = []; S.shareInfo = null; shareNote(); if ('caches' in window) caches.delete('vas-share').catch(function () {}); }
+function shareNote() {
+  var n = $('shareNote'); n.classList.toggle('hide', !S.shared.length);
+  n.firstChild.textContent = L('📎 ' + S.shared.length + ' फाइल मिली – पहले लॉगिन करें, फिर बताएँ कि किस खाने में डालनी है.', '📎 ' + S.shared.length + ' file(s) received – log in first, then choose where they go.');
+}
+function openShare() {
+  if (!S.shared.length || !S.st) return;
+  var src = S.shared;
+  (S.shareInfo && S.shareInfo.src === src ? Promise.resolve(S.shareInfo) : (busy(true, L('फाइल जाँच रहे हैं…', 'Checking files…')), Promise.all(src.map(function (f) {
+    return Detect.inspect(f).then(function (r) { return { file: f, zip: r.zip, items: r.items }; }, function () { return { file: f, items: [{ file: f, type: '', months: [] }] }; });
+  })).then(function (list) { S.shareInfo = { src: src, list: list }; return S.shareInfo; })))
+    .then(function (info) {
+      // first time: jump to the month/quarter the reports belong to (they know it, the client often doesn't)
+      if (!info.periodSet) {
+        info.periodSet = true;
+        var pids = {};
+        info.list.forEach(function (x) { x.items.forEach(function (it) { (it.months || []).forEach(function (m) { pids[Core.pidFor(S.st.client.freq, m)] = 1; }); }); });
+        var only = Object.keys(pids);
+        if (only.length === 1 && only[0] !== S.pid && S.st.periods.some(function (p) { return p.pid === only[0]; })) return load(only[0], true).then(function () { return info; });
+      }
+      return info;
+    })
+    .then(function (info) { busy(false); if (S.shared === src) { renderShare(info.list); openSheet(sShare); } });
+}
+function shareTyped(x) { return x.items.length && x.items.every(function (it) { return it.type; }); }
+function renderShare(list) {
+  var st = S.st, sm = st.summary, c = st.client, locked = sm.work === 'FILED' || sm.data === 'NIL';
+  var h = '<label class="f" style="margin-top:0">' + L('किस महीने / तिमाही का डेटा है?', 'Which month / quarter is this data for?') + '</label><select class="i" onchange="sharePeriod(this.value)">' +
+    st.periods.map(function (p) { return '<option value="' + p.pid + '"' + (p.pid === st.pid ? ' selected' : '') + '>' + esc(p.label) + (p.work === 'FILED' ? L(' (फाइल हो गया)', ' (filed)') : p.running ? L(' (चालू)', ' (running)') : '') + '</option>'; }).join('') + '</select>';
+  if (sm.work === 'FILED') h += '<div class="miss">' + L('इस अवधि का रिटर्न फाइल हो चुका है – ऊपर दूसरा महीना चुनें.', 'The return for this period is filed – choose another month above.') + '</div>';
+  else if (sm.data === 'NIL') h += '<div class="miss">' + L('इस अवधि में NIL लगा है – फाइल डालनी है तो पहले होम पर NIL हटाएँ.', 'This period is marked NIL – to add files, first switch off NIL on the home screen.') + '</div>';
+  var need = false, plainOnly = true, missing = {};
+  h += '<div style="margin-top:12px">' + list.map(function (x) {
+    var typed = shareTyped(x), tag;
+    if (typed) {
+      tag = x.items.map(function (it) { return it.label + (it.months.length ? ' – ' + it.months.map(Core.monthLabel).join(', ') : ''); }).join(', ');
+      x.items.forEach(function (it) { var k = Detect.TYPES[it.type][0]; if (c.platforms.indexOf(k) < 0) missing[k] = 1; });
+      tag = '<small style="color:var(--ok)">✓ ' + esc(tag) + '</small>';
+    } else {
+      need = true; tag = '<small class="mute">' + L('❔ नीचे चुनें कि ये कौन सी फाइल है', '❔ Choose below what this file is') + '</small>';
+      if (x.items.some(function (it) { return !it.type && !it.plain; }) || /\.zip$/i.test(x.file.name)) plainOnly = false;
+    }
+    return '<div class="file" style="white-space:normal">📄<span style="white-space:normal"><b>' + esc(x.file.name) + '</b> <small class="mute">' + fmtSize(x.file.size) + '</small><br>' + tag + '</span></div>';
+  }).join('') + '</div>';
+  Object.keys(missing).forEach(function (k) {
+    var pl = esc(Core.platLabel(k));
+    h += '<div class="miss">' + L('⚠ ये ' + pl + ' की रिपोर्ट है, पर आपकी प्रोफाइल में ' + pl + ' नहीं है.', '⚠ This is a ' + pl + ' report, but ' + pl + ' is not in your profile.') + ' <button class="btn sm" style="margin-top:6px" onclick="shareAddPlat(\'' + k + '\')">' + L('+ ' + pl + ' जोड़ें', '+ Add ' + pl) + '</button></div>';
+  });
+  if (need && !locked) {
+    h += '<label class="f" style="margin-top:14px">' + L('ये फाइल किस खाने में डालें?', 'Which box should these files go in?') + '</label>';
+    Core.PLATFORM_ORDER.forEach(function (pk) {
+      // a PDF / photo can only go in a bills-type slot (marketplace slots take only their own Excel report)
+      var sl = st.slots.filter(function (s) { return s.plat === pk && !(plainOnly && s.detect); }); if (!sl.length) return;
+      h += '<div class="mute" style="margin:8px 0 4px"><b style="color:' + Core.PLATFORMS[pk].color + '">' + esc(Core.platLabel(pk)) + '</b></div><div class="pick">' +
+        sl.map(function (s) { return '<label><input type="radio" name="shSlot" value="' + s.id + '"> ' + esc(s.name) + (filesOf(s.id).length ? ' ✓' : '') + '</label>'; }).join('') + '</div>';
+    });
+    if (!st.slots.length) h += '<div class="miss">' + L('आपकी प्रोफाइल में कोई प्लेटफॉर्म नहीं है. ☰ → प्रोफाइल में जाकर चुनें.', 'No platform in your profile. Go to ☰ → profile and choose.') + '</div>';
+  }
+  h += '<button class="btn block ok" style="margin-top:16px" onclick="doShare()"' + (locked || !st.slots.length ? ' disabled' : '') + '>' + L('⬆ अपलोड करें', '⬆ Upload') + '</button>' +
+    '<button class="btn ghost block" style="margin-top:6px;color:var(--bad)" onclick="cancelShare()">' + L('रद्द करें', 'Cancel') + '</button>';
+  $('shareBody').innerHTML = h;
+  var opts = document.querySelectorAll('input[name=shSlot]');
+  if (opts.length === 1) opts[0].checked = true;
+  if (need && !locked && st.slots.length && !opts.length) $('shareBody').querySelector('.btn.ok').insertAdjacentHTML('beforebegin',
+    '<div class="miss">' + L('बिल / PDF के लिए आपकी प्रोफाइल में कोई खाना नहीं है.', 'There is no box for bills / PDFs in your profile.') + ' <button class="btn sm" style="margin-top:6px" onclick="shareAddPlat(\'pdf\')">' + L('+ ' + esc(Core.platLabel('pdf')) + ' जोड़ें', '+ Add ' + esc(Core.platLabel('pdf'))) + '</button></div>');
+}
+function cancelShare() { if (confirm(L('ये फाइल नहीं भेजनी?', 'Discard these files?'))) { closeSheet(sShare); clearShared(); render(); } }
+function sharePeriod(pid) { load(pid, true).then(openShare); }
+function shareAddPlat(k) {
   busy(true);
-  call('profile', { platforms: S.st.client.platforms.concat([k]) }).then(function () { toast(P.label + ' जोड़ दिया ✓'); return load(S.pid, true); })
+  call('profile', { platforms: S.st.client.platforms.concat([k]) }).then(function () { toast(Core.platLabel(k) + L(' जोड़ दिया ✓', ' added ✓')); return load(S.pid, true); })
+    .then(openShare).catch(function (e) { toast(e.message); }).finally(function () { busy(false); });
+}
+function doShare() {
+  if (!S.shareInfo) return;   // double tap: already sent
+  var st = S.st, list = S.shareInfo.list, groups = {}, order = [];
+  var chosen = (document.querySelector('input[name=shSlot]:checked') || {}).value;
+  for (var i = 0; i < list.length; i++) {
+    var x = list[i], slot = chosen;
+    if (shareTyped(x)) {
+      var T = Detect.TYPES[x.items[0].type];
+      var cand = st.slots.filter(function (s) { return s.plat === T[0] && s.key === T[1]; })[0] || st.slots.filter(function (s) { return s.plat === T[0]; })[0];
+      slot = cand ? cand.id : (chosen || st.slots[0].id);   // no slot for that platform → planFor refuses with the "+ जोड़ें" hint
+    } else if (!chosen) return toast(L('पहले चुनें कि फाइल किस खाने में डालनी है', 'First choose which box the file goes in'), 3500);
+    if (!groups[slot]) { groups[slot] = []; order.push(slot); }
+    groups[slot].push(x.file);
+  }
+  closeSheet(sShare); clearShared();
+  runUpload(order.map(function (s) { return { slot: s, files: groups[s] }; }));
+}
+function addPlatform(k) {
+  var P = Core.platLabel(k);
+  if (!confirm(L(P + ' का सेक्शन जोड़ें?', 'Add the ' + P + ' section?'))) return;
+  busy(true);
+  call('profile', { platforms: S.st.client.platforms.concat([k]) }).then(function () { toast(P + L(' जोड़ दिया ✓', ' added ✓')); return load(S.pid, true); })
     .catch(function (e) { toast(e.message); }).finally(function () { busy(false); });
 }
 function delFile(id) {
-  if (!confirm('यह फाइल हटाएँ?')) return;
+  if (!confirm(L('यह फाइल हटाएँ?', 'Remove this file?'))) return;
   busy(true);
   call('deleteFile', { pid: S.pid, id: id }).then(function () { return load(S.pid, true); }).catch(function (e) { toast(e.message, 4000); }).finally(function () { busy(false); });
 }
 function setNil(cb) {
   var on = cb.checked;
-  if (on && !confirm(S.st.summary.label + ' में कोई भी सेल नहीं हुई – NIL रिटर्न भरना है?')) { cb.checked = false; return; }
+  if (on && !confirm(L(S.st.summary.label + ' में कोई भी सेल नहीं हुई – NIL रिटर्न भरना है?', 'No sales at all in ' + S.st.summary.label + ' – file a NIL return?'))) { cb.checked = false; return; }
   busy(true);
-  call('setNil', { pid: S.pid, nil: on }).then(function () { toast(on ? 'NIL भेज दिया ✓' : 'NIL हटा दिया'); return load(S.pid, true); })
+  call('setNil', { pid: S.pid, nil: on }).then(function () { toast(on ? L('NIL भेज दिया ✓', 'NIL sent ✓') : L('NIL हटा दिया', 'NIL removed')); return load(S.pid, true); })
     .catch(function (e) { cb.checked = !on; toast(e.message, 4500); }).finally(function () { busy(false); });
 }
 function submitData(force) {
-  busy(true, 'भेज रहे हैं…');
+  busy(true, L('भेज रहे हैं…', 'Sending…'));
   call('submit', { pid: S.pid, force: !!force }).then(function (d) {
     busy(false);
     if (d && d.needConfirm) {
-      var names = d.missing.map(function (m) { return '• ' + Core.PLATFORMS[m.plat].label + ' – ' + m.name; }).join('\n');
-      if (confirm('ये रिपोर्ट अभी बाकी हैं:\n' + names + '\n\nफिर भी भेजें? (बाद में भी डाल सकते हैं)')) submitData(true);
+      var names = d.missing.map(function (m) { return '• ' + Core.platLabel(m.plat) + ' – ' + m.name; }).join('\n');
+      if (confirm(L('ये रिपोर्ट अभी बाकी हैं:\n' + names + '\n\nफिर भी भेजें? (बाद में भी डाल सकते हैं)', 'These reports are still pending:\n' + names + '\n\nSend anyway? (You can add them later too)'))) submitData(true);
       return;
     }
-    toast('डेटा भेज दिया ✓ धन्यवाद!'); load(S.pid, true);
+    toast(L('डेटा भेज दिया ✓ धन्यवाद!', 'Data sent ✓ Thank you!')); load(S.pid, true);
   }).catch(function (e) { busy(false); toast(e.message, 4000); });
 }
 function unsubmit() {
   call('unsubmit', { pid: S.pid }).then(function () { load(S.pid, true); }).catch(function (e) { toast(e.message); });
 }
 function claimPaid(pid) {
-  var note = prompt('पेमेंट की जानकारी (UPI Ref / किसको दिया) – वैकल्पिक:', '');
+  var note = prompt(L('पेमेंट की जानकारी (UPI Ref / किसको दिया) – वैकल्पिक:', 'Payment details (UPI ref / paid to whom) – optional:'), '');
   if (note === null) return;
   busy(true);
-  call('claimPaid', { pid: pid, note: note }).then(function () { toast('धन्यवाद! ऑफिस जाँच कर कन्फर्म करेगा.'); return load(S.pid, true); }).catch(function (e) { toast(e.message); }).finally(function () { busy(false); });
+  call('claimPaid', { pid: pid, note: note }).then(function () { toast(L('धन्यवाद! ऑफिस जाँच कर कन्फर्म करेगा.', 'Thank you! The office will check and confirm.')); return load(S.pid, true); }).catch(function (e) { toast(e.message); }).finally(function () { busy(false); });
 }
 
 /* ---------- files from the office (filed returns) and the document vault ---------- */
 function retList(list) {
-  return (list || []).map(function (r) { return '<div class="file" style="background:#fff;margin-top:8px">📄<span>' + esc(r.kind === 'GSTR3B' ? 'GSTR-3B' : r.kind === 'GSTR1' ? 'GSTR-1' : '') + ' ' + esc(r.name) + '</span><button class="btn sm" onclick="getFile(\'' + r.id + '\')">⬇ डाउनलोड</button></div>'; }).join('');
+  return (list || []).map(function (r) { return '<div class="file" style="background:#fff;margin-top:8px">📄<span>' + esc(r.kind === 'GSTR3B' ? 'GSTR-3B' : r.kind === 'GSTR1' ? 'GSTR-1' : '') + ' ' + esc(r.name) + '</span><button class="btn sm" onclick="getFile(\'' + r.id + '\')">' + L('⬇ डाउनलोड', '⬇ Download') + '</button></div>'; }).join('');
 }
 function getFile(id) {
-  busy(true, 'फाइल ला रहे हैं…');
+  busy(true, L('फाइल ला रहे हैं…', 'Fetching file…'));
   call('fileGet', { id: id }).then(function (d) {
     if (d.b64) { var bin = atob(d.b64), arr = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); return { name: d.name, blob: new Blob([arr], { type: d.mime }) }; }
     return API.demoFile(d.fileId).then(function (x) { return { name: d.name, blob: x.blob }; });
@@ -578,12 +734,12 @@ function getFile(id) {
 function openDocs() {
   var st = S.st, req = (st.docReq && st.docReq.types) || [];
   var types = Object.keys(st.docTypes).sort(function (a, b) { return (req.indexOf(b) >= 0) - (req.indexOf(a) >= 0); });
-  $('docsBody').innerHTML = (req.length ? '<div class="miss" style="margin-top:0">⚠ <b>ऑफिस ने ये माँगे हैं:</b> ' + req.map(function (t) { return esc(st.docTypes[t]); }).join(', ') + (st.docReq.note ? '<br>' + esc(st.docReq.note) : '') + '</div>' : '') +
-    '<div class="mute" style="margin:8px 0">आपके डॉक्यूमेंट सुरक्षित रहते हैं – सिर्फ आप और Vishal Accounting Services देख सकते हैं.</div>' +
+  $('docsBody').innerHTML = (req.length ? '<div class="miss" style="margin-top:0">⚠ <b>' + L('ऑफिस ने ये माँगे हैं:', 'The office has asked for:') + '</b> ' + req.map(function (t) { return esc(st.docTypes[t]); }).join(', ') + (st.docReq.note ? '<br>' + esc(st.docReq.note) : '') + '</div>' : '') +
+    '<div class="mute" style="margin:8px 0">' + L('आपके डॉक्यूमेंट सुरक्षित रहते हैं – सिर्फ आप और Vishal Accounting Services देख सकते हैं.', 'Your documents are kept safe – only you and Vishal Accounting Services can see them.') + '</div>' +
     types.map(function (t) {
       var have = st.docs.filter(function (d) { return d.type === t; }), want = req.indexOf(t) >= 0;
       return '<div class="slot"><div class="sr"><div class="tick' + (have.length ? ' y' : '') + '">' + (have.length ? '✓' : want ? '!' : '•') + '</div><div class="nm"' + (want ? ' style="color:var(--warn)"' : '') + '>' + esc(st.docTypes[t]) + '</div>' +
-        '<button class="btn sm' + (have.length ? ' sec' : '') + '" onclick="pickDoc(\'' + t + '\')">' + (have.length ? '+ और' : '⬆ अपलोड') + '</button></div>' +
+        '<button class="btn sm' + (have.length ? ' sec' : '') + '" onclick="pickDoc(\'' + t + '\')">' + (have.length ? L('+ और', '+ More') : L('⬆ अपलोड', '⬆ Upload')) + '</button></div>' +
         (have.length ? '<div class="files">' + have.map(function (d) { return '<div class="file">📄<span>' + esc(d.name) + '</span><button class="x" style="color:var(--pri)" onclick="getFile(\'' + d.id + '\')">⬇</button><button class="x" onclick="delDoc(\'' + d.id + '\')">✕</button></div>'; }).join('') + '</div>' : '') + '</div>';
     }).join('');
   openSheet(sDocs);
@@ -593,31 +749,33 @@ function docChosen(inp) {
   var list = Array.prototype.slice.call(inp.files || []); if (!list.length) return;
   var i = 0;
   (function next() {
-    if (i >= list.length) { busy(false); toast('डॉक्यूमेंट सेव ✓'); return load(S.pid, true).then(openDocs); }
+    if (i >= list.length) { busy(false); toast(L('डॉक्यूमेंट सेव ✓', 'Document saved ✓')); return load(S.pid, true).then(openDocs); }
     var f = list[i++];
-    if (f.size > 20 * 1048576) { toast(f.name + ' – 20 MB से बड़ी'); return next(); }
-    busy(true, 'अपलोड ' + i + '/' + list.length + ': ' + f.name);
+    if (f.size > 20 * 1048576) { toast(f.name + L(' – 20 MB से बड़ी', ' – larger than 20 MB')); return next(); }
+    busy(true, L('अपलोड ', 'Uploading ') + i + '/' + list.length + ': ' + f.name);
     API.fileToB64(f).then(function (b64) { return call('docUpload', { type: S.docType, name: f.name, mime: f.type, b64: b64 }); }).then(next, function (e) { busy(false); toast(e.message, 4000); });
   })();
 }
 function delDoc(id) {
-  if (!confirm('ये डॉक्यूमेंट हटाएँ?')) return;
+  if (!confirm(L('ये डॉक्यूमेंट हटाएँ?', 'Remove this document?'))) return;
   call('docDelete', { id: id }).then(function () { return load(S.pid, true); }).then(openDocs).catch(function (e) { toast(e.message); });
 }
 function appLink() { return location.origin + location.pathname.replace(/[^\/]*$/, ''); }
 function shareRef() {
-  var txt = 'नमस्ते! मैं अपना GST का सारा काम Vishal Accounting Services से करवाता हूँ – डेटा भेजना, रिटर्न, सब एक ऐप में. आप भी जुड़ें:\n' + appLink() + '?ref=' + S.st.refCode;
+  var txt = L('नमस्ते! मैं अपना GST का सारा काम Vishal Accounting Services से करवाता हूँ – डेटा भेजना, रिटर्न, सब एक ऐप में. आप भी जुड़ें:\n', 'Hi! I get all my GST work done by Vishal Accounting Services – sending data, returns, everything in one app. Join too:\n') + appLink() + '?ref=' + S.st.refCode;
   if (navigator.share) navigator.share({ text: txt }).catch(function () {}); else window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
 }
 
 /* ---------- tabs: learn / news / services / FAQ (content comes from the office dashboard) ---------- */
 S.tab = 'home';
-var TAB_HEAD = {
-  learn: ['🎓 सीखें और ऑफर', 'E-commerce कोर्स, बिज़नेस आइडिया और खास ऑफर – हमारे पार्टनर्स के साथ.'],
-  news: ['📰 GST और E-commerce न्यूज़', 'नए नियम, रेट में बदलाव और सेलर्स के लिए ज़रूरी अपडेट.'],
-  service: ['💼 हमारी सेवाएँ', 'Vishal Accounting Services से ये सब काम करवाएँ – एक टैप में पूछताछ करें.'],
-  faq: ['❓ मदद – सवाल-जवाब', 'ऐप इस्तेमाल करने से जुड़े आम सवाल.']
-};
+function tabHead(t) {
+  return {
+    learn: [L('🎓 सीखें और ऑफर', '🎓 Learn and offers'), L('E-commerce कोर्स, बिज़नेस आइडिया और खास ऑफर – हमारे पार्टनर्स के साथ.', 'E-commerce courses, business ideas and special offers – with our partners.')],
+    news: [L('📰 GST और E-commerce न्यूज़', '📰 GST and e-commerce news'), L('नए नियम, रेट में बदलाव और सेलर्स के लिए ज़रूरी अपडेट.', 'New rules, rate changes and important updates for sellers.')],
+    service: [L('💼 हमारी सेवाएँ', '💼 Our services'), L('Vishal Accounting Services से ये सब काम करवाएँ – एक टैप में पूछताछ करें.', 'Get all this done by Vishal Accounting Services – enquire with one tap.')],
+    faq: [L('❓ मदद – सवाल-जवाब', '❓ Help – questions and answers'), L('ऐप इस्तेमाल करने से जुड़े आम सवाल.', 'Common questions about using the app.')]
+  }[t];
+}
 function itemsOf(kind) { return ((S.st && S.st.content) || []).filter(function (x) { return x.kind === kind; }); }
 function showTab(t) {
   S.tab = t;
@@ -635,24 +793,24 @@ function updateDots() {
   });
 }
 function renderTab(t) {
-  var list = itemsOf(t), h = '<div style="padding:14px 2px 4px"><h2 style="margin:0">' + TAB_HEAD[t][0] + '</h2><div class="mute">' + TAB_HEAD[t][1] + '</div></div>';
+  var list = itemsOf(t), th = tabHead(t), h = '<div style="padding:14px 2px 4px"><h2 style="margin:0">' + th[0] + '</h2><div class="mute">' + th[1] + '</div></div>';
   if (t === 'faq') {
     h += list.map(function (x) { return '<details class="faq"><summary><span>' + esc(x.icon || '❔') + '</span><span>' + esc(x.title) + '</span></summary><div>' + esc(x.body) + '</div></details>'; }).join('');
-    h += '<div class="card" style="text-align:center"><b>जवाब नहीं मिला?</b><div class="mute" style="margin:4px 0 10px">हमें सीधे WhatsApp करें</div><a class="btn" target="_blank" rel="noopener" href="' + waOffice('नमस्ते, मुझे ऐप के बारे में एक सवाल पूछना है:') + '">💬 WhatsApp करें</a></div>';
+    h += '<div class="card" style="text-align:center"><b>' + L('जवाब नहीं मिला?', 'Did not find your answer?') + '</b><div class="mute" style="margin:4px 0 10px">' + L('हमें सीधे WhatsApp करें', 'WhatsApp us directly') + '</div><a class="btn" target="_blank" rel="noopener" href="' + waOffice(L('नमस्ते, मुझे ऐप के बारे में एक सवाल पूछना है:', 'Hello, I have a question about the app:')) + '">' + L('💬 WhatsApp करें', '💬 WhatsApp us') + '</a></div>';
   } else if (t === 'service') {
     h += '<div class="svc">' + list.map(function (x) {
       return '<div class="card"><div class="ic">' + esc(x.icon || '📌') + '</div><b>' + esc(x.title) + '</b><div class="mute">' + esc(x.body) + '</div>' + (x.price ? '<div class="price" style="font-size:14px;margin:0">' + esc(x.price) + '</div>' : '') +
-        '<button class="btn sm" onclick="askLead(\'' + x.id + '\')">' + esc(x.cta || 'पूछताछ करें') + '</button></div>';
+        '<button class="btn sm" onclick="askLead(\'' + x.id + '\')">' + esc(x.cta || L('पूछताछ करें', 'Enquire')) + '</button></div>';
     }).join('') + '</div>';
   } else {
     h += list.map(function (x) {
       return '<div class="card post">' + (x.img ? '<img class="pimg" loading="lazy" src="' + esc(x.img) + '" alt="">' : '') + '<div class="pb"><div class="pt">' + (x.img ? '' : '<span class="ic">' + esc(x.icon || (t === 'news' ? '📰' : '🎓')) + '</span>') +
-        '<div style="flex:1"><b style="font-size:15.5px">' + esc(x.title) + '</b><div>' + (x.pinned ? '<span class="pinned">📌 खास</span> ' : '') + (x.partner ? '<span class="partner">' + esc(x.partner) + '</span> ' : '') + '<span class="mute">' + fmtDate(x.at).split(' ').slice(0, 2).join(' ') + '</span></div></div></div>' +
+        '<div style="flex:1"><b style="font-size:15.5px">' + esc(x.title) + '</b><div>' + (x.pinned ? '<span class="pinned">' + L('📌 खास', '📌 Featured') + '</span> ' : '') + (x.partner ? '<span class="partner">' + esc(x.partner) + '</span> ' : '') + '<span class="mute">' + fmtDate(x.at).split(' ').slice(0, 2).join(' ') + '</span></div></div></div>' +
         (x.body ? '<div class="body">' + esc(x.body) + '</div>' : '') + (x.price ? '<div class="price">' + esc(x.price) + '</div>' : '') +
-        (x.cta || x.link ? '<button class="btn block" style="margin-top:12px" onclick="askLead(\'' + x.id + '\')">' + esc(x.cta || 'और जानें') + '</button>' : '') + '</div></div>';
+        (x.cta || x.link ? '<button class="btn block" style="margin-top:12px" onclick="askLead(\'' + x.id + '\')">' + esc(x.cta || L('और जानें', 'Know more')) + '</button>' : '') + '</div></div>';
     }).join('');
   }
-  if (!list.length) h += '<div class="empty">अभी यहाँ कुछ नहीं है – जल्द नई जानकारी आएगी.</div>';
+  if (!list.length) h += '<div class="empty">' + L('अभी यहाँ कुछ नहीं है – जल्द नई जानकारी आएगी.', 'Nothing here yet – new updates are coming soon.') + '</div>';
   $('tabOther').innerHTML = h;
 }
 function waOffice(text) { return 'https://wa.me/91' + ((S.st && S.st.settings.phone) || CONFIG.OFFICE_PHONE) + '?text=' + encodeURIComponent(text); }
@@ -660,8 +818,8 @@ function askLead(id) {
   var x = ((S.st && S.st.content) || []).filter(function (i) { return i.id === id; })[0]; if (!x) return;
   // open first (inside the tap so the browser allows it), tell the office in the background
   var who = S.st.client.fullName || S.st.client.trade;
-  window.open(x.link || waOffice('नमस्ते, मुझे "' + x.title + '" के बारे में जानकारी चाहिए. – ' + who + ' (' + S.st.client.gstin + ')'), '_blank');
-  call('lead', { id: id }).then(function () { toast('धन्यवाद! हमारी टीम आपसे संपर्क करेगी 🙏', 3500); }).catch(function () {});
+  window.open(x.link || waOffice(L('नमस्ते, मुझे "' + x.title + '" के बारे में जानकारी चाहिए. – ', 'Hello, I would like to know about "' + x.title + '". – ') + who + ' (' + S.st.client.gstin + ')'), '_blank');
+  call('lead', { id: id }).then(function () { toast(L('धन्यवाद! हमारी टीम आपसे संपर्क करेगी 🙏', 'Thank you! Our team will contact you 🙏'), 3500); }).catch(function () {});
 }
 
 /* ---------- inbox / profile ---------- */
@@ -671,50 +829,52 @@ function openInbox() {
   var list = S.st.inbox;
   $('inboxList').innerHTML = list.length ? list.map(function (n) {
     return '<div class="note' + (n.read ? '' : ' unread') + '"><b>' + esc(n.title) + '</b><div>' + esc(n.body) + '</div><div class="t">' + fmtDate(n.at) + '</div></div>';
-  }).join('') : '<div class="mute">कोई सूचना नहीं.</div>';
+  }).join('') : '<div class="mute">' + L('कोई सूचना नहीं.', 'No notifications.') + '</div>';
   openSheet(sInbox);
   if (S.st.unread) call('readInbox').then(function () { S.st.unread = 0; S.st.inbox.forEach(function (n) { n.read = true; }); $('hBadge').classList.add('hide'); }).catch(function () {});
 }
 function openProfile() {
   var c = S.st.client, st = S.st;
   var plats = Core.PLATFORM_ORDER.map(function (k) {
-    return '<label><input type="checkbox" name="pPlat" value="' + k + '"' + (c.platforms.indexOf(k) >= 0 ? ' checked' : '') + '> ' + esc(Core.PLATFORMS[k].label) + '</label>';
+    return '<label><input type="checkbox" name="pPlat" value="' + k + '"' + (c.platforms.indexOf(k) >= 0 ? ' checked' : '') + '> ' + esc(Core.platLabel(k)) + '</label>';
   }).join('');
   var others = S.sessions.filter(function (s) { return s.gstin !== c.gstin; });
   $('profBody').innerHTML =
-    '<div class="card" style="margin-top:0;background:#f8fafc"><b>' + esc(c.trade) + '</b>' + (c.verified ? ' <span class="pill COMPLETE">✓ verified</span>' : '') + '<div class="mute">' + esc(c.gstin) + ' • ' + esc(c.state) + '</div><div class="mute">' + esc(c.legal || '') + '</div></div>' +
-    '<label class="f">आपका नाम</label><input class="i" id="pOwner" value="' + esc(c.owner || '') + '">' +
-    '<label class="f">ईमेल</label><input class="i" id="pEmail" value="' + esc(c.email || '') + '">' +
-    '<label class="f">रिटर्न</label><div class="pick"><label><input type="radio" name="pFreq" value="M"' + (c.freq !== 'Q' ? ' checked' : '') + '> Monthly</label><label><input type="radio" name="pFreq" value="Q"' + (c.freq === 'Q' ? ' checked' : '') + '> Quarterly</label></div>' +
-    '<label class="f">आप कहाँ बेचते हैं?</label><div class="pick">' + plats + '</div>' +
-    '<button class="btn block" style="margin-top:14px" onclick="saveProfile()">सेव करें</button>' +
+    '<label class="f" style="margin-top:0">' + L('ऐप की भाषा / Language', 'App language / भाषा') + '</label><div class="langrow"><button data-l="hi" onclick="setLang(\'hi\')">हिंदी</button><button data-l="en" onclick="setLang(\'en\')">English</button></div>' +
+    '<div class="card" style="margin-top:12px;background:#f8fafc"><b>' + esc(c.trade) + '</b>' + (c.verified ? ' <span class="pill COMPLETE">✓ verified</span>' : '') + '<div class="mute">' + esc(c.gstin) + ' • ' + esc(c.state) + '</div><div class="mute">' + esc(c.legal || '') + '</div></div>' +
+    '<label class="f">' + L('आपका नाम', 'Your name') + '</label><input class="i" id="pOwner" value="' + esc(c.owner || '') + '">' +
+    '<label class="f">' + L('ईमेल', 'Email') + '</label><input class="i" id="pEmail" value="' + esc(c.email || '') + '">' +
+    '<label class="f">' + L('रिटर्न', 'Return') + '</label><div class="pick"><label><input type="radio" name="pFreq" value="M"' + (c.freq !== 'Q' ? ' checked' : '') + '> Monthly</label><label><input type="radio" name="pFreq" value="Q"' + (c.freq === 'Q' ? ' checked' : '') + '> Quarterly</label></div>' +
+    '<label class="f">' + L('आप कहाँ बेचते हैं?', 'Where do you sell?') + '</label><div class="pick">' + plats + '</div>' +
+    '<button class="btn block" style="margin-top:14px" onclick="saveProfile()">' + L('सेव करें', 'Save') + '</button>' +
     '<hr style="border:0;border-top:1px solid var(--line);margin:18px 0">' +
-    '<button class="btn sec block" onclick="changePin()">PIN बदलें</button>' +
-    '<a class="btn sec block" style="margin-top:8px;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/91' + esc(st.settings.phone) + '">💬 ऑफिस से WhatsApp पर बात करें</a>' +
-    (others.length ? '<label class="f" style="margin-top:16px">दूसरी फर्म पर जाएँ</label>' + others.map(function (s) { return '<button class="btn sec block" style="margin-top:6px" onclick="closeSheet(sProfile);useSession(\'' + s.gstin + '\')">' + esc(s.trade) + ' <small>(' + s.gstin + ')</small></button>'; }).join('') : '') +
-    '<button class="btn ghost block" style="margin-top:8px" onclick="closeSheet(sProfile);S.active=null;route()">+ दूसरी फर्म जोड़ें (लॉगिन)</button>' +
-    '<button class="btn ghost block" style="color:var(--bad)" onclick="logout()">लॉगआउट</button>' +
-    (st.fyTurnover && st.fyTurnover.months ? '<div class="card" style="background:#f8fafc;margin-top:14px"><b>📈 इस साल (FY ' + esc(st.fyTurnover.fy) + ') की बिक्री</b><div>अब तक: <b>' + rupee(Math.round(st.fyTurnover.total)) + '</b> (' + st.fyTurnover.months + ' महीने)</div>' + (st.fyTurnover.projected ? '<div class="mute">पूरे साल का अनुमान: ' + rupee(Math.round(st.fyTurnover.projected)) + '</div>' : '') + '</div>' : '') +
-    '<div class="foot">ऐप वर्ज़न ' + Core.VERSION + ' – नया अपडेट अपने आप आ जाता है.</div>';
+    '<button class="btn sec block" onclick="changePin()">' + L('PIN बदलें', 'Change PIN') + '</button>' +
+    '<a class="btn sec block" style="margin-top:8px;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/91' + esc(st.settings.phone) + '">' + L('💬 ऑफिस से WhatsApp पर बात करें', '💬 Chat with the office on WhatsApp') + '</a>' +
+    (others.length ? '<label class="f" style="margin-top:16px">' + L('दूसरी फर्म पर जाएँ', 'Switch to another firm') + '</label>' + others.map(function (s) { return '<button class="btn sec block" style="margin-top:6px" onclick="closeSheet(sProfile);useSession(\'' + s.gstin + '\')">' + esc(s.trade) + ' <small>(' + s.gstin + ')</small></button>'; }).join('') : '') +
+    '<button class="btn ghost block" style="margin-top:8px" onclick="closeSheet(sProfile);S.active=null;route()">' + L('+ दूसरी फर्म जोड़ें (लॉगिन)', '+ Add another firm (login)') + '</button>' +
+    '<button class="btn ghost block" style="color:var(--bad)" onclick="logout()">' + L('लॉगआउट', 'Log out') + '</button>' +
+    (st.fyTurnover && st.fyTurnover.months ? '<div class="card" style="background:#f8fafc;margin-top:14px"><b>' + L('📈 इस साल (FY ' + esc(st.fyTurnover.fy) + ') की बिक्री', '📈 Sales this year (FY ' + esc(st.fyTurnover.fy) + ')') + '</b><div>' + L('अब तक: ', 'So far: ') + '<b>' + rupee(Math.round(st.fyTurnover.total)) + '</b> (' + st.fyTurnover.months + L(' महीने', ' months') + ')</div>' + (st.fyTurnover.projected ? '<div class="mute">' + L('पूरे साल का अनुमान: ', 'Full-year estimate: ') + rupee(Math.round(st.fyTurnover.projected)) + '</div>' : '') + '</div>' : '') +
+    '<div class="foot">' + L('ऐप वर्ज़न ' + Core.VERSION + ' – नया अपडेट अपने आप आ जाता है.', 'App version ' + Core.VERSION + ' – updates install by themselves.') + '</div>';
+  applyLang();
   openSheet(sProfile);
 }
 function saveProfile() {
   var plats = Array.prototype.map.call(document.querySelectorAll('input[name=pPlat]:checked'), function (x) { return x.value; });
   busy(true);
   call('profile', { owner: $('pOwner').value, email: $('pEmail').value, freq: document.querySelector('input[name=pFreq]:checked').value, platforms: plats })
-    .then(function () { closeSheet(sProfile); toast('सेव हो गया ✓'); S.pid = null; return load(null, true); }).catch(function (e) { toast(e.message); }).finally(function () { busy(false); });
+    .then(function () { closeSheet(sProfile); toast(L('सेव हो गया ✓', 'Saved ✓')); S.pid = null; return load(null, true); }).catch(function (e) { toast(e.message); }).finally(function () { busy(false); });
 }
 function changePin() {
-  var old = prompt('पुराना PIN:'); if (!old) return;
-  var n1 = prompt('नया PIN (4–6 अंक):'); if (!n1) return;
-  if (prompt('नया PIN दोबारा:') !== n1) return toast('PIN मेल नहीं खाए');
-  call('changePin', { old: old, pin: n1 }).then(function () { toast('PIN बदल गया ✓'); }).catch(function (e) { toast(e.message); });
+  var old = prompt(L('पुराना PIN:', 'Old PIN:')); if (!old) return;
+  var n1 = prompt(L('नया PIN (4–6 अंक):', 'New PIN (4–6 digits):')); if (!n1) return;
+  if (prompt(L('नया PIN दोबारा:', 'New PIN again:')) !== n1) return toast(L('PIN मेल नहीं खाए', 'The PINs do not match'));
+  call('changePin', { old: old, pin: n1 }).then(function () { toast(L('PIN बदल गया ✓', 'PIN changed ✓')); }).catch(function (e) { toast(e.message); });
 }
 
 /* ---------- install / update / push ---------- */
 var deferredInstall = null;
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferredInstall = e; $('installBar').classList.remove('hide'); });
-window.addEventListener('appinstalled', function () { $('installBar').classList.add('hide'); toast('ऐप इंस्टॉल हो गया ✓'); });
+window.addEventListener('appinstalled', function () { $('installBar').classList.add('hide'); toast(L('ऐप इंस्टॉल हो गया ✓', 'App installed ✓')); });
 function doInstall() { if (!deferredInstall) return; deferredInstall.prompt(); deferredInstall.userChoice.finally(function () { deferredInstall = null; $('installBar').classList.add('hide'); }); }
 function hideIos() { $('iosBar').classList.add('hide'); store('vas_ios_hide', 1); }
 var standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
@@ -740,7 +900,7 @@ function setupPushBar() {
 }
 function loadScript(src) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
 function enablePush() {
-  Notification.requestPermission().then(function (p) { $('pushBar').classList.add('hide'); if (p === 'granted') registerPush(); else toast('नोटिफिकेशन बंद हैं – फोन की सेटिंग से चालू करें'); });
+  Notification.requestPermission().then(function (p) { $('pushBar').classList.add('hide'); if (p === 'granted') registerPush(); else toast(L('नोटिफिकेशन बंद हैं – फोन की सेटिंग से चालू करें', 'Notifications are off – turn them on in the phone settings')); });
 }
 function registerPush() {
   var base = 'https://www.gstatic.com/firebasejs/10.12.2/';
@@ -754,6 +914,13 @@ function registerPush() {
 }
 
 /* ---------- start ---------- */
+// language: saved choice, or ?lang=en in a link; Hindi by default
+(function () {
+  var q = new URLSearchParams(location.search).get('lang');
+  if (q === 'en' || q === 'hi') store('vas_lang', q);
+  S.lang = store('vas_lang') === 'en' ? 'en' : 'hi';
+  applyLang();
+})();
 buildPick();
 if (API.DEMO) $('demoNote').classList.remove('hide');
 // referral link: …/?ref=ABC123 → fills the code and opens the registration form
@@ -767,6 +934,16 @@ S.sessions = store('vas_sessions') || [];
 var act = store('vas_active');
 S.active = S.sessions.filter(function (s) { return s.gstin === act; })[0] || S.sessions[0] || null;
 route();
+// opened from the phone's share sheet (…/index.html?share=1) or a share left over from earlier
+(function () {
+  var fresh = new URLSearchParams(location.search).get('share') === '1';
+  if (fresh) history.replaceState(null, '', location.pathname);
+  readShared().then(function (files) {
+    if (!files.length) { if (fresh) toast(L('शेयर में कोई फाइल नहीं मिली – फाइल को ही शेयर करें', 'No file came with the share – please share the file itself'), 4000); return; }
+    S.shared = files; S.shareAuto = fresh; shareNote();
+    if (S.st) render();
+  });
+})();
 </script>
 </body>
 </html>

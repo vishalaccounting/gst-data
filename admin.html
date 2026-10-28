@@ -732,6 +732,10 @@ function editItem(id) {
     f('icon', 'आइकन (इमोजी)', x.icon, '🎓') + '</div>' +
     '<label style="font-size:12px;font-weight:600;display:block;margin-top:8px">शीर्षक *<input class="i" id="ci_title" style="width:100%" value="' + esc(x.title || '') + '"></label>' +
     '<label style="font-size:12px;font-weight:600;display:block;margin-top:8px">पूरी जानकारी<textarea class="i" id="ci_body" rows="6" style="width:100%">' + esc(x.body || '') + '</textarea></label>' +
+    '<details style="margin-top:8px"' + (x.titleEn ? ' open' : '') + '><summary style="cursor:pointer;font-size:12px;font-weight:600">🇬🇧 English में (वैकल्पिक – जो क्लाइंट ऐप English में चलाते हैं उन्हें ये दिखेगा; खाली = हिंदी ही दिखेगी)</summary>' +
+    '<label style="font-size:12px;font-weight:600;display:block;margin-top:6px">Title (English)<input class="i" id="ci_titleEn" style="width:100%" value="' + esc(x.titleEn || '') + '"></label>' +
+    '<label style="font-size:12px;font-weight:600;display:block;margin-top:6px">Details (English)<textarea class="i" id="ci_bodyEn" rows="4" style="width:100%">' + esc(x.bodyEn || '') + '</textarea></label>' +
+    '<div class="grid2" style="margin-top:6px">' + f('ctaEn', 'Button text (English)', x.ctaEn, 'Know more / Enquire') + f('priceEn', 'Price / offer (English)', x.priceEn, '₹999 or 30% off') + '</div></details>' +
     '<div class="grid2" style="margin-top:8px">' + f('price', 'कीमत / ऑफर', x.price, '₹999 या 30% छूट') + f('partner', 'पार्टनर का नाम', x.partner, 'जैसे XYZ Academy') +
     f('cta', 'बटन पर लिखा', x.cta, 'और जानें / पूछताछ करें') + f('link', 'बटन का लिंक (खाली = हमारा WhatsApp)', x.link, 'https://…') + f('order', 'क्रम (छोटा पहले)', x.order, '') + '</div>' +
     '<div style="margin-top:10px"><label style="font-size:12px;font-weight:600">फोटो / बैनर (वैकल्पिक)</label><div class="row" style="margin-top:4px"><input type="file" accept="image/*" onchange="pickImg(this)"><input class="i" id="ci_img" placeholder="या फोटो का लिंक" value="' + esc(x.img || '') + '" style="flex:1"></div><img id="ci_prev" src="' + esc(x.img || '') + '" style="max-width:100%;max-height:180px;margin-top:6px;border-radius:8px;' + (x.img ? '' : 'display:none') + '"></div>' +
@@ -755,7 +759,8 @@ function pickImg(inp) {
 }
 function saveItem(id) {
   var item = { id: id || undefined, kind: $('ci_kind').value, icon: $('ci_icon').value, title: $('ci_title').value, body: $('ci_body').value, price: $('ci_price').value, partner: $('ci_partner').value,
-    cta: $('ci_cta').value, link: $('ci_link').value, order: $('ci_order').value, img: $('ci_img').value, pinned: $('ci_pinned').checked, active: $('ci_active').checked };
+    cta: $('ci_cta').value, link: $('ci_link').value, order: $('ci_order').value, img: $('ci_img').value, pinned: $('ci_pinned').checked, active: $('ci_active').checked,
+    titleEn: $('ci_titleEn').value, bodyEn: $('ci_bodyEn').value, ctaEn: $('ci_ctaEn').value, priceEn: $('ci_priceEn').value };
   var notify = $('ci_notify').checked;
   if (notify && !confirm('सभी क्लाइंट्स को नोटिफिकेशन जाएगा. ठीक है?')) return;
   (IMG_DATA ? A('aContentImage', { b64: IMG_DATA.split(',')[1], mime: 'image/jpeg', name: 'banner.jpg' }).then(function (d) { item.img = d.url; }) : Promise.resolve())
