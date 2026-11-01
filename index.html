@@ -118,6 +118,10 @@ details.faq div{padding:0 16px 14px 48px;font-size:14px;color:#374151;white-spac
 .langsw button,.langrow button{border:1.5px solid var(--line);background:#fff;border-radius:20px;padding:5px 12px;font-size:13px;font-weight:600;color:var(--pri);cursor:pointer}
 .langsw button.on,.langrow button.on{background:var(--pri);border-color:var(--pri);color:#fff}
 .langrow{display:flex;gap:8px}.langrow button{flex:1;padding:10px}
+.consent{display:flex;gap:8px;align-items:flex-start;margin-top:16px;font-size:13px;line-height:1.45;color:#475569}
+.consent input{margin-top:2px;width:18px;height:18px;flex:none}
+.consent a{color:#2563eb}
+.btn:disabled{opacity:.45;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -173,7 +177,9 @@ details.faq div{padding:0 16px 14px 48px;font-size:14px;color:#374151;white-spac
     <div class="mute" style="margin-top:6px" data-en="⚠ Do not use your ATM / bank PIN. If you forget the PIN, the office can tell you.">⚠ ATM / बैंक वाला PIN न रखें. PIN भूल जाने पर ऑफिस आपको बता सकता है.</div>
     <label class="f" data-en='Referral code &lt;span class="mute"&gt;(if someone referred you – optional)&lt;/span&gt;'>रेफरल कोड <span class="mute">(किसी ने बताया हो तो – वैकल्पिक)</span></label>
     <input class="i" id="rRef" maxlength="6" style="text-transform:uppercase">
-    <button class="btn block" style="margin-top:16px" data-en="Register">रजिस्टर करें</button>
+    <!-- DPDP consent: empty tick box, Register stays off until the client ticks it -->
+    <label class="consent"><input type="checkbox" id="rConsent" onchange="$('rBtn').disabled=!this.checked"> <span data-en='I agree that Vishal Accounting Services may use the details above and the data I upload to prepare and file my returns and send me reminders, as in the &lt;a href="https://vishalaccountingservices.in/privacy.html" target="_blank" rel="noopener"&gt;Privacy Policy&lt;/a&gt;. I can withdraw this any time from my profile.'>मैं सहमत हूँ कि Vishal Accounting Services ऊपर की जानकारी और मेरा भेजा डेटा मेरे रिटर्न बनाने, फाइल करने और रिमाइंडर भेजने के लिए इस्तेमाल करे, जैसा <a href="https://vishalaccountingservices.in/privacy.html" target="_blank" rel="noopener">प्राइवेसी नीति</a> में लिखा है. ये सहमति मैं कभी भी प्रोफाइल से वापस ले सकता/सकती हूँ.</span></label>
+    <button class="btn block" id="rBtn" style="margin-top:12px" disabled data-en="Register">रजिस्टर करें</button>
     <div class="mute" style="margin-top:10px" data-en="The office will match your name and GSTIN with the GST portal.">आपका नाम और GSTIN ऑफिस द्वारा GST पोर्टल से मिलाया जाएगा.</div>
   </form>
 </div>
@@ -214,6 +220,11 @@ details.faq div{padding:0 16px 14px 48px;font-size:14px;color:#374151;white-spac
 <div class="sheet" id="sProfile" onclick="if(event.target===this)closeSheet(this)"><div class="pane">
   <div class="hd"><h2 style="margin:0" data-en="My profile">मेरी प्रोफाइल</h2><button class="btn ghost" onclick="closeSheet(sProfile)" data-en="Close ✕">बंद ✕</button></div>
   <div id="profBody"></div>
+</div></div>
+
+<div class="sheet" id="sConsent"><div class="pane">
+  <div class="hd"><h2 style="margin:0" data-en="🔒 Your data, your consent">🔒 आपका डेटा, आपकी सहमति</h2></div>
+  <div id="consentBody"></div>
 </div></div>
 
 <div class="sheet" id="sResult" onclick="if(event.target===this)closeSheet(this)"><div class="pane">
@@ -320,6 +331,7 @@ function gstinCheck() {
 }
 function doRegister(e) {
   e.preventDefault();
+  if (!$('rConsent').checked) return toast(L('आगे बढ़ने के लिए सहमति वाले बॉक्स पर टिक करें', 'Please tick the consent box to continue'));
   if ($('rPin').value !== $('rPin2').value) return toast(L('दोनों PIN एक जैसे नहीं हैं', 'The two PINs do not match'));
   var plats = Array.prototype.map.call(document.querySelectorAll('input[name=rPlat]:checked'), function (x) { return x.value; });
   if (!plats.length && !confirm(L('कोई प्लेटफॉर्म नहीं चुना. फिर भी आगे बढ़ें? (बाद में प्रोफाइल से बदल सकते हैं)', 'No platform selected. Continue anyway? (You can change it later in your profile)'))) return;
@@ -327,7 +339,7 @@ function doRegister(e) {
   API.call('register', {
     gstin: $('rGstin').value, trade: $('rTrade').value, legal: $('rLegal').value, owner: $('rOwner').value,
     mobile: $('rMobile').value, email: $('rEmail').value, pin: $('rPin').value,
-    freq: document.querySelector('input[name=rFreq]:checked').value, platforms: plats, ref: $('rRef').value.trim()
+    freq: document.querySelector('input[name=rFreq]:checked').value, platforms: plats, ref: $('rRef').value.trim(), consent: true
   }).then(function (d) { savePin($('rGstin').value.trim().toUpperCase(), $('rPin').value, $('rTrade').value); addSessions(d.sessions); toast(L('रजिस्ट्रेशन हो गया ✓', 'Registered ✓')); }).catch(function (er) { toast(er.message, 4000); }).finally(function () { busy(false); });
 }
 function doLogin(e) {
@@ -386,6 +398,7 @@ function load(pid, quiet) {
     S.st = st; S.pid = st.pid;
     if (S.active.trade !== st.client.trade) { S.active.trade = st.client.trade; store('vas_sessions', S.sessions); }
     render();
+    if (st.needConsent && !S.office) askConsent(); else closeSheet(sConsent);
   }).catch(function (e) { if (e.code !== 'SESSION_EXPIRED') toast(e.message, 4000); }).finally(function () { busy(false); });
 }
 function render() {
@@ -1013,10 +1026,38 @@ function openProfile() {
     (others.length ? '<label class="f" style="margin-top:16px">' + L('दूसरी फर्म पर जाएँ', 'Switch to another firm') + '</label>' + others.map(function (s) { return '<button class="btn sec block" style="margin-top:6px" onclick="closeSheet(sProfile);useSession(\'' + s.gstin + '\')">' + esc(s.trade) + ' <small>(' + s.gstin + ')</small></button>'; }).join('') : '') +
     '<button class="btn ghost block" style="margin-top:8px" onclick="closeSheet(sProfile);S.active=null;route()">' + L('+ दूसरी फर्म जोड़ें (लॉगिन)', '+ Add another firm (login)') + '</button>' +
     '<button class="btn ghost block" style="color:var(--bad)" onclick="logout()">' + L('लॉगआउट', 'Log out') + '</button>' +
+    '<a class="btn ghost block" style="text-decoration:none" target="_blank" rel="noopener" href="' + esc(st.privacyUrl || '') + '">' + L('🔒 प्राइवेसी नीति', '🔒 Privacy Policy') + '</a>' +
+    (S.office ? '' : '<button class="btn ghost block mute" style="font-size:13px" onclick="deleteMe()">' + L('🗑️ सहमति वापस लें / मेरा अकाउंट हटाएँ', '🗑️ Withdraw consent / delete my account') + '</button>') +
     (st.fyTurnover && st.fyTurnover.months ? '<div class="card" style="background:#f8fafc;margin-top:14px"><b>' + L('📈 इस साल (FY ' + esc(st.fyTurnover.fy) + ') की बिक्री', '📈 Sales this year (FY ' + esc(st.fyTurnover.fy) + ')') + '</b><div>' + L('अब तक: ', 'So far: ') + '<b>' + rupee(Math.round(st.fyTurnover.total)) + '</b> (' + st.fyTurnover.months + L(' महीने', ' months') + ')</div>' + (st.fyTurnover.projected ? '<div class="mute">' + L('पूरे साल का अनुमान: ', 'Full-year estimate: ') + rupee(Math.round(st.fyTurnover.projected)) + '</div>' : '') + '</div>' : '') +
     '<div class="foot">' + L('ऐप वर्ज़न ' + Core.VERSION + ' – नया अपडेट अपने आप आ जाता है.', 'App version ' + Core.VERSION + ' – updates install by themselves.') + '</div>';
   applyLang();
   openSheet(sProfile);
+}
+/* ---------- DPDP consent ---------- */
+// older clients (joined before v1.8) see this once; it cannot be closed without ticking, only by logging out
+function askConsent() {
+  $('consentBody').innerHTML =
+    '<p>' + L('नए सरकारी नियम (DPDP Act 2023) के हिसाब से हमें आपके डेटा के लिए आपकी सहमति चाहिए.', 'Under the new data protection law (DPDP Act 2023) we need your consent for your data.') + '</p>' +
+    '<ul class="mute" style="padding-left:18px;margin:8px 0">' +
+    '<li>' + L('हम क्या रखते हैं: नाम, फर्म, GSTIN, मोबाइल, ईमेल और आपकी भेजी रिपोर्ट / बिल.', 'What we keep: name, firm, GSTIN, mobile, email and the reports / bills you send.') + '</li>' +
+    '<li>' + L('क्यों: आपके रिटर्न बनाने, फाइल करने और रिमाइंडर भेजने के लिए. डेटा न बेचते हैं, न विज्ञापन में लगाते हैं.', 'Why: to prepare and file your returns and send reminders. We never sell your data or use it for ads.') + '</li>' +
+    '<li>' + L('अपलोड की फाइलें रिटर्न फाइल होने के बाद हटा दी जाती हैं; कानूनी रिकॉर्ड कानून जितना कहे उतना रखते हैं.', 'Uploaded files are removed after the return is filed; legal records are kept as long as the law requires.') + '</li></ul>' +
+    '<label class="consent"><input type="checkbox" id="cTick" onchange="$(\'cBtn\').disabled=!this.checked"> <span>' +
+    L('मैं सहमत हूँ, जैसा <a href="' + esc(S.st.privacyUrl) + '" target="_blank" rel="noopener">प्राइवेसी नीति</a> में लिखा है. ये सहमति कभी भी प्रोफाइल से वापस ले सकता/सकती हूँ.', 'I agree, as explained in the <a href="' + esc(S.st.privacyUrl) + '" target="_blank" rel="noopener">Privacy Policy</a>. I can withdraw this any time from my profile.') + '</span></label>' +
+    '<button class="btn block" id="cBtn" disabled onclick="giveConsent()">' + L('सहमत हूँ – आगे बढ़ें', 'I agree – continue') + '</button>' +
+    '<button class="btn ghost block" style="margin-top:6px" onclick="closeSheet(sConsent);call(\'logout\').catch(function(){});dropSession(S.active.gstin)">' + L('अभी नहीं (लॉगआउट)', 'Not now (log out)') + '</button>';
+  openSheet(sConsent);
+}
+function giveConsent() {
+  if (!$('cTick').checked) return;
+  busy(true);
+  call('consent', { agree: true }).then(function () { S.st.needConsent = false; closeSheet(sConsent); toast(L('धन्यवाद ✓', 'Thank you ✓')); }).catch(function (e) { toast(e.message, 4000); }).finally(function () { busy(false); });
+}
+function deleteMe() {
+  if (!confirm(L('क्या आप सहमति वापस लेना / अपना अकाउंट हटवाना चाहते हैं?\n\nइसके बाद आपको रिमाइंडर नहीं आएँगे और ऑफिस 7 दिन के अंदर आपका डेटा हटा देगा (फाइल हो चुके रिटर्न का कानूनी रिकॉर्ड छोड़कर). आप लॉगआउट हो जाएँगे.', 'Do you want to withdraw consent / delete your account?\n\nYou will get no more reminders and the office will delete your data within 7 days (except legal records of filed returns). You will be logged out.'))) return;
+  var g = S.active.gstin;
+  busy(true);
+  call('deleteMe').then(function () { closeSheet(sProfile); dropSession(g); toast(L('रिक्वेस्ट ऑफिस को भेज दी ✓', 'Request sent to the office ✓'), 4000); }).catch(function (e) { toast(e.message, 4000); }).finally(function () { busy(false); });
 }
 function saveProfile() {
   var plats = Array.prototype.map.call(document.querySelectorAll('input[name=pPlat]:checked'), function (x) { return x.value; });

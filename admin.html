@@ -368,7 +368,8 @@ function openClient(g, keep, focusPid) {
       (c.verified ? '<button class="btn sec sm" onclick="quickVerify(\'' + c.gstin + '\',false)">Verify हटाएँ</button>' : '<button class="btn ok sm" onclick="quickVerify(\'' + c.gstin + '\',true)">✓ GST पोर्टल से मिला लिया (Verify)</button>') + '</div>' +
       '<div class="grid2" style="margin-top:8px">' + kv('👤 बात करने वाले', esc(c.owner)) + kv('🪪 GST धारक (लीगल नाम)', esc(c.legal)) + kv('🏪 फर्म (ट्रेड नाम)', esc(c.trade)) +
       kv('GSTIN', esc(c.gstin)) + kv('PAN', esc(c.pan)) + kv('राज्य', esc(c.state)) + kv('मोबाइल', esc(c.mobile)) + kv('ईमेल', esc(c.email)) +
-      kv('रिटर्न', c.freq === 'Q' ? 'Quarterly' : 'Monthly') + kv('प्लेटफॉर्म', plats(c)) + kv('रजिस्टर हुआ', fmtDate(c.createdAt)) + kv('आखिरी लॉगिन', fmtDate(c.lastLogin)) + '</div>' +
+      kv('रिटर्न', c.freq === 'Q' ? 'Quarterly' : 'Monthly') + kv('प्लेटफॉर्म', plats(c)) + kv('रजिस्टर हुआ', fmtDate(c.createdAt)) + kv('आखिरी लॉगिन', fmtDate(c.lastLogin)) +
+      kv('सहमति (DPDP)', c.deleteReqAt ? '<span style="color:#dc2626">🗑️ ' + fmtDate(c.deleteReqAt) + ' को वापस ली – डेटा हटाना है</span>' : c.consent && c.consent.at ? '✅ ' + fmtDate(c.consent.at) : '<span class="mute">⏳ अभी नहीं (अगले लॉगिन पर ऐप पूछेगा)</span>') + '</div>' +
       '<div style="margin-top:8px"><span class="mute">फोन / फोल्डर में नाम</span><div class="row"><b>' + esc(c.fullName) + '</b><button class="btn sec sm" data-t="' + esc(c.fullName) + '" onclick="copyText(this.dataset.t,\'नाम कॉपी ✓\')">कॉपी</button><button class="btn sec sm" onclick="vcardOne(\'' + c.gstin + '\')">📇 कॉन्टैक्ट सेव (vCard)</button></div>' +
       '<div class="mute" style="margin-top:4px">📁 Drive फोल्डर: ' + esc(c.folder) + '</div></div></div>';
     h += '<div class="per" style="background:#f8fafc"><div class="row"><h3>🔑 लॉगिन जानकारी</h3>' + (c.pinReqAt ? '<span class="pill CLAIM">PIN माँगा – ' + fmtDate(c.pinReqAt) + '</span>' : '') + '</div>' +

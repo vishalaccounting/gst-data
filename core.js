@@ -5,7 +5,7 @@
    No DOM, no async, no modules – plain ES2019.
    ============================================================ */
 var Core = (function () {
-  var VERSION = '1.7.1';
+  var VERSION = '1.8.0';
 
   /* ---------- language: client picks हिंदी or English (q.lang per request, c.lang for notifications).
      T(hi, en) returns the text for the current LANG. The office / admin side always stays Hindi. ---------- */
@@ -297,6 +297,7 @@ var Core = (function () {
   // dashboard view: also the PIN (kept so the office can tell a client who forgot it; set on register/login/PIN change)
   function adminClient(c, db, ctx) {
     var o = publicClient(c); o.pin = c.pin || ''; o.pinReqAt = c.pinReqAt || ''; o.folder = folderName(c); o.lastLogin = c.lastLogin || '';
+    o.consent = c.consent || null; o.deleteReqAt = c.deleteReqAt || '';
     o.tds = !!c.tds; o.advtax = !!c.advtax; o.annual = !!c.annual; o.refCode = refCode(c);
     if (db) {
       var rb = c.referredBy && db.clients[c.referredBy];
@@ -311,6 +312,7 @@ var Core = (function () {
   function newFolderName(c) { return (fullName(c) + ' ' + c.gstin).replace(/[\\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase().slice(0, 140); }
   function folderName(c) { return c.folder || ((str(c.trade, 60) || c.gstin).replace(/[\\\/:*?"<>|]/g, ' ') + ' ' + c.gstin); }
   function notifyClient(db, ctx, c, title, body) {
+    if (c.consent && c.consent.withdrawnAt) return;   // consent withdrawn: no reminders or messages
     c.inbox = c.inbox || [];
     c.inbox.unshift({ id: ctx.uuid(), at: ctx.now.toISOString(), title: title, body: body, read: false });
     c.inbox = c.inbox.slice(0, 40);
@@ -340,19 +342,37 @@ var Core = (function () {
   }
 
   /* ---------- wrong-try lock (v1.7.1): 5 wrong PINs → that GSTIN/mobile waits 15 min; 10 wrong admin passwords → dashboard waits 15 min.
+     v1.8: the 3rd lock within 24 hours lasts 24 hours (a guesser gets ~15 tries a day, not ~480).
      Kept in db.meta.locks; secDirty makes handle() save the count even when the request fails. ---------- */
-  var LOCK_MS = 15 * 60000, secDirty = false;
+  var LOCK_MS = 15 * 60000, LONG_LOCK_MS = 24 * 3600000, DAY_MS = 86400000, secDirty = false;
   function locked(db, ctx, key) { var l = (db.meta.locks || {})[key]; return !!(l && l.until && ctx.now < new Date(l.until)); }
-  function wrongTry(db, ctx, key, max) {   // true when this try starts a lock
+  function waitText(db, ctx, key) {   // "15 मिनट" / "24 घंटे" left on a lock
+    var mins = Math.max(1, Math.ceil((new Date(db.meta.locks[key].until) - ctx.now) / 60000));
+    return mins > 90 ? T(Math.ceil(mins / 60) + ' घंटे', Math.ceil(mins / 60) + ' hours') : T(mins + ' मिनट', mins + ' minutes');
+  }
+  function wrongTry(db, ctx, key, max) {   // 0 = no lock yet, 1 = 15-minute lock started, 2 = 24-hour lock started
     var locks = db.meta.locks = db.meta.locks || {}, l = locks[key] || { n: 0 };
-    if (l.until && ctx.now >= new Date(l.until)) l = { n: 0 };
+    if (l.until && ctx.now >= new Date(l.until)) { l.n = 0; delete l.until; }
     l.n++; l.last = ctx.now.toISOString();
-    var start = l.n >= max;
-    if (start) { l.until = new Date(ctx.now.getTime() + LOCK_MS).toISOString(); l.n = 0; }
+    var start = l.n >= max ? 1 : 0;
+    if (start) {
+      l.hist = (l.hist || []).filter(function (t) { return ctx.now - new Date(t) < DAY_MS; }).concat(ctx.now.toISOString());
+      if (l.hist.length >= 3) start = 2;
+      l.until = new Date(ctx.now.getTime() + (start === 2 ? LONG_LOCK_MS : LOCK_MS)).toISOString(); l.n = 0;
+    }
     locks[key] = l; secDirty = true;
     return start;
   }
   function clearTries(db, key) { if (db.meta.locks && db.meta.locks[key]) { delete db.meta.locks[key]; secDirty = true; } }
+  // login log (DPDP Rules ask for access logs kept 1 year): newest first, older than 365 days dropped
+  function logLogin(db, ctx, c, ok) {
+    db.meta.loginLog = [{ at: ctx.now.toISOString(), gstin: c.gstin, ok: ok }].concat((db.meta.loginLog || []).filter(function (x) { return ctx.now - new Date(x.at) < 365 * DAY_MS; })).slice(0, 5000);
+    secDirty = true;
+  }
+  // DPDP consent: given with an empty tick box at registration (or on first login for older clients); version = date of the privacy text
+  var CONSENT_VER = '2026-11-01', PRIVACY_URL = 'https://vishalaccountingservices.in/privacy.html';
+  function needConsent(c) { return !c.consent || !!c.consent.withdrawnAt; }
+  var REG_PER_HOUR = 40;
   // server-side file check (the phone checks too): refuse program / web-page files. A blocklist, so odd report names like "Sale.Oct.2026" still pass.
   var BAD_EXT = /\.(exe|msi|bat|cmd|com|scr|pif|cpl|vbs|vbe|js|jse|mjs|wsf|wsh|hta|ps1|psm1|jar|apk|dll|sys|lnk|reg|html?|xhtml|svg|php|sh|py)$/i;
   function safeName(name) {
@@ -377,6 +397,12 @@ var Core = (function () {
   /* ---------- client actions ---------- */
   var A = {};
   A.register = function (db, q, ctx) {
+    // rate limit: every try counts (also failed ones), so nobody can flood fake registrations or test which GSTINs are registered
+    var tries = db.meta.regTries = (db.meta.regTries || []).filter(function (t) { return ctx.now - new Date(t) < 3600000; });
+    if (tries.length >= REG_PER_HOUR) fail(T('अभी बहुत ज़्यादा रजिस्ट्रेशन हो रहे हैं – 1 घंटे बाद फिर कोशिश करें', 'Too many registrations right now – please try again after 1 hour'));
+    tries.push(ctx.now.toISOString()); secDirty = true;
+    if (tries.length === REG_PER_HOUR) notifyAdmin(db, ctx, 'SECURITY', '⚠️ 1 घंटे में ' + REG_PER_HOUR + ' रजिस्ट्रेशन की कोशिश', 'नए रजिस्ट्रेशन 1 घंटे के लिए रोके गए. अगर आपने एक साथ बहुत क्लाइंट्स को लिंक नहीं भेजा है तो ये कोई गड़बड़ हो सकती है.');
+    if (!q.consent) fail(T('आगे बढ़ने के लिए सहमति वाले बॉक्स पर टिक करें', 'Please tick the consent box to continue'));
     var g = str(q.gstin, 15).toUpperCase();
     if (!gstinValid(g)) fail(T('GSTIN सही नहीं है – दोबारा जाँचें', 'This GSTIN is not valid – please check it'));
     if (db.clients[g]) fail(T('यह GSTIN पहले से रजिस्टर है – लॉगिन करें', 'This GSTIN is already registered – please log in'));
@@ -393,7 +419,7 @@ var Core = (function () {
       gstin: g, trade: trade, legal: str(q.legal, 100), owner: str(q.owner, 80), mobile: mobile, email: str(q.email, 100),
       freq: q.freq === 'Q' ? 'Q' : 'M', platforms: cleanPlatforms(q.platforms), status: 'ACTIVE', verified: false,
       salt: salt, pinHash: pinHash(pin, salt), pin: pin, tokens: [], pushTokens: [], inbox: [], defaultFee: null, notes: '',
-      createdAt: ctx.now.toISOString(), lang: LANG
+      createdAt: ctx.now.toISOString(), lang: LANG, consent: { at: ctx.now.toISOString(), ver: CONSENT_VER }
     };
     c.folder = newFolderName(c);
     var ref = byRef(db, q.ref);
@@ -412,13 +438,17 @@ var Core = (function () {
     // the lock is per client (key L:<GSTIN>), so switching between GSTIN and mobile gives no extra tries.
     // Random IDs match no client: nothing to protect, nothing stored.
     var known = Object.keys(db.clients).map(function (g) { return db.clients[g]; }).filter(function (c) { return c.gstin === id || c.mobile === id; });
-    if (known.some(function (c) { return locked(db, ctx, 'L:' + c.gstin); })) fail(T('5 बार गलत PIN – 15 मिनट बाद फिर कोशिश करें, या "PIN भूल गए?" दबाएँ', 'Wrong PIN 5 times – try again after 15 minutes, or tap "Forgot PIN?"'));
+    var lockedOne = known.filter(function (c) { return locked(db, ctx, 'L:' + c.gstin); })[0];
+    if (lockedOne) fail(T('कई बार गलत PIN – ' + waitText(db, ctx, 'L:' + lockedOne.gstin) + ' बाद फिर कोशिश करें, या "PIN भूल गए?" दबाएँ', 'Too many wrong PINs – try again after ' + waitText(db, ctx, 'L:' + lockedOne.gstin) + ', or tap "Forgot PIN?"'));
     known.forEach(function (c) {
-      if (c.pinHash === pinHash(pin, c.salt) && c.status !== 'BLOCKED') { c.pin = pin; c.pinReqAt = ''; c.lastLogin = ctx.now.toISOString(); if (q.lang) c.lang = LANG; out.push(newSession(c, ctx)); }
+      if (c.pinHash === pinHash(pin, c.salt) && c.status !== 'BLOCKED') { c.pin = pin; c.pinReqAt = ''; c.lastLogin = ctx.now.toISOString(); if (q.lang) c.lang = LANG; out.push(newSession(c, ctx)); logLogin(db, ctx, c, true); }
     });
     if (!out.length) {
       known.forEach(function (c) {
-        if (wrongTry(db, ctx, 'L:' + c.gstin, 5)) notifyAdmin(db, ctx, 'SECURITY', '⚠️ ' + displayName(c) + ' – 5 बार गलत PIN', c.gstin + ' • ' + c.mobile + ' का लॉगिन 15 मिनट के लिए रोका गया. क्लाइंट खुद नहीं था तो PIN बदलवा दें.', c.gstin);
+        logLogin(db, ctx, c, false);
+        var lk = wrongTry(db, ctx, 'L:' + c.gstin, 5);
+        if (lk === 1) notifyAdmin(db, ctx, 'SECURITY', '⚠️ ' + displayName(c) + ' – 5 बार गलत PIN', c.gstin + ' • ' + c.mobile + ' का लॉगिन 15 मिनट के लिए रोका गया. क्लाइंट खुद नहीं था तो PIN बदलवा दें.', c.gstin);
+        if (lk === 2) notifyAdmin(db, ctx, 'SECURITY', '🚨 ' + displayName(c) + ' – 24 घंटे में 3 बार लॉक', c.gstin + ' • ' + c.mobile + ' का लॉगिन 24 घंटे के लिए रोका गया. कोई PIN गेस कर रहा हो सकता है – क्लाइंट से बात करके PIN बदलवा दें (PIN रीसेट से लॉक भी खुल जाएगा).', c.gstin);
       });
       fail(T('GSTIN / मोबाइल या PIN गलत है', 'Wrong GSTIN / mobile or PIN'));
     }
@@ -437,6 +467,24 @@ var Core = (function () {
     });
     return { phone: db.settings.phone };
   };
+  // consent for clients who joined before v1.8 (or who withdrew and came back). Only the client can give it, not the office.
+  A.consent = function (db, q, ctx) {
+    var c = byToken(db, q.token);
+    if (c.officeToken === q.token) fail('ऑफिस मोड में सहमति नहीं दी जा सकती – ये क्लाइंट खुद देंगे');
+    if (!q.agree) fail(T('आगे बढ़ने के लिए सहमति वाले बॉक्स पर टिक करें', 'Please tick the consent box to continue'));
+    var back = c.deleteReqAt;
+    c.consent = { at: ctx.now.toISOString(), ver: CONSENT_VER }; c.deleteReqAt = '';
+    if (back) notifyAdmin(db, ctx, 'SECURITY', '↩️ ' + displayName(c) + ' ने दोबारा सहमति दी', 'डेटा हटाने की रिक्वेस्ट वापस हो गई – डेटा न हटाएँ.', c.gstin);
+    return {};
+  };
+  // "delete my account" = withdraw consent + ask the office to delete. The office keeps only filed-return records the law requires.
+  A.deleteMe = function (db, q, ctx) {
+    var c = byToken(db, q.token);
+    if (c.officeToken === q.token) fail('ऑफिस मोड से ये नहीं हो सकता');
+    c.consent = c.consent || {}; c.consent.withdrawnAt = ctx.now.toISOString(); c.deleteReqAt = ctx.now.toISOString(); c.tokens = [];
+    notifyAdmin(db, ctx, 'SECURITY', '🗑️ ' + displayName(c) + ' – सहमति वापस / डेटा हटाने की रिक्वेस्ट', c.gstin + ' • ' + c.mobile + ' – 7 दिन के अंदर: क्लाइंट से बात करें, फाइल हो चुके रिटर्न का कानूनी रिकॉर्ड छोड़कर बाकी डेटा हटाएँ (डैशबोर्ड → क्लाइंट → डिलीट). इसे अब रिमाइंडर नहीं जाएँगे.', c.gstin);
+    return { phone: db.settings.phone };
+  };
   A.logout = function (db, q) { var c = byToken(db, q.token); c.tokens = c.tokens.filter(function (t) { return t !== q.token; }); return {}; };
   A.state = function (db, q, ctx) {
     var c = byToken(db, q.token);
@@ -447,7 +495,7 @@ var Core = (function () {
     var rec = getRec(db, c.gstin, pid, false);
     var dues = Object.keys(all).map(function (p) { return summary(c, p, all[p]); }).filter(function (s) { return s.due > 0; });
     return {
-      client: publicClient(c), pid: pid, current: cur,
+      client: publicClient(c), pid: pid, current: cur, needConsent: needConsent(c), privacyUrl: PRIVACY_URL,
       periods: choices.map(function (p) { var s = summary(c, p, all[p] || emptyRec()); return { pid: p, label: s.label, data: s.data, work: s.work, done: s.done, required: s.required, running: p === choices[0] && p !== cur }; }),
       summary: summary(c, pid, rec), slots: slotsFor(c, pid),
       files: (rec.files || []).map(function (f) { return { id: f.id, slot: f.slot, covers: f.covers, name: f.name, size: f.size, at: f.at, pur: f.pur || null }; }),
@@ -651,6 +699,7 @@ var Core = (function () {
     var c = client(db, q.gstin), pin = str(q.pin, 6);
     if (!/^\d{4,6}$/.test(pin)) fail('PIN 4 से 6 अंकों का रखें');
     c.pinHash = pinHash(pin, c.salt); c.pin = pin; c.pinReqAt = ''; c.tokens = [];
+    clearTries(db, 'L:' + c.gstin);   // a new PIN also opens a wrong-PIN lock
     return {};
   };
   A.aSetWork = function (db, q, ctx) {
