@@ -148,5 +148,67 @@ var Detect = (function () {
     return { file: file, type: r.type, months: r.months, label: r.type ? TYPES[r.type][2] : '', taxable: r.taxable == null ? null : r.taxable };
   }
 
-  return { TYPES: TYPES, inspect: inspect };
+  /* ---------- purchase bills ----------
+     readBill(file, ownGstin) -> Promise<pur|null>: best guess from a text PDF (supplier GSTIN, bill no, date, amounts).
+     Scanned PDFs and photos have no text -> null (client / office types the details). */
+  var PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+  var PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  function pdfText(file) {
+    return load(PDFJS).then(function () {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+      return file.arrayBuffer();
+    }).then(function (buf) { return pdfjsLib.getDocument({ data: buf, isEvalSupported: false }).promise; }).then(function (doc) {   // isEvalSupported:false blocks CVE-2024-4367 (code inside a crafted PDF)
+      var pages = [];
+      for (var i = 1; i <= Math.min(doc.numPages, 3); i++) pages.push(doc.getPage(i).then(function (p) { return p.getTextContent(); }).then(function (tc) { return tc.items.map(function (x) { return x.str; }).join(' '); }));
+      return Promise.all(pages);
+    }).then(function (list) { return list.join('\n').replace(/[ \t]+/g, ' '); });
+  }
+  function money(s) { var n = Number(String(s).replace(/,/g, '')); return isFinite(n) ? Math.round(n * 100) / 100 : null; }
+  function after(txt, label) {   // first amount with paise within 60 characters after the label
+    var m = new RegExp(label + '[^\\d\\n]{0,40}(?:\\d{1,2}(?:\\.\\d+)?\\s*%[^\\d\\n]{0,10})?([\\d,]+\\.\\d{2})', 'i').exec(txt);
+    return m ? money(m[1]) : null;
+  }
+  var MONS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+  function isoDate(s) {
+    var m = /^(\d{1,2})[\/\-. ](\d{1,2}|[A-Za-z]{3})[A-Za-z]*[\/\-., ]+(\d{2,4})$/.exec(String(s).trim());
+    if (!m) return '';
+    var mo = /\d/.test(m[2]) ? +m[2] : MONS[m[2].toLowerCase()], y = +m[3] < 100 ? 2000 + +m[3] : +m[3];
+    if (!mo || mo > 12 || +m[1] > 31) return '';
+    return y + '-' + (mo < 10 ? '0' : '') + mo + '-' + (+m[1] < 10 ? '0' : '') + +m[1];
+  }
+  function readBill(file, ownGstin) {
+    if (ext(file.name) !== 'pdf') return Promise.resolve(null);
+    return pdfText(file).then(function (txt) {
+      if (txt.replace(/\s/g, '').length < 40) return null;   // scanned PDF
+      var own = String(ownGstin || '').toUpperCase(), up = txt.toUpperCase();
+      var gstins = (up.match(/\b\d{2}[A-Z]{5}\d{4}[A-Z][0-9A-Z]Z[0-9A-Z]\b/g) || []).filter(function (g) { return g !== own && (!window.Core || Core.gstinValid(g)); });
+      var inv = /(?:invoice|inv|bill)\s*(?:no|number|#)\.?\s*[:\-]?\s*([A-Z0-9][A-Z0-9\/\-]{0,19})/i.exec(txt);
+      var dt = /(?:invoice\s*date|inv\.?\s*date|bill\s*date|dated|date)\s*[:\-]?\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}|\d{1,2}[\s\-][A-Za-z]{3,9}[\s\-,]+\d{2,4})/i.exec(txt);
+      var all = (txt.match(/[\d,]+\.\d{2}\b/g) || []).map(money).filter(function (n) { return n != null; });
+      var p = { gstin: gstins[0] || '', party: '', inv: inv ? inv[1] : '', date: dt ? isoDate(dt[1]) : '',
+        taxable: after(txt, 'taxable\\s*(?:value|amount|amt)?'), igst: after(txt, 'IGST'), cgst: after(txt, 'CGST'), sgst: after(txt, '(?:SGST|UTGST)'),
+        total: after(txt, '(?:grand\\s*total|invoice\\s*(?:total|value|amount)|total\\s*amount|net\\s*amount)') || (all.length ? Math.max.apply(null, all) : null), note: 'ऐप ने PDF से पढ़ा – जाँच लें' };
+      return p.gstin || p.inv || p.total ? p : null;
+    }).catch(function () { return null; });
+  }
+  // rows = [{ pur, name, label }] -> downloads an Excel in the same order as the GSTR-2B / IMS invoice view
+  function purchaseXlsx(rows, fileName, title) {
+    return load(XLSX_URL).then(function () {
+      var head = ['Sr', 'Supplier GSTIN', 'Supplier name', 'Invoice no', 'Invoice date', 'Taxable value', 'IGST', 'CGST', 'SGST', 'Total tax (ITC)', 'Invoice value', 'Period', 'Bill file', 'Details by', 'IMS action (Accept / Reject / Pending)', 'In GSTR-2B? (Y/N)', 'Note'];
+      var t = { taxable: 0, igst: 0, cgst: 0, sgst: 0, total: 0 };
+      var aoa = [[title || 'Purchase bills'], head].concat(rows.map(function (r, i) {
+        var p = r.pur || {}, tax = (p.igst || 0) + (p.cgst || 0) + (p.sgst || 0);
+        ['taxable', 'igst', 'cgst', 'sgst', 'total'].forEach(function (k) { t[k] += p[k] || 0; });
+        return [i + 1, p.gstin || '', p.party || '', p.inv || '', p.date ? p.date.split('-').reverse().join('-') : '', p.taxable, p.igst, p.cgst, p.sgst, tax ? Math.round(tax * 100) / 100 : null, p.total, r.label || '', r.name || '',
+          !r.pur ? 'डिटेल बाकी' : p.by === 'auto' ? 'ऐप (जाँचें)' : p.by === 'office' ? 'ऑफिस' : 'क्लाइंट', '', '', p.note || ''];
+      }));
+      aoa.push(['', 'TOTAL', '', '', '', t.taxable, t.igst, t.cgst, t.sgst, Math.round((t.igst + t.cgst + t.sgst) * 100) / 100, t.total]);
+      var ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = [4, 17, 26, 14, 11, 12, 10, 10, 10, 12, 12, 12, 30, 12, 18, 12, 24].map(function (w) { return { wch: w }; });
+      var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Purchase');
+      XLSX.writeFile(wb, fileName);
+    });
+  }
+
+  return { TYPES: TYPES, inspect: inspect, readBill: readBill, purchaseXlsx: purchaseXlsx };
 })();

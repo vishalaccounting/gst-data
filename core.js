@@ -5,7 +5,7 @@
    No DOM, no async, no modules – plain ES2019.
    ============================================================ */
 var Core = (function () {
-  var VERSION = '1.6.0';
+  var VERSION = '1.7.1';
 
   /* ---------- language: client picks हिंदी or English (q.lang per request, c.lang for notifications).
      T(hi, en) returns the text for the current LANG. The office / admin side always stays Hindi. ---------- */
@@ -78,6 +78,16 @@ var Core = (function () {
           hint: 'इस अवधि के सारे सेल बिल. एक PDF में या अलग-अलग – जितने हों सब डालें.', hintEn: 'All sale bills of this period – in one PDF or separate files. Upload all of them.' }
       ]
     },
+    // purchase bills: for ITC / IMS / GSTR-2B matching. Kept out of INPUT (GST REPORT TOOL reads every sheet there as sales),
+    // never "missing", and still open after GSTR-1 is filed – until GSTR-3B is filed.
+    purchase: {
+      label: 'खरीद बिल (Purchase)', labelEn: 'Purchase bills', group: 'offline', color: '#7c3aed', dir: 'PURCHASE', afterFiling: true,
+      reports: [
+        { key: 'bills', name: 'खरीद के बिल – PDF / Excel / फोटो', nameEn: 'Purchase bills – PDF / Excel / photo', perMonth: false, multi: true, optional: true, accept: '.pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.zip',
+          hint: 'इस अवधि में जो माल / सर्विस GST बिल पर खरीदी – सप्लायर के बिल की PDF, फोटो या खरीद की Excel. इससे हम IMS और GSTR-2B में आपका ITC मिलाते हैं. PDF बिल की डिटेल ऐप खुद पढ़ लेता है.',
+          hintEn: 'Goods / services you bought on a GST bill in this period – the supplier\'s bill as PDF, photo or a purchase Excel. We use it to match your ITC in IMS and GSTR-2B. The app reads the details of PDF bills by itself.' }
+      ]
+    },
     other: {
       label: 'अन्य फाइलें', labelEn: 'Other files', group: 'offline', color: '#6b7280',
       reports: [
@@ -87,7 +97,8 @@ var Core = (function () {
       ]
     }
   };
-  var PLATFORM_ORDER = ['meesho', 'amazon', 'flipkart', 'vyapar', 'tool', 'pdf', 'other'];
+  var PLATFORM_ORDER = ['meesho', 'amazon', 'flipkart', 'vyapar', 'tool', 'pdf', 'purchase', 'other'];
+  function isPurSlot(id) { return String(id || '').indexOf('purchase.') === 0; }
 
   var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var STATES = { '01': 'Jammu & Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh', '05': 'Uttarakhand', '06': 'Haryana', '07': 'Delhi', '08': 'Rajasthan', '09': 'Uttar Pradesh', '10': 'Bihar', '11': 'Sikkim', '12': 'Arunachal Pradesh', '13': 'Nagaland', '14': 'Manipur', '15': 'Mizoram', '16': 'Tripura', '17': 'Meghalaya', '18': 'Assam', '19': 'West Bengal', '20': 'Jharkhand', '21': 'Odisha', '22': 'Chhattisgarh', '23': 'Madhya Pradesh', '24': 'Gujarat', '26': 'Dadra & Nagar Haveli and Daman & Diu', '27': 'Maharashtra', '29': 'Karnataka', '30': 'Goa', '31': 'Lakshadweep', '32': 'Kerala', '33': 'Tamil Nadu', '34': 'Puducherry', '35': 'Andaman & Nicobar', '36': 'Telangana', '37': 'Andhra Pradesh', '38': 'Ladakh' };
@@ -193,7 +204,8 @@ var Core = (function () {
     (rec.files || []).forEach(function (f) { (f.covers || [f.slot]).forEach(function (s) { have[s] = (have[s] || 0) + 1; }); });
     var req = slots.filter(function (s) { return !s.optional; });
     var missing = req.filter(function (s) { return !have[s.id]; });
-    var files = (rec.files || []).length;
+    // purchase bills do not count as sales data (a NIL period can still have purchases)
+    var files = (rec.files || []).filter(function (f) { return !isPurSlot(f.slot); }).length, purFiles = (rec.files || []).length - files;
     var data = rec.nil ? 'NIL'
       : rec.submittedAt ? 'SUBMITTED'
       : (req.length && !missing.length) ? 'COMPLETE'
@@ -206,9 +218,9 @@ var Core = (function () {
     return {
       pid: pid, label: periodLabel(pid), data: data, required: req.length, done: req.length - missing.length,
       missing: missing.map(function (s) { return { id: s.id, plat: s.plat, name: s.name }; }),
-      files: files, lastUpload: last, submittedAt: rec.submittedAt || '',
+      files: files, purFiles: purFiles, lastUpload: last, submittedAt: rec.submittedAt || '',
       work: rec.work || '', filed: rec.filed || {}, fee: fee, paid: paid,
-      due: fee == null ? 0 : Math.max(0, num(fee - paid)), payClaim: rec.payClaim || null,
+      due: fee == null ? 0 : Math.max(0, num(fee - paid)), payClaim: rec.payClaim || null, feePending: !!rec.feePending,
       autoTurnover: auto, turnover: rec.nil ? 0 : rec.turnover != null ? rec.turnover : auto,
       returns: (rec.returns || []).map(function (r) { return { id: r.id, kind: r.kind, name: r.name, size: r.size, at: r.at }; })
     };
@@ -322,15 +334,37 @@ var Core = (function () {
     return { title: T(sm.label + ' का GST डेटा भेजें', 'Send your ' + sm.label + ' GST data'), body: body };
   }
   function payReminder(c, sm) {
-    return { title: T('फीस बाकी: ₹', 'Fee due: ₹') + sm.due, body: T(sm.label + ' का GST रिटर्न फाइल हो चुका है. कृपया ₹' + sm.due + ' का भुगतान करें. भुगतान कर दिया हो तो ऐप में "मैंने पेमेंट कर दिया" दबाएँ.',
-      'Your ' + sm.label + ' GST return has been filed. Please pay ₹' + sm.due + '. If you have already paid, tap "I have paid" in the app.') };
+    var filed = sm.work === 'FILED';
+    return { title: T('फीस बाकी: ₹', 'Fee due: ₹') + sm.due, body: T((filed ? sm.label + ' का GST रिटर्न फाइल हो चुका है. ' : sm.label + ' की फीस बाकी है. ') + 'कृपया ₹' + sm.due + ' का भुगतान करें – ऐप में "फीस भरनी है" दबाएँ, हम QR भेज देंगे. भुगतान कर दिया हो तो "मैंने पेमेंट कर दिया" दबाएँ.',
+      (filed ? 'Your ' + sm.label + ' GST return has been filed. ' : 'Your ' + sm.label + ' fee is pending. ') + 'Please pay ₹' + sm.due + ' – tap "Pay fee" in the app and we will send a QR. If you have already paid, tap "I have paid".') };
+  }
+
+  /* ---------- wrong-try lock (v1.7.1): 5 wrong PINs → that GSTIN/mobile waits 15 min; 10 wrong admin passwords → dashboard waits 15 min.
+     Kept in db.meta.locks; secDirty makes handle() save the count even when the request fails. ---------- */
+  var LOCK_MS = 15 * 60000, secDirty = false;
+  function locked(db, ctx, key) { var l = (db.meta.locks || {})[key]; return !!(l && l.until && ctx.now < new Date(l.until)); }
+  function wrongTry(db, ctx, key, max) {   // true when this try starts a lock
+    var locks = db.meta.locks = db.meta.locks || {}, l = locks[key] || { n: 0 };
+    if (l.until && ctx.now >= new Date(l.until)) l = { n: 0 };
+    l.n++; l.last = ctx.now.toISOString();
+    var start = l.n >= max;
+    if (start) { l.until = new Date(ctx.now.getTime() + LOCK_MS).toISOString(); l.n = 0; }
+    locks[key] = l; secDirty = true;
+    return start;
+  }
+  function clearTries(db, key) { if (db.meta.locks && db.meta.locks[key]) { delete db.meta.locks[key]; secDirty = true; } }
+  // server-side file check (the phone checks too): refuse program / web-page files. A blocklist, so odd report names like "Sale.Oct.2026" still pass.
+  var BAD_EXT = /\.(exe|msi|bat|cmd|com|scr|pif|cpl|vbs|vbe|js|jse|mjs|wsf|wsh|hta|ps1|psm1|jar|apk|dll|sys|lnk|reg|html?|xhtml|svg|php|sh|py)$/i;
+  function safeName(name) {
+    if (BAD_EXT.test(name)) fail(T('इस तरह की फाइल नहीं ले सकते – सिर्फ़ Excel, PDF, फोटो या ZIP भेजें', 'This file type is not allowed – send only Excel, PDF, photo or ZIP'));
+    return name;
   }
 
   /* ---------- auth ---------- */
   function byToken(db, token) {
     token = str(token, 80);
     if (!token) fail(T('लॉगिन करें', 'Please log in'));
-    for (var g in db.clients) { if ((db.clients[g].tokens || []).indexOf(token) >= 0) return db.clients[g]; }
+    for (var g in db.clients) { if ((db.clients[g].tokens || []).indexOf(token) >= 0 || db.clients[g].officeToken === token) return db.clients[g]; }
     fail('SESSION_EXPIRED');
   }
   function newSession(c, ctx) {
@@ -375,11 +409,20 @@ var Core = (function () {
   };
   A.login = function (db, q, ctx) {
     var id = str(q.id, 15).toUpperCase(), pin = str(q.pin, 6), out = [];
-    Object.keys(db.clients).forEach(function (g) {
-      var c = db.clients[g];
-      if ((c.gstin === id || c.mobile === id) && c.pinHash === pinHash(pin, c.salt) && c.status !== 'BLOCKED') { c.pin = pin; c.pinReqAt = ''; c.lastLogin = ctx.now.toISOString(); if (q.lang) c.lang = LANG; out.push(newSession(c, ctx)); }
+    // the lock is per client (key L:<GSTIN>), so switching between GSTIN and mobile gives no extra tries.
+    // Random IDs match no client: nothing to protect, nothing stored.
+    var known = Object.keys(db.clients).map(function (g) { return db.clients[g]; }).filter(function (c) { return c.gstin === id || c.mobile === id; });
+    if (known.some(function (c) { return locked(db, ctx, 'L:' + c.gstin); })) fail(T('5 बार गलत PIN – 15 मिनट बाद फिर कोशिश करें, या "PIN भूल गए?" दबाएँ', 'Wrong PIN 5 times – try again after 15 minutes, or tap "Forgot PIN?"'));
+    known.forEach(function (c) {
+      if (c.pinHash === pinHash(pin, c.salt) && c.status !== 'BLOCKED') { c.pin = pin; c.pinReqAt = ''; c.lastLogin = ctx.now.toISOString(); if (q.lang) c.lang = LANG; out.push(newSession(c, ctx)); }
     });
-    if (!out.length) fail(T('GSTIN / मोबाइल या PIN गलत है', 'Wrong GSTIN / mobile or PIN'));
+    if (!out.length) {
+      known.forEach(function (c) {
+        if (wrongTry(db, ctx, 'L:' + c.gstin, 5)) notifyAdmin(db, ctx, 'SECURITY', '⚠️ ' + displayName(c) + ' – 5 बार गलत PIN', c.gstin + ' • ' + c.mobile + ' का लॉगिन 15 मिनट के लिए रोका गया. क्लाइंट खुद नहीं था तो PIN बदलवा दें.', c.gstin);
+      });
+      fail(T('GSTIN / मोबाइल या PIN गलत है', 'Wrong GSTIN / mobile or PIN'));
+    }
+    known.forEach(function (c) { clearTries(db, 'L:' + c.gstin); });
     return { sessions: out };
   };
   // "PIN भूल गए?" – tells the office (dashboard + email). Max once per 10 minutes per client.
@@ -407,7 +450,8 @@ var Core = (function () {
       client: publicClient(c), pid: pid, current: cur,
       periods: choices.map(function (p) { var s = summary(c, p, all[p] || emptyRec()); return { pid: p, label: s.label, data: s.data, work: s.work, done: s.done, required: s.required, running: p === choices[0] && p !== cur }; }),
       summary: summary(c, pid, rec), slots: slotsFor(c, pid),
-      files: (rec.files || []).map(function (f) { return { id: f.id, slot: f.slot, covers: f.covers, name: f.name, size: f.size, at: f.at }; }),
+      files: (rec.files || []).map(function (f) { return { id: f.id, slot: f.slot, covers: f.covers, name: f.name, size: f.size, at: f.at, pur: f.pur || null }; }),
+      returnsAll: Object.keys(all).sort().reverse().reduce(function (out, p) { (all[p].returns || []).forEach(function (r) { out.push({ id: r.id, kind: r.kind, name: r.name, at: r.at, label: periodLabel(p) }); }); return out; }, []),
       inbox: (c.inbox || []).slice(0, 30), unread: (c.inbox || []).filter(function (n) { return !n.read; }).length,
       dues: dues, settings: { upi: db.settings.upi, payeeName: db.settings.payeeName, phone: db.settings.phone, firm: db.settings.firm },
       due: duesFor(db, c, ctx.now, 5, 60).slice(0, 8),
@@ -418,9 +462,13 @@ var Core = (function () {
       content: contentFor(db).map(function (x) { return { id: x.id, kind: x.kind, icon: x.icon, title: T(x.title, x.titleEn || null), body: T(x.body, x.bodyEn || null), img: x.img, price: T(x.price, x.priceEn || null), partner: x.partner, cta: T(x.cta, x.ctaEn || null), link: x.link, pinned: x.pinned, at: x.at }; })
     };
   };
-  function editableRec(db, c, pid) {
+  function editableRec(db, c, pid, plat) {
     if (!isPid(pid)) fail(T('अवधि सही नहीं', 'Wrong period'));
     var rec = getRec(db, c.gstin, pid, true);
+    if (PLATFORMS[plat] && PLATFORMS[plat].afterFiling) {
+      if (rec.filed && rec.filed.gstr3b) fail(T('इस अवधि का GSTR-3B फाइल हो चुका है – ये खरीद बिल अगली अवधि में डालें', 'GSTR-3B for this period is already filed – put these purchase bills in the next period'));
+      return rec;
+    }
     if (rec.work === 'FILED') fail(T('इस अवधि का रिटर्न फाइल हो चुका है – बदलाव के लिए ऑफिस से बात करें', 'The return for this period is already filed – talk to the office for any change'));
     return rec;
   }
@@ -432,10 +480,12 @@ var Core = (function () {
     }
   }
   A.upload = function (db, q, ctx) {
-    var c = byToken(db, q.token), pid = str(q.pid, 10), rec = editableRec(db, c, pid);
+    var c = byToken(db, q.token), pid = str(q.pid, 10);
+    if (!isPid(pid)) fail(T('अवधि सही नहीं', 'Wrong period'));
     var slot = slotsFor(c, pid).filter(function (s) { return s.id === q.slot; })[0];
     if (!slot) fail(T('यह रिपोर्ट आपकी प्रोफाइल में नहीं है', 'This report is not in your profile'));
-    var name = str(q.name, 150).replace(/[\\\/:*?"<>|]/g, '_') || 'file';
+    var rec = editableRec(db, c, pid, slot.plat);
+    var name = safeName(str(q.name, 150).replace(/[\\\/:*?"<>|]/g, '_') || 'file');
     if (!q.b64) fail(T('फाइल खाली है', 'The file is empty'));
     var size = Math.round(String(q.b64).length * 0.75);
     if (size > 30 * 1048576) fail(T('फाइल 30 MB से बड़ी है', 'The file is larger than 30 MB'));
@@ -444,7 +494,7 @@ var Core = (function () {
     // GST REPORT TOOL layout: <client>\<FY>\<PERIOD>\INPUT\  (the tool reads every report in INPUT by its columns)
     var pd = periodDirs(pid);
     var stored = ctx.saveFile({
-      folders: [folderName(c), pd.fy, pd.label, 'INPUT'],
+      folders: [folderName(c), pd.fy, pd.label, P.dir || 'INPUT'],
       name: (slot.month && monthsOf(pid).length > 1 ? MON[+slot.month.slice(5, 7) - 1].toUpperCase() + '_' : '') + name,
       mime: str(q.mime, 100) || 'application/octet-stream'
     }, q.b64);
@@ -458,14 +508,15 @@ var Core = (function () {
       if (cov.length > 1) f.covers = cov;
     }
     rec.files.push(f);
-    rec.nil = false;
+    if (!P.afterFiling) rec.nil = false;
     checkComplete(db, ctx, c, pid, rec);
+    if (P.afterFiling && rec.work === 'FILED') notifyAdmin(db, ctx, 'PURCHASE', displayName(c) + ' – ' + periodLabel(pid) + ': नया खरीद बिल', name + ' (GSTR-1 के बाद आया – 3B से पहले ITC में लें)', c.gstin);
     return { file: { id: f.id, slot: f.slot, covers: f.covers, name: f.name, size: f.size, at: f.at } };
   };
   A.deleteFile = function (db, q, ctx) {
-    var c = byToken(db, q.token), rec = editableRec(db, c, str(q.pid, 10));
-    var f = rec.files.filter(function (x) { return x.id === q.id; })[0];
+    var c = byToken(db, q.token), f = (getRec(db, c.gstin, str(q.pid, 10), false).files || []).filter(function (x) { return x.id === q.id; })[0];
     if (!f) fail(T('फाइल नहीं मिली', 'File not found'));
+    var rec = editableRec(db, c, str(q.pid, 10), f.slot.split('.')[0]);
     rec.files = rec.files.filter(function (x) { return x.id !== q.id; });
     ctx.deleteFile(f.fileId);
     if (rec.completeNotified && summary(c, q.pid, rec).data !== 'COMPLETE') rec.completeNotified = '';
@@ -473,7 +524,7 @@ var Core = (function () {
   };
   A.setNil = function (db, q, ctx) {
     var c = byToken(db, q.token), pid = str(q.pid, 10), rec = editableRec(db, c, pid);
-    if (q.nil && rec.files.length) fail(T('इस अवधि में फाइलें अपलोड हैं. NIL के लिए पहले उन्हें हटाएँ.', 'Files are uploaded for this period. Remove them first to mark NIL.'));
+    if (q.nil && rec.files.some(function (f) { return !isPurSlot(f.slot); })) fail(T('इस अवधि में फाइलें अपलोड हैं. NIL के लिए पहले उन्हें हटाएँ.', 'Files are uploaded for this period. Remove them first to mark NIL.'));
     rec.nil = !!q.nil;
     rec.submittedAt = rec.nil ? ctx.now.toISOString() : '';
     if (rec.nil) notifyAdmin(db, ctx, 'NIL', 'NIL रिटर्न: ' + displayName(c) + ' – ' + periodLabel(pid), c.gstin + ' ने बताया कि इस अवधि में कोई सेल नहीं है. पहले फाइल करें.', c.gstin);
@@ -482,7 +533,7 @@ var Core = (function () {
   A.submit = function (db, q, ctx) {
     var c = byToken(db, q.token), pid = str(q.pid, 10), rec = editableRec(db, c, pid);
     var sm = summary(c, pid, rec);
-    if (!rec.files.length) fail(T('पहले रिपोर्ट अपलोड करें, या कोई सेल नहीं थी तो NIL चुनें', 'Upload your reports first, or choose NIL if there were no sales'));
+    if (!sm.files) fail(T('पहले रिपोर्ट अपलोड करें, या कोई सेल नहीं थी तो NIL चुनें', 'Upload your reports first, or choose NIL if there were no sales'));
     if (sm.missing.length && !q.force) return { needConfirm: true, missing: sm.missing };
     rec.submittedAt = ctx.now.toISOString();
     rec.completeNotified = rec.completeNotified || rec.submittedAt;
@@ -526,6 +577,31 @@ var Core = (function () {
     notifyAdmin(db, ctx, 'PAYCLAIM', displayName(c) + ' ने पेमेंट किया (जाँचें)', sm.label + ' • ₹' + sm.due + (rec.payClaim.note ? ' • ' + rec.payClaim.note : ''), c.gstin);
     return {};
   };
+
+  // client taps "I want to pay the fee" -> office sends the UPI QR on WhatsApp
+  A.payRequest = function (db, q, ctx) {
+    var c = byToken(db, q.token), pid = str(q.pid, 10), sm = summary(c, pid, getRec(db, c.gstin, pid, false));
+    if (!(sm.due > 0)) fail(T('इस अवधि की कोई फीस बाकी नहीं', 'No fee is due for this period'));
+    notifyAdmin(db, ctx, 'PAYREQ', displayName(c) + ' फीस भरना चाहते हैं – QR भेजें', sm.label + ' • ₹' + sm.due + ' • ' + c.mobile, c.gstin);
+    return {};
+  };
+
+  /* ---------- purchase bill details (for the purchase Excel / IMS / 2B match) ----------
+     f.pur = { gstin, party, inv, date, taxable, igst, cgst, sgst, total, note, by: auto|client|office, at } */
+  function amt(v) { return v == null || v === '' || !isFinite(Number(v)) ? null : num(v); }
+  function savePur(db, ctx, c, q, by) {
+    var pid = str(q.pid, 10), rec = getRec(db, c.gstin, pid, false);
+    var f = (rec.files || []).filter(function (x) { return x.id === q.id && isPurSlot(x.slot); })[0];
+    if (!f) fail(T('बिल नहीं मिला', 'Bill not found'));
+    if (by !== 'office' && rec.filed && rec.filed.gstr3b) fail(T('GSTR-3B फाइल हो चुका – बदलाव के लिए ऑफिस से बात करें', 'GSTR-3B is filed – talk to the office for any change'));
+    if (by === 'auto' && f.pur && f.pur.by !== 'auto') return { pur: f.pur };   // never overwrite what a person typed
+    var p = q.pur || {};
+    f.pur = { gstin: str(p.gstin, 15).toUpperCase(), party: str(p.party, 100), inv: str(p.inv, 30), date: str(p.date, 10),
+      taxable: amt(p.taxable), igst: amt(p.igst), cgst: amt(p.cgst), sgst: amt(p.sgst), total: amt(p.total), note: str(p.note, 150), by: by, at: ctx.now.toISOString() };
+    return { pur: f.pur };
+  }
+  A.purSave = function (db, q, ctx) { return savePur(db, ctx, byToken(db, q.token), q, q.auto ? 'auto' : 'client'); };
+  A.aPurSave = function (db, q, ctx) { return savePur(db, ctx, client(db, q.gstin), q, 'office'); };
 
   /* ---------- admin actions (need adminKey) ---------- */
   function client(db, g) { var c = db.clients[str(g, 15).toUpperCase()]; if (!c) fail('क्लाइंट नहीं मिला'); return c; }
@@ -611,12 +687,30 @@ var Core = (function () {
     checkTurnover(db, ctx, c);
     return { summary: summary(c, pid, rec) };
   };
-  A.aSetFee = function (db, q) {
+  /* fee: status PENDING -> client is told and reminded every few days (even if we did the work outside the app);
+     RECEIVED -> the balance is booked as a payment right away (cash / UPI in hand) */
+  A.aSetFee = function (db, q, ctx) {
     var c = client(db, q.gstin), pid = str(q.pid, 10);
     if (!isPid(pid)) fail('अवधि सही नहीं');
     var rec = getRec(db, c.gstin, pid, true);
     rec.fee = q.fee === '' || q.fee == null ? null : num(q.fee);
+    var sm = summary(c, pid, rec);
+    if (q.status === 'PENDING') {
+      if (!(sm.due > 0)) fail('फीस डालें (बाकी ₹0 है)');
+      rec.feePending = true; rec.payRemindAt = ctx.now.toISOString();
+      asClient(c, function () { var m = payReminder(c, sm); notifyClient(db, ctx, c, m.title, m.body); });
+    } else if (q.status === 'RECEIVED') {
+      if (!(sm.due > 0)) fail('कुछ बाकी नहीं है');
+      rec.feePending = false;
+      return A.aAddPayment(db, { gstin: c.gstin, pid: pid, amt: sm.due, mode: q.mode, note: q.note }, ctx);
+    }
     return { summary: summary(c, pid, rec) };
+  };
+  // office opens the client's own app (to tick / untick, upload, mark NIL …). Separate token so the client's phones stay logged in.
+  A.aLoginAs = function (db, q, ctx) {
+    var c = client(db, q.gstin);
+    c.officeToken = ctx.uuid().replace(/-/g, '') + ctx.uuid().replace(/-/g, '').slice(0, 8);
+    return { session: { gstin: c.gstin, trade: displayName(c), token: c.officeToken } };
   };
   A.aAddPayment = function (db, q, ctx) {
     var c = client(db, q.gstin), pid = str(q.pid, 10), rec = getRec(db, c.gstin, pid, true);
@@ -690,7 +784,7 @@ var Core = (function () {
   // office sets its own easy-to-remember admin password (stored by the host: Script Properties / demo db)
   A.aSetAdminKey = function (db, q, ctx) {
     var k = String(q.newKey == null ? '' : q.newKey);
-    if (k.length < 6) fail('पासवर्ड कम से कम 6 अक्षर का रखें');
+    if (k.length < 8) fail('पासवर्ड कम से कम 8 अक्षर का रखें (12+ सबसे अच्छा)');
     if (k.length > 60 || /\s/.test(k)) fail('पासवर्ड में स्पेस न डालें (60 अक्षर तक)');
     ctx.setAdminKey(k);
     return {};
@@ -795,19 +889,21 @@ var Core = (function () {
   var DOC_TYPES = {
     pan: 'PAN कार्ड', aadhaar: 'आधार कार्ड (आगे-पीछे)', gst_cert: 'GST सर्टिफिकेट', photo: 'पासपोर्ट साइज़ फोटो',
     bank: 'बैंक पासबुक / कैंसल चेक', address: 'दुकान / ऑफिस का एड्रेस प्रूफ (बिजली बिल / रेंट एग्रीमेंट)', msme: 'उद्यम (MSME) सर्टिफिकेट',
-    fssai: 'फूड लाइसेंस (FSSAI)', bank_stmt: 'बैंक स्टेटमेंट (पूरे साल का – ITR के लिए)', form16: 'फॉर्म 16 (नौकरी है तो)', other: 'कोई और डॉक्यूमेंट'
+    fssai: 'फूड लाइसेंस (FSSAI)', bank_stmt: 'बैंक स्टेटमेंट (पूरे साल का – ITR के लिए)', form16: 'फॉर्म 16 (नौकरी है तो)',
+    rent: 'रेंट एग्रीमेंट (किराये की जगह है तो)', noc: 'NOC / सहमति पत्र (जगह के मालिक का)', elec: 'बिजली बिल (दुकान / ऑफिस का, ताज़ा)', shop_photo: 'दुकान की फोटो (बोर्ड और GST सर्टिफिकेट के साथ)', other: 'कोई और डॉक्यूमेंट'
   };
   var DOC_TYPES_EN = {
     pan: 'PAN card', aadhaar: 'Aadhaar card (front and back)', gst_cert: 'GST certificate', photo: 'Passport size photo',
     bank: 'Bank passbook / cancelled cheque', address: 'Shop / office address proof (electricity bill / rent agreement)', msme: 'Udyam (MSME) certificate',
-    fssai: 'Food licence (FSSAI)', bank_stmt: 'Bank statement (full year – for ITR)', form16: 'Form 16 (if salaried)', other: 'Any other document'
+    fssai: 'Food licence (FSSAI)', bank_stmt: 'Bank statement (full year – for ITR)', form16: 'Form 16 (if salaried)',
+    rent: 'Rent agreement (if the place is rented)', noc: 'NOC / consent letter (from the owner of the place)', elec: 'Electricity bill (shop / office, recent)', shop_photo: 'Shop photo (with the board and GST certificate)', other: 'Any other document'
   };
   function docTypes() { return LANG === 'en' ? DOC_TYPES_EN : DOC_TYPES; }
-  function docView(d) { return { id: d.id, type: d.type, label: docTypes()[d.type] || d.type, name: d.name, size: d.size, at: d.at, url: d.url || '', fileId: d.fileId }; }
+  function docView(d) { return { id: d.id, type: d.type, label: docTypes()[d.type] || d.type, name: d.name, size: d.size, at: d.at, url: d.url || '', fileId: d.fileId, by: d.by || '' }; }
   A.docUpload = function (db, q, ctx) {
     var c = byToken(db, q.token), type = DOC_TYPES[q.type] ? q.type : 'other';
     if (!q.b64) fail(T('फाइल खाली है', 'The file is empty'));
-    var name = str(q.name, 120).replace(/[\\\/:*?"<>|]/g, '_') || 'document';
+    var name = safeName(str(q.name, 120).replace(/[\\\/:*?"<>|]/g, '_') || 'document');
     var size = Math.round(String(q.b64).length * 0.75);
     if (size > 20 * 1048576) fail(T('फाइल 20 MB से बड़ी है', 'The file is larger than 20 MB'));
     var st = ctx.saveFile({ folders: [folderName(c), 'KYC DOCUMENTS'], name: DOC_TYPES[type].replace(/[\\\/:*?"<>|()]/g, ' ').trim() + ' - ' + name, mime: str(q.mime, 100) || 'application/octet-stream' }, q.b64);
@@ -823,6 +919,26 @@ var Core = (function () {
   A.docDelete = function (db, q, ctx) {
     var c = byToken(db, q.token), d = (c.docs || []).filter(function (x) { return x.id === q.id; })[0];
     if (!d) fail(T('नहीं मिला', 'Not found'));
+    if (d.by === 'office') fail(T('ये डॉक्यूमेंट ऑफिस ने डाला है – हटाना हो तो ऑफिस को बताएँ', 'The office added this document – ask the office to remove it'));
+    c.docs = c.docs.filter(function (x) { return x.id !== q.id; }); ctx.deleteFile(d.fileId);
+    return {};
+  };
+  // office puts a document into the client's vault (GST certificate, NOC draft, rent agreement copy …)
+  A.aDocUpload = function (db, q, ctx) {
+    var c = client(db, q.gstin), type = DOC_TYPES[q.type] ? q.type : 'other';
+    if (!q.b64) fail('फाइल खाली है');
+    var name = safeName(str(q.name, 120).replace(/[\\\/:*?"<>|]/g, '_') || 'document');
+    var size = Math.round(String(q.b64).length * 0.75);
+    if (size > 20 * 1048576) fail('फाइल 20 MB से बड़ी है');
+    var st = ctx.saveFile({ folders: [folderName(c), 'KYC DOCUMENTS'], name: DOC_TYPES[type].replace(/[\\\/:*?"<>|()]/g, ' ').trim() + ' - ' + name, mime: str(q.mime, 100) || 'application/octet-stream' }, q.b64);
+    c.docs = c.docs || [];
+    c.docs.push({ id: ctx.uuid(), type: type, name: name, size: size, mime: str(q.mime, 100), at: ctx.now.toISOString(), fileId: st.fileId, url: st.url || '', by: 'office' });
+    asClient(c, function () { notifyClient(db, ctx, c, T('📁 ऑफिस ने डॉक्यूमेंट भेजा', '📁 The office sent a document'), docTypes()[type] + T(' – ऐप में "डॉक्यूमेंट तिजोरी" में रखा है. GST ऑफिसर आए तो वहीं से दिखा सकते हैं.', ' – it is in the app\'s "Document vault". You can show it from there if a GST officer visits.')); });
+    return {};
+  };
+  A.aDocDelete = function (db, q, ctx) {
+    var c = client(db, q.gstin), d = (c.docs || []).filter(function (x) { return x.id === q.id; })[0];
+    if (!d) fail('नहीं मिला');
     c.docs = c.docs.filter(function (x) { return x.id !== q.id; }); ctx.deleteFile(d.fileId);
     return {};
   };
@@ -1024,6 +1140,7 @@ var Core = (function () {
   A.aContentImage = function (db, q, ctx) {
     if (!q.b64) fail('फोटो खाली है');
     if (String(q.b64).length > 2.8e6) fail('फोटो 2 MB से छोटी रखें');
+    if (!/^image\/(jpe?g|png|webp|gif)$/i.test(str(q.mime, 40) || 'image/jpeg')) fail('सिर्फ़ JPG / PNG / WEBP फोटो डालें');   // these pictures are public, so no SVG/HTML
     return { url: ctx.saveImage(q.b64, str(q.mime, 40) || 'image/jpeg', str(q.name, 80) || 'image.jpg') };
   };
   A.aLeadUpdate = function (db, q) {
@@ -1058,7 +1175,7 @@ var Core = (function () {
       var all = db.periods[g] || {};
       Object.keys(all).forEach(function (p) {
         var r = all[p], sm2 = summary(c, p, r);
-        if (sm2.due > 0 && r.work === 'FILED') {
+        if (sm2.due > 0 && (r.work === 'FILED' || r.feePending)) {
           var days = r.payRemindAt ? (ctx.now - new Date(r.payRemindAt)) / 86400000 : 999;
           if (days >= (s.payEveryDays || 3) - 0.05) { asClient(c, function () { var m3 = payReminder(c, summary(c, p, r)); notifyClient(db, ctx, c, m3.title, m3.body); }); r.payRemindAt = ctx.now.toISOString(); paySent++; }
         }
@@ -1075,14 +1192,22 @@ var Core = (function () {
   function handle(db, q, ctx) {
     var action = String(q && q.action || '');
     setLang(q && q.lang);
+    secDirty = false;
     try {
       if (!A[action]) fail('Unknown action: ' + action);
       ensure(db);
-      if (action[0] === 'a' && action[1] === action[1].toUpperCase() && !ctx.adminKeyOk(q.adminKey)) fail('ADMIN_KEY_WRONG');
+      if (action[0] === 'a' && action[1] === action[1].toUpperCase()) {
+        if (locked(db, ctx, 'ADMIN')) fail('ADMIN_LOCKED');
+        if (!ctx.adminKeyOk(q.adminKey)) {
+          if (wrongTry(db, ctx, 'ADMIN', 10)) notifyAdmin(db, ctx, 'SECURITY', '⚠️ एडमिन पासवर्ड 10 बार गलत', 'डैशबोर्ड 15 मिनट के लिए लॉक किया गया. अगर ये आप नहीं थे तो डैशबोर्ड की सेटिंग में पासवर्ड बदल दें.');
+          fail('ADMIN_KEY_WRONG');
+        }
+        clearTries(db, 'ADMIN');
+      }
       var data = A[action](db, q, ctx);
-      return { out: { ok: true, data: data, v: VERSION }, dirty: !READ_ONLY[action] };
+      return { out: { ok: true, data: data, v: VERSION }, dirty: !READ_ONLY[action] || secDirty };
     } catch (e) {
-      return { out: { ok: false, error: e.user ? e.message : 'Server error: ' + e.message }, dirty: false };
+      return { out: { ok: false, error: e.user ? e.message : 'Server error: ' + e.message }, dirty: secDirty };
     }
   }
 

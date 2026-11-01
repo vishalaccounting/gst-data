@@ -187,7 +187,7 @@ tr.rowc{cursor:pointer}tr.rowc:hover td{background:#f8fafc}
       <div class="row" style="margin-top:12px"><button class="btn" onclick="saveSettings()">सेव करें</button></div>
     </div>
     <div class="card"><h3 style="margin-top:0">🔑 Admin पासवर्ड बदलें</h3>
-      <p class="mute">अपना आसान पासवर्ड रखें (कम से कम 6 अक्षर, बिना स्पेस). पुराना लंबा वाला Key उसी समय बंद हो जाएगा.</p>
+      <p class="mute">लंबा पासवर्ड रखें (कम से कम 8 अक्षर, 12+ सबसे अच्छा, बिना स्पेस – नाम या मोबाइल नंबर नहीं). 10 बार गलत पासवर्ड पर डैशबोर्ड 15 मिनट बंद हो जाता है. पुराना लंबा वाला Key उसी समय बंद हो जाएगा.</p>
       <form class="grid2" onsubmit="event.preventDefault();changeAdminPw()">
         <input type="text" name="username" autocomplete="username" value="VAS Admin" readonly style="display:none">
         <label>नया पासवर्ड<input class="i" id="newPw1" type="password" autocomplete="new-password"></label>
@@ -224,7 +224,10 @@ function toast(m, ms) { var t = $('toast'); t.textContent = m; t.style.display =
 function rupee(n) { return n == null ? '–' : '₹' + Number(n).toLocaleString('en-IN'); }
 function fmtDate(iso) { if (!iso) return ''; var d = new Date(iso); return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }); }
 function today() { var d = new Date(Date.now() + 19800000); return d.toISOString().slice(0, 10); }
-function A(action, p) { return API.call(action, Object.assign({ adminKey: KEY }, p || {})).catch(function (e) { if (e.code === 'ADMIN_KEY_WRONG') { logoutAdmin(); } throw e; }); }
+function A(action, p) { return API.call(action, Object.assign({ adminKey: KEY }, p || {})).catch(function (e) {
+  if (e.code === 'ADMIN_KEY_WRONG') { logoutAdmin(); }
+  if (e.code === 'ADMIN_LOCKED') e.message = '🔒 10 बार गलत पासवर्ड डला – डैशबोर्ड 15 मिनट के लिए बंद है. थोड़ी देर बाद खोलें.';
+  throw e; }); }
 function plats(c) { return (c.platforms || []).map(function (k) { var P = Core.PLATFORMS[k]; return '<span class="plat" style="background:' + P.color + '">' + esc(k === 'tool' ? 'Tool' : k === 'pdf' ? 'PDF' : P.label) + '</span>'; }).join('') || '<span class="mute">–</span>'; }
 var DATA_TXT = { NONE: 'नहीं भेजा', PARTIAL: 'अधूरा', COMPLETE: 'पूरा ✓', SUBMITTED: 'भेज दिया ✓', NIL: 'NIL' };
 var WORK_TXT = { '': 'शुरू नहीं', PROCESS: 'चल रहा', FILED: 'फाइल ✓' };
@@ -232,7 +235,7 @@ var WORK_TXT = { '': 'शुरू नहीं', PROCESS: 'चल रहा', F
 /* ---------- login ---------- */
 function login() {
   KEY = $('key').value.trim();
-  A('aSettings').then(function () { try { localStorage.setItem('vas_admin_key', KEY); } catch (e) {} saveAdminPw(KEY); start(); }).catch(function (e) { toast(e.code === 'ADMIN_KEY_WRONG' ? 'पासवर्ड गलत है' : e.message); });
+  A('aSettings').then(function () { try { localStorage.setItem('vas_admin_key', KEY); } catch (e) {} saveAdminPw(KEY); start(); }).catch(function (e) { toast(e.code === 'ADMIN_KEY_WRONG' ? 'पासवर्ड गलत है' : e.message, 5000); });
 }
 // asks Chrome's password manager to keep the admin password (works across reinstalls / new Chrome on same Google account)
 function saveAdminPw(pw) { try { if (window.PasswordCredential && navigator.credentials) navigator.credentials.store(new PasswordCredential({ id: 'VAS Admin', password: pw, name: 'VAS Admin' })).catch(function () {}); } catch (e) {} }
@@ -360,6 +363,7 @@ function openClient(g, keep, focusPid) {
     $('dTitle').innerHTML = '<b style="font-size:16px">' + esc(c.fullName) + '</b> ' + (c.verified ? '<span class="pill COMPLETE">✓ Verified</span>' : '<span class="pill PARTIAL">Verify बाकी</span>') + '<div class="mute">' + esc(c.gstin) + ' • ' + esc(c.state) + ' • ' + (c.freq === 'Q' ? 'Quarterly' : 'Monthly') + '</div>';
     var h = '';
     var kv = function (l, v) { return '<div><span class="mute">' + l + '</span><div><b>' + (v || '<span class="mute">–</span>') + '</b></div></div>'; };
+    h += '<div class="per" style="background:#eef4fb"><div class="row"><b>📱 क्लाइंट का ऐप खुद चलाएँ</b><span class="mute grow">टिक / अनटिक, फाइल डालना-हटाना, NIL – सब वैसे ही जैसे क्लाइंट करता है</span><button class="btn sm" onclick="openAsClient(\'' + c.gstin + '\')">📱 क्लाइंट का ऐप खोलें ↗</button></div></div>';
     h += '<div class="per"><div class="row"><h3>📋 रजिस्ट्रेशन में क्या डाला</h3><span class="grow"></span>' +
       (c.verified ? '<button class="btn sec sm" onclick="quickVerify(\'' + c.gstin + '\',false)">Verify हटाएँ</button>' : '<button class="btn ok sm" onclick="quickVerify(\'' + c.gstin + '\',true)">✓ GST पोर्टल से मिला लिया (Verify)</button>') + '</div>' +
       '<div class="grid2" style="margin-top:8px">' + kv('👤 बात करने वाले', esc(c.owner)) + kv('🪪 GST धारक (लीगल नाम)', esc(c.legal)) + kv('🏪 फर्म (ट्रेड नाम)', esc(c.trade)) +
@@ -386,8 +390,11 @@ function openClient(g, keep, focusPid) {
     // document vault
     var reqT = (c.docReq && c.docReq.types) || [];
     h += '<div class="per"><div class="row"><h3>📁 डॉक्यूमेंट तिजोरी</h3>' + (reqT.length ? '<span class="pill CLAIM">माँगे: ' + reqT.map(function (t) { return esc(d.docTypes[t]); }).join(', ') + '</span>' : '') + '</div>' +
-      ((c.docs || []).length ? (c.docs || []).map(function (x) { return '<div class="sl"><span class="nm">' + esc(x.label) + '</span><span>' + fileLink({ name: x.name, at: x.at, url: x.url, fileId: x.fileId }) + '</span></div>'; }).join('') : '<div class="mute" style="margin-top:6px">अभी कोई डॉक्यूमेंट नहीं.</div>') +
-      '<div style="margin-top:10px"><b style="font-size:12.5px">डॉक्यूमेंट माँगें:</b> <button class="btn sec sm" onclick="presetDocs(\'itr\')">ITR के लिए</button> <button class="btn sec sm" onclick="presetDocs(\'reg\')">रजिस्ट्रेशन के लिए</button>' +
+      ((c.docs || []).length ? (c.docs || []).map(function (x) { return '<div class="sl"><span class="nm">' + esc(x.label) + (x.by === 'office' ? ' <span class="pill FILED">ऑफिस ने डाला</span>' : '') + '</span><span>' + fileLink({ name: x.name, at: x.at, url: x.url, fileId: x.fileId }) +
+        (x.by === 'office' ? ' <button class="btn sec sm" style="padding:1px 6px" onclick="delOfficeDoc(\'' + c.gstin + '\',\'' + x.id + '\')">✕</button>' : '') + '</span></div>'; }).join('') : '<div class="mute" style="margin-top:6px">अभी कोई डॉक्यूमेंट नहीं.</div>') +
+      '<div class="row" style="margin-top:10px"><b style="font-size:12.5px">क्लाइंट के ऐप में डॉक्यूमेंट डालें (GST सर्टिफिकेट, NOC, रेंट एग्रीमेंट…):</b> <select class="i" id="odType">' + Object.keys(d.docTypes).map(function (t) { return '<option value="' + t + '"' + (t === 'gst_cert' ? ' selected' : '') + '>' + esc(d.docTypes[t]) + '</option>'; }).join('') + '</select>' +
+      '<input type="file" accept=".pdf,.jpg,.jpeg,.png" onchange="sendOfficeDoc(\'' + c.gstin + '\',this)"></div>' +
+      '<div style="margin-top:10px"><b style="font-size:12.5px">डॉक्यूमेंट माँगें:</b> <button class="btn sec sm" onclick="presetDocs(\'itr\')">ITR के लिए</button> <button class="btn sec sm" onclick="presetDocs(\'reg\')">रजिस्ट्रेशन के लिए</button> <button class="btn sec sm" onclick="presetDocs(\'visit\')">👮 ऑफिसर विज़िट के लिए</button>' +
       '<div class="pk" style="margin-top:6px">' + Object.keys(d.docTypes).map(function (t) { return '<label><input type="checkbox" class="dq" value="' + t + '"' + (reqT.indexOf(t) >= 0 ? ' checked' : '') + '>' + esc(d.docTypes[t]) + '</label>'; }).join('') + '</div>' +
       '<div class="row" style="margin-top:6px"><input class="i" id="dqNote" placeholder="नोट – जैसे: ITR FY 2025-26 के लिए" style="flex:1" value="' + esc(c.docReq ? c.docReq.note : '') + '"><button class="btn sm" onclick="requestDocs(\'' + c.gstin + '\')">📩 क्लाइंट से माँगें</button></div></div></div>';
     // this client's due dates
@@ -396,7 +403,8 @@ function openClient(g, keep, focusPid) {
         (x.done ? '<span class="pill FILED">हो गया ✓</span>' : '<span class="pill ' + (x.days < 0 ? 'NONE' : x.days <= 3 ? 'PARTIAL' : 'COMPLETE') + '">' + (x.days < 0 ? (-x.days) + ' दिन ऊपर' : x.days + ' दिन') + '</span>') +
         (x.pid ? '' : ' <label class="mute"><input type="checkbox"' + (x.done ? ' checked' : '') + ' onchange="dueDone(\'' + c.gstin + '\',\'' + esc(x.key) + '\',this.checked)"> हो गया</label>') + '</div>';
     }).join('') + '</div>';
-    h += d.periods.map(function (p) { return periodBlock(c, p, p.summary.pid === focusPid); }).join('');
+    // periods come newest first: "last time" = the next older period that had a fee
+    h += d.periods.map(function (p, i) { return periodBlock(c, p, p.summary.pid === focusPid, d.periods.slice(i + 1).filter(function (x) { return x.summary.fee != null; })[0]); }).join('');
     h += '<div class="per"><h3>प्रोफाइल</h3><div class="grid2" style="margin-top:8px">' +
       fld('owner', '👤 बात करने वाले का नाम', c.owner) + fld('legal', '🪪 GST धारक (लीगल नाम)', c.legal) + fld('trade', '🏪 फर्म (ट्रेड नाम)', c.trade) + fld('mobile', 'मोबाइल', c.mobile) + fld('email', 'ईमेल', c.email) +
       '<label>रिटर्न<select class="i" id="pf_freq"><option value="M"' + (c.freq !== 'Q' ? ' selected' : '') + '>Monthly</option><option value="Q"' + (c.freq === 'Q' ? ' selected' : '') + '>Quarterly</option></select></label>' +
@@ -413,7 +421,7 @@ function openClient(g, keep, focusPid) {
   }).catch(function (e) { toast(e.message); });
 }
 function fld(k, l, v) { return '<label>' + l + '<input class="i" id="pf_' + k + '" value="' + esc(v == null ? '' : v) + '"></label>'; }
-function periodBlock(c, p, focus) {
+function periodBlock(c, p, focus, prev) {
   var s = p.summary, g = c.gstin, pid = s.pid, f1 = s.filed.gstr1 || {}, f3 = s.filed.gstr3b || {};
   var bySlot = {};
   p.files.forEach(function (f) { (bySlot[f.slot] = bySlot[f.slot] || []).push(f); });
@@ -430,19 +438,26 @@ function periodBlock(c, p, focus) {
     '<div class="row"><h3>' + esc(s.label) + '</h3><span class="pill ' + s.data + '">' + DATA_TXT[s.data] + (s.data !== 'NIL' && s.required ? ' ' + s.done + '/' + s.required : '') + '</span><span class="pill ' + (s.work || 'NONE') + '">' + WORK_TXT[s.work || ''] + '</span>' +
     (s.submittedAt ? '<span class="mute">भेजा: ' + fmtDate(s.submittedAt) + '</span>' : '') + '</div>' +
     (s.data === 'NIL' ? '<div class="mute" style="margin-top:6px">क्लाइंट ने बताया: इस अवधि में कोई सेल नहीं – NIL रिटर्न.</div>' : '<div class="slots">' + (slots || '<span class="mute">कोई प्लेटफॉर्म नहीं</span>') + orphan + '</div>') +
+    purBlock(c, p) +
     '<hr class="sep"><div class="row">' +
     (s.work ? '' : '<button class="btn sec sm" onclick="setWork(\'' + g + '\',\'' + pid + '\',\'PROCESS\')">▶ फाइलिंग शुरू (क्लाइंट को बताएँ)</button>') +
     '<label>GSTR-1 ARN <input class="i" id="a1' + id + '" value="' + esc(f1.arn || '') + '" style="width:170px"></label><input class="i" type="date" id="d1' + id + '" value="' + esc(f1.date || today()) + '">' +
     '<button class="btn ok sm" onclick="saveFiled(\'' + g + '\',\'' + pid + '\',\'gstr1\')">GSTR-1 फाइल ✓</button></div>' +
     '<div class="row" style="margin-top:6px"><label>GSTR-3B ARN <input class="i" id="a3' + id + '" value="' + esc(f3.arn || '') + '" style="width:170px"></label><input class="i" type="date" id="d3' + id + '" value="' + esc(f3.date || today()) + '">' +
     '<button class="btn ok sm" onclick="saveFiled(\'' + g + '\',\'' + pid + '\',\'gstr3b\')">GSTR-3B फाइल ✓</button>' +
-    (s.work ? '<button class="btn sec sm" onclick="undoWork(\'' + g + '\',\'' + pid + '\')">↺ स्थिति हटाएँ</button>' : '') + '</div>' +
+    (s.filed.gstr1 && s.filed.gstr3b ? '' : '<button class="btn sm" style="background:#0369a1" onclick="workDone(\'' + g + '\',\'' + pid + '\')" title="डेटा ऐप से नहीं आया, काम बाहर से किया – GSTR-1 और 3B दोनों फाइल मार्क होंगे">✅ पूरा काम हो गया (1 + 3B)</button>') +
+    (s.work ?'<button class="btn sec sm" onclick="undoWork(\'' + g + '\',\'' + pid + '\')">↺ स्थिति हटाएँ</button>' : '') + '</div>' +
     '<div class="row" style="margin-top:6px"><label>टर्नओवर (taxable) ₹ <input class="i" type="number" id="to' + id + '" value="' + (s.turnover == null ? '' : s.turnover) + '" style="width:130px"></label>' +
     (s.autoTurnover != null ? '<span class="mute">रिपोर्ट से अनुमान: ' + rupee(Math.round(s.autoTurnover)) + '</span>' : '') + '<button class="btn sec sm" onclick="saveTurnover(\'' + g + '\',\'' + pid + '\')">सेव</button></div>' +
     '<div style="margin-top:8px"><b style="font-size:12.5px">📄 क्लाइंट को भेजी PDF:</b> ' + ((s.returns || []).map(function (r) { return '<span class="pill FILED">' + esc(r.kind) + ': ' + esc(r.name) + ' <button class="lnk" style="border:0;background:none;cursor:pointer" onclick="delReturn(\'' + g + '\',\'' + pid + '\',\'' + r.id + '\')">✕</button></span>'; }).join(' ') || '<span class="mute">अभी नहीं</span>') +
     ' <select class="i" id="rk' + id + '"><option>GSTR3B</option><option>GSTR1</option><option value="OTHER">अन्य</option></select> <input type="file" accept=".pdf" id="rf' + id + '" onchange="sendReturn(\'' + g + '\',\'' + pid + '\',this)"></div>' +
-    '<hr class="sep"><div class="row"><label>फीस ₹ <input class="i" type="number" id="fee' + id + '" value="' + (s.fee == null ? '' : s.fee) + '" style="width:100px"></label><button class="btn sec sm" onclick="saveFee(\'' + g + '\',\'' + pid + '\')">सेव</button>' +
-    '<span>मिला: <b>' + rupee(s.paid) + '</b></span><span>बाकी: <b style="color:' + (s.due > 0 ? 'var(--bad)' : 'var(--ok)') + '">' + rupee(s.due) + '</b></span></div>' +
+    '<hr class="sep"><div class="row"><label>फीस ₹ <input class="i" type="number" id="fee' + id + '" value="' + (s.fee == null ? '' : s.fee) + '" style="width:100px"></label>' +
+    '<button class="btn sm" style="background:#d97706" onclick="feeStatus(\'' + g + '\',\'' + pid + '\',\'PENDING\')" title="क्लाइंट को फीस बाकी का नोटिफिकेशन जाएगा और हर कुछ दिन रिमाइंडर">⏳ पेंडिंग</button>' +
+    '<button class="btn ok sm" onclick="feeStatus(\'' + g + '\',\'' + pid + '\',\'RECEIVED\')" title="पूरी बाकी फीस मिल गई – पेमेंट जुड़ जाएगा">✅ मिल गया</button><select class="i" id="fm' + id + '"><option>UPI</option><option>Cash</option><option>Bank</option></select>' +
+    '<button class="btn sec sm" onclick="saveFee(\'' + g + '\',\'' + pid + '\')">सिर्फ सेव</button>' +
+    '<span>मिला: <b>' + rupee(s.paid) + '</b></span><span>बाकी: <b style="color:' + (s.due > 0 ? 'var(--bad)' : 'var(--ok)') + '">' + rupee(s.due) + '</b></span>' +
+    (s.fee != null ? (s.due > 0 ? (s.feePending || s.work === 'FILED' ? '<span class="pill PARTIAL">⏳ पेंडिंग – क्लाइंट को रिमाइंडर जा रहे</span>' : '<span class="pill NONE">क्लाइंट को अभी नहीं बताया</span>') : '<span class="pill COMPLETE">✅ फीस मिल गई</span>') : '') + '</div>' +
+    (prev ? '<div class="mute" style="margin-top:4px">🔒 पिछली बार (' + esc(prev.summary.label) + '): फीस <b>' + rupee(prev.summary.fee) + '</b> • मिला ' + rupee(prev.summary.paid) + (prev.summary.due > 0 ? ' • <b style="color:var(--bad)">बाकी ' + rupee(prev.summary.due) + '</b>' : ' ✓') + (prev.payments.length ? ' • ' + esc(prev.payments[prev.payments.length - 1].date) + ' ' + esc(prev.payments[prev.payments.length - 1].mode) : '') + ' <span style="font-size:11px">(सिर्फ आपको दिखता है)</span></div>' : '') +
     (s.payClaim ? '<div class="row" style="margin-top:6px"><span class="pill CLAIM">क्लाइंट ने कहा पेमेंट कर दिया – ' + fmtDate(s.payClaim.at) + (s.payClaim.note ? ': ' + esc(s.payClaim.note) : '') + '</span><button class="btn sec sm" onclick="rejectClaim(\'' + g + '\',\'' + pid + '\')">नहीं मिला</button></div>' : '') +
     (s.fee != null || p.payments.length ? '<div class="row" style="margin-top:6px"><label>पेमेंट मिला ₹ <input class="i" type="number" id="pa' + id + '" value="' + (s.due > 0 ? s.due : '') + '" style="width:100px"></label><select class="i" id="pm' + id + '"><option>UPI</option><option>Cash</option><option>Bank</option></select><input class="i" id="pn' + id + '" placeholder="नोट / Ref" style="width:140px"><button class="btn ok sm" onclick="addPay(\'' + g + '\',\'' + pid + '\')">+ जोड़ें</button></div>' + pays : '') +
     (s.due > 0 ? '<div class="row" style="margin-top:6px"><a class="btn wa sm" target="_blank" rel="noopener" href="' + waLink(c, s, 'pay') + '">WhatsApp पेमेंट रिमाइंडर</a></div>' : '') +
@@ -466,6 +481,20 @@ function saveFiled(g, pid, k) {
   o[k] = { arn: $('a' + n + id).value.trim(), date: $('d' + n + id).value || today() };
   o.gstin = g; o.pid = pid;
   after(A('aSetWork', o), (k === 'gstr1' ? 'GSTR-1' : 'GSTR-3B') + ' फाइल ✓ – क्लाइंट को सूचना गई');
+}
+function feeStatus(g, pid, st) {
+  var id = pid.replace(/\W/g, '');
+  if (!$('fee' + id).value) return toast('पहले फीस ₹ डालें');
+  after(A('aSetFee', { gstin: g, pid: pid, fee: $('fee' + id).value, status: st, mode: $('fm' + id).value }), st === 'PENDING' ? 'पेंडिंग ✓ – क्लाइंट को फीस का नोटिफिकेशन गया' : 'फीस मिल गई ✓ – क्लाइंट को रसीद गई');
+}
+function workDone(g, pid) {
+  var id = pid.replace(/\W/g, '');
+  if (!confirm('इस अवधि का GSTR-1 और GSTR-3B दोनों फाइल मार्क करें? (क्लाइंट को सूचना जाएगी)')) return;
+  after(A('aSetWork', { gstin: g, pid: pid, work: 'FILED', gstr1: { arn: $('a1' + id).value.trim(), date: $('d1' + id).value }, gstr3b: { arn: $('a3' + id).value.trim(), date: $('d3' + id).value } }), 'काम पूरा ✓ – अब 3B की PDF भी नीचे से भेज दें');
+}
+function openAsClient(g) {
+  var w = window.open('about:blank', '_blank');   // opened inside the click so the popup is allowed
+  A('aLoginAs', { gstin: g }).then(function (d) { w.location = 'index.html#as=' + encodeURIComponent(JSON.stringify(d.session)); }).catch(function (e) { w.close(); toast(e.message); });
 }
 function saveFee(g, pid) { after(A('aSetFee', { gstin: g, pid: pid, fee: $('fee' + pid.replace(/\W/g, '')).value }), 'फीस सेव ✓'); }
 function addPay(g, pid) { var id = pid.replace(/\W/g, ''); after(A('aAddPayment', { gstin: g, pid: pid, amt: $('pa' + id).value, mode: $('pm' + id).value, note: $('pn' + id).value }), 'पेमेंट जुड़ गया ✓ – क्लाइंट को रसीद गई'); }
@@ -586,9 +615,41 @@ function quickVerify(g, on) { after(A('aUpdateClient', { gstin: g, fields: { ver
 
 function saveFlags(g) { after(A('aUpdateClient', { gstin: g, fields: { tds: $('fl_tds').checked, advtax: $('fl_adv').checked, annual: $('fl_annual').checked } }), 'सेव ✓ – ड्यू डेट अपडेट'); }
 function presetDocs(k) {
-  var set = k === 'itr' ? ['pan', 'aadhaar', 'bank_stmt', 'form16'] : ['pan', 'aadhaar', 'photo', 'bank', 'address'];
+  var set = k === 'itr' ? ['pan', 'aadhaar', 'bank_stmt', 'form16'] : k === 'visit' ? ['gst_cert', 'aadhaar', 'pan', 'rent', 'noc', 'elec', 'photo', 'shop_photo'] : ['pan', 'aadhaar', 'photo', 'bank', 'address'];
   document.querySelectorAll('.dq').forEach(function (x) { x.checked = set.indexOf(x.value) >= 0; });
-  $('dqNote').value = k === 'itr' ? 'ITR के लिए ये डॉक्यूमेंट चाहिए' : 'रजिस्ट्रेशन के लिए ये डॉक्यूमेंट चाहिए';
+  $('dqNote').value = k === 'itr' ? 'ITR के लिए ये डॉक्यूमेंट चाहिए' : k === 'visit' ? 'GST ऑफिसर विज़िट के लिए ये डॉक्यूमेंट ऐप में रखें' : 'रजिस्ट्रेशन के लिए ये डॉक्यूमेंट चाहिए';
+}
+function sendOfficeDoc(g, inp) {
+  var f = inp.files[0]; if (!f) return;
+  API.fileToB64(f).then(function (b64) { return A('aDocUpload', { gstin: g, type: $('odType').value, name: f.name, mime: f.type, b64: b64 }); })
+    .then(function () { toast('डॉक्यूमेंट क्लाइंट के ऐप में पहुँच गया ✓'); return refresh(); }).catch(function (e) { toast(e.message, 4000); });
+}
+function delOfficeDoc(g, id) { if (confirm('ये डॉक्यूमेंट क्लाइंट के ऐप से हटाएँ?')) after(A('aDocDelete', { gstin: g, id: id }), 'हटा दिया'); }
+/* purchase bill details (office checks / fills) + Excel for IMS / GSTR-2B matching */
+var PUR_K = ['gstin', 'party', 'inv', 'date', 'taxable', 'igst', 'cgst', 'sgst', 'total'];
+function purBlock(c, p) {
+  var list = p.files.filter(function (f) { return f.slot.indexOf('purchase.') === 0; });
+  if (!list.length) return '';
+  var pid = p.summary.pid, w = { gstin: 150, party: 140, inv: 90, date: 125, taxable: 90, igst: 75, cgst: 75, sgst: 75, total: 90 };
+  return '<div style="margin-top:8px"><div class="row"><b style="font-size:12.5px">🧾 खरीद बिल (' + list.length + ') – IMS / 2B मिलान के लिए</b><button class="btn sec sm" onclick="purExcelAdmin(\'' + c.gstin + '\',\'' + pid + '\')">📥 खरीद Excel</button></div>' +
+    '<div class="mute" style="font-size:12px">कॉलम: GSTIN • नाम • बिल नं • तारीख • Taxable • IGST • CGST • SGST • कुल</div>' +
+    list.map(function (f) {
+      var x = f.pur || {}, id = f.id.replace(/\W/g, '');
+      return '<div style="border-top:1px dashed var(--line);padding:6px 0">' + fileLink(f) + ' ' + (!f.pur ? '<span class="pill NONE">डिटेल बाकी</span>' : x.by === 'auto' ? '<span class="pill PARTIAL">ऐप ने पढ़ा – जाँचें</span>' : '<span class="pill COMPLETE">' + (x.by === 'office' ? 'ऑफिस' : 'क्लाइंट') + '</span>') +
+        '<div class="row" style="margin-top:4px">' + PUR_K.map(function (k) { return '<input class="i" id="pr_' + k + id + '" title="' + k + '" placeholder="' + k + '"' + (k === 'date' ? ' type="date"' : /tax|gst|total/.test(k) && k !== 'gstin' ? ' type="number" step="0.01"' : '') + ' value="' + esc(x[k] == null ? '' : x[k]) + '" style="width:' + w[k] + 'px">'; }).join('') +
+        '<button class="btn ok sm" onclick="savePurAdmin(\'' + c.gstin + '\',\'' + pid + '\',\'' + f.id + '\')">सेव</button></div></div>';
+    }).join('') + '</div>';
+}
+function savePurAdmin(g, pid, fid) {
+  var id = fid.replace(/\W/g, ''), pur = {}; PUR_K.forEach(function (k) { pur[k] = $('pr_' + k + id).value.trim(); });
+  A('aPurSave', { gstin: g, pid: pid, id: fid, pur: pur }).then(function () { toast('खरीद बिल सेव ✓'); }).catch(function (e) { toast(e.message, 4000); });
+}
+function purExcelAdmin(g, pid) {
+  A('aClient', { gstin: g, pid: pid }).then(function (d) {
+    var p = d.periods.filter(function (x) { return x.summary.pid === pid; })[0], c = d.client;
+    var rows = p.files.filter(function (f) { return f.slot.indexOf('purchase.') === 0; }).map(function (f) { return { pur: f.pur, name: f.name, label: p.summary.label }; });
+    return Detect.purchaseXlsx(rows, c.fullName.replace(/[\\\/:*?"<>|]/g, ' ') + ' PURCHASE ' + pid + '.xlsx', c.fullName + ' – ' + c.gstin + ' – Purchase bills ' + p.summary.label);
+  }).catch(function (e) { toast(e.message, 4000); });
 }
 function requestDocs(g) {
   var types = Array.prototype.map.call(document.querySelectorAll('.dq:checked'), function (x) { return x.value; });
@@ -789,7 +850,7 @@ function renderLeads() {
 function leadSet(id, status, note) { A('aLeadUpdate', { id: id, status: status || undefined, note: note == null ? undefined : note }).then(function () { return loadContent(); }).then(function () { toast('सेव ✓'); }).catch(function (e) { toast(e.message); }); }
 
 /* ---------- inbox ---------- */
-var KIND = { LEAD: ['पूछताछ', 'COMPLETE'], REG: ['नया क्लाइंट', 'PARTIAL'], NIL: ['NIL', 'NIL'], COMPLETE: ['डेटा पूरा', 'COMPLETE'], SUBMIT: ['डेटा भेजा', 'SUBMITTED'], PAYCLAIM: ['पेमेंट', 'CLAIM'], PROFILE: ['प्रोफाइल', 'FILED'], TICK: ['रिमाइंडर', 'PROCESS'], PIN: ['PIN भूले', 'CLAIM'], DUE: ['ड्यू डेट', 'PROCESS'], TURNOVER: ['टर्नओवर', 'DUE'], DOCS: ['डॉक्यूमेंट', 'COMPLETE'], REF: ['रेफरल', 'FILED'] };
+var KIND = { LEAD: ['पूछताछ', 'COMPLETE'], REG: ['नया क्लाइंट', 'PARTIAL'], NIL: ['NIL', 'NIL'], COMPLETE: ['डेटा पूरा', 'COMPLETE'], SUBMIT: ['डेटा भेजा', 'SUBMITTED'], PAYCLAIM: ['पेमेंट', 'CLAIM'], PROFILE: ['प्रोफाइल', 'FILED'], TICK: ['रिमाइंडर', 'PROCESS'], PIN: ['PIN भूले', 'CLAIM'], DUE: ['ड्यू डेट', 'PROCESS'], TURNOVER: ['टर्नओवर', 'DUE'], DOCS: ['डॉक्यूमेंट', 'COMPLETE'], REF: ['रेफरल', 'FILED'], PURCHASE: ['खरीद बिल', 'PARTIAL'], PAYREQ: ['फीस QR माँगा', 'CLAIM'] };
 function loadInbox() {
   A('aInbox').then(function (d) {
     INBOX = d.inbox;

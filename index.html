@@ -229,6 +229,18 @@ details.faq div{padding:0 16px 14px 48px;font-size:14px;color:#374151;white-spac
   <div class="hd"><h2 style="margin:0" data-en="📎 Shared files">📎 शेयर की हुई फाइल</h2><button class="btn ghost" onclick="closeSheet(sShare)" data-en="Close ✕">बंद ✕</button></div>
   <div id="shareBody"></div>
 </div></div>
+<div class="sheet" id="sPur" onclick="if(event.target===this)closeSheet(this)"><div class="pane">
+  <div class="hd"><h2 style="margin:0" data-en="🧾 Purchase bill details">🧾 खरीद बिल की डिटेल</h2><button class="btn ghost" onclick="closeSheet(sPur)" data-en="Close ✕">बंद ✕</button></div>
+  <div id="purBody"></div>
+</div></div>
+<div class="sheet" id="sHsn" onclick="if(event.target===this)closeSheet(this)"><div class="pane">
+  <div class="hd"><h2 style="margin:0" data-en="🔎 Find HSN / SAC code">🔎 HSN / SAC कोड खोजें</h2><button class="btn ghost" onclick="closeSheet(sHsn)" data-en="Close ✕">बंद ✕</button></div>
+  <div id="hsnBody"></div>
+</div></div>
+<div class="sheet" id="sVisit" onclick="if(event.target===this)closeSheet(this)"><div class="pane">
+  <div class="hd"><h2 style="margin:0" data-en="👮 If a GST officer visits">👮 GST ऑफिसर आए तो</h2><button class="btn ghost" onclick="closeSheet(sVisit)" data-en="Close ✕">बंद ✕</button></div>
+  <div id="visitBody"></div>
+</div></div>
 <input type="file" id="docPick" class="hide" multiple accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.zip" onchange="docChosen(this)">
 
 <input type="file" id="filePick" class="hide" multiple onchange="filesChosen(this)">
@@ -244,7 +256,7 @@ details.faq div{padding:0 16px 14px 48px;font-size:14px;color:#374151;white-spac
 var S = { sessions: [], active: null, st: null, pid: null, uploadSlot: null, uploading: 0, shared: [], shareInfo: null, shareAuto: false, lang: 'hi' };
 var $ = function (id) { return document.getElementById(id); };
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || 'null'); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+function store(k, v) { try { if (S.office && /^vas_(sessions|active)$/.test(k)) return v === undefined ? null : undefined; if (v === undefined) return JSON.parse(localStorage.getItem(k) || 'null'); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
 function toast(m, ms) { var t = $('toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(function () { t.style.display = 'none'; }, ms || 2800); }
 function busy(on, txt) { $('busy').style.display = on ? 'grid' : 'none'; $('busyTxt').textContent = txt || L('रुकिए…', 'Please wait…'); }
 function fmtSize(b) { return b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB'; }
@@ -278,6 +290,8 @@ function setLang(l) {
 }
 
 function call(action, params) {
+  // office mode: never register the office browser for the client's push, mark the client's inbox read, or change the client's language
+  if (S.office && (action === 'pushToken' || action === 'readInbox' || (action === 'profile' && params && params.lang))) return Promise.resolve({});
   var q = Object.assign({ token: S.active && S.active.token }, params || {});
   return API.call(action, q).catch(function (e) {
     if (e.code === 'SESSION_EXPIRED') { dropSession(S.active && S.active.gstin); toast(L('दोबारा लॉगिन करें', 'Please log in again')); }
@@ -384,6 +398,7 @@ function render() {
   }).join('');
   var filed = sm.work === 'FILED', locked = filed;
   var html = '';
+  if (S.office) html += '<div class="banner" style="background:#fef3c7;color:#92400e"><span class="grow">' + L('🏢 ऑफिस मोड – आप क्लाइंट का ऐप चला रहे हैं. जो बदलेंगे वो क्लाइंट को भी दिखेगा.', '🏢 Office mode – you are using the client\'s app. Changes are visible to the client.') + '</span></div>';
   if (S.shared.length) html += '<div class="banner" style="background:#e0f2fe;color:#075985"><span class="grow">' + L('📎 शेयर की हुई ' + S.shared.length + ' फाइल अभी अपलोड नहीं हुई', '📎 ' + S.shared.length + ' shared file(s) not uploaded yet') + '</span><button class="btn sm" onclick="openShare()">' + L('अपलोड', 'Upload') + '</button></div>';
 
   // dues banner (any period)
@@ -391,9 +406,10 @@ function render() {
     var claim = d.payClaim ? '<div class="mute" style="margin-top:6px">' + L('✓ आपने ' + fmtDate(d.payClaim.at) + ' को बताया कि पेमेंट कर दिया – ऑफिस जाँच रहा है.', '✓ On ' + fmtDate(d.payClaim.at) + ' you told us you have paid – the office is checking.') + '</div>' : '';
     var upi = st.settings.upi ? 'upi://pay?pa=' + encodeURIComponent(st.settings.upi) + '&pn=' + encodeURIComponent(st.settings.payeeName || '') + '&am=' + d.due + '&cu=INR&tn=' + encodeURIComponent('GST fee ' + d.label) : '';
     html += '<div class="card pay"><h2>' + L('💰 फीस बाकी – ', '💰 Fee due – ') + esc(d.label) + '</h2><div style="font-size:24px;font-weight:800">' + rupee(d.due) + '</div>' +
-      '<div class="mute">' + L('रिटर्न फाइल हो चुका है. कृपया भुगतान करें.', 'Your return has been filed. Please pay.') + '</div>' + claim +
+      '<div class="mute">' + (d.work === 'FILED' ? L('रिटर्न फाइल हो चुका है. कृपया भुगतान करें.', 'Your return has been filed. Please pay.') : L('कृपया फीस का भुगतान करें.', 'Please pay the fee.')) + '</div>' + claim +
       '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">' +
-      (upi ? '<a class="btn" href="' + upi + '">' + L('UPI से पे करें', 'Pay by UPI') + '</a>' : '') +
+      '<button class="btn" onclick="wantPay(\'' + d.pid + '\')">' + L('💬 फीस भरनी है – QR भेजें', '💬 I want to pay – send QR') + '</button>' +
+      (upi ? '<a class="btn sec" href="' + upi + '">' + L('UPI से पे करें', 'Pay by UPI') + '</a>' : '') +
       (d.payClaim ? '' : '<button class="btn sec" onclick="claimPaid(\'' + d.pid + '\')">' + L('मैंने पेमेंट कर दिया', 'I have paid') + '</button>') + '</div></div>';
   });
 
@@ -423,10 +439,14 @@ function render() {
     }).join('') + '</div>';
   }
 
-  // document vault + referral
+  // reports & documents (vault) + GST officer visit + HSN search + referral
   var req = (st.docReq && st.docReq.types) || [];
-  html += '<div class="card" onclick="openDocs()" style="cursor:pointer;' + (req.length ? 'border:2px solid var(--warn)' : '') + '"><div class="nilbox"><div class="grow"><h3>' + L('📁 डॉक्यूमेंट तिजोरी', '📁 Document vault') + '</h3><div class="mute">' +
-    (req.length ? '<b style="color:var(--warn)">' + L('⚠ ऑफिस ने ' + req.length + ' डॉक्यूमेंट माँगे हैं', '⚠ The office has asked for ' + req.length + ' document(s)') + '</b>' : L('PAN, आधार, GST सर्टिफिकेट, बैंक डिटेल – एक बार डालें, हर काम में काम आएँगे', 'PAN, Aadhaar, GST certificate, bank details – upload once, useful for every job')) + '</div></div><span style="font-size:13px" class="mute">' + st.docs.length + L(' फाइल ›', ' files ›') + '</span></div></div>';
+  html += '<div class="card" onclick="openDocs()" style="cursor:pointer;' + (req.length ? 'border:2px solid var(--warn)' : '') + '"><div class="nilbox"><div class="grow"><h3>' + L('📁 रिपोर्ट और डॉक्यूमेंट', '📁 Reports and documents') + '</h3><div class="mute">' +
+    (req.length ? '<b style="color:var(--warn)">' + L('⚠ ऑफिस ने ' + req.length + ' डॉक्यूमेंट माँगे हैं', '⚠ The office has asked for ' + req.length + ' document(s)') + '</b>' : L('GST सर्टिफिकेट, आधार, PAN, रेंट एग्रीमेंट, NOC, बिजली बिल और GSTR-3B रिपोर्ट – सब एक जगह, फोन में', 'GST certificate, Aadhaar, PAN, rent agreement, NOC, electricity bill and GSTR-3B reports – all in one place, on your phone')) + '</div></div><span style="font-size:13px" class="mute">' + (st.docs.length + (st.returnsAll || []).length) + L(' फाइल ›', ' files ›') + '</span></div></div>';
+  var vs = visitScore();
+  html += '<div class="pick" style="margin:0 0 12px">' +
+    '<button class="card" style="flex:1 1 45%;margin:0;text-align:left;cursor:pointer;border:0" onclick="openVisit()"><b>' + L('👮 GST ऑफिसर आए तो', '👮 If a GST officer visits') + '</b><div class="mute" style="font-size:12.5px">' + L('तैयारी: ', 'Ready: ') + vs.have + '/' + vs.total + L(' डॉक्यूमेंट ›', ' documents ›') + '</div></button>' +
+    '<button class="card" style="flex:1 1 45%;margin:0;text-align:left;cursor:pointer;border:0" onclick="openHsn()"><b>' + L('🔎 HSN कोड खोजें', '🔎 Find HSN code') + '</b><div class="mute" style="font-size:12.5px">' + L('अपने प्रोडक्ट का कोड और GST रेट ›', 'Your product\'s code and GST rate ›') + '</div></button></div>';
   html += '<div class="card" style="background:linear-gradient(135deg,#eef2ff,#f5f3ff)"><h3>' + L('🎁 दोस्तों को रेफर करें', '🎁 Refer your friends') + '</h3><div class="mute" style="margin:2px 0 8px">' + (st.refReward ? esc(st.refReward) : L('अपने व्यापारी दोस्तों को हमारे बारे में बताएँ', 'Tell your business friends about us')) + (st.referrals ? L(' • आपके ' + st.referrals + ' रेफरल जुड़ चुके 🎉', ' • ' + st.referrals + ' of your referrals have joined 🎉') : '') + '</div>' +
     '<div class="row" style="display:flex;gap:8px;align-items:center"><span class="pill FILED" style="font-size:14px;letter-spacing:1px">' + L('कोड: ', 'Code: ') + esc(st.refCode) + '</span><button class="btn sm" style="margin-left:auto" onclick="shareRef()">' + L('📲 WhatsApp पर भेजें', '📲 Send on WhatsApp') + '</button></div></div>';
 
@@ -436,15 +456,17 @@ function render() {
       '<label class="switch"><input type="checkbox" ' + (sm.data === 'NIL' ? 'checked' : '') + (locked ? ' disabled' : '') + ' onchange="setNil(this)"><i></i></label></div></div>';
   }
 
-  // platforms
-  if (sm.data !== 'NIL') {
-    var byPlat = {};
-    st.slots.forEach(function (s) { (byPlat[s.plat] = byPlat[s.plat] || []).push(s); });
-    Core.PLATFORM_ORDER.forEach(function (pk) {
-      if (!byPlat[pk]) return;
+  // platforms (purchase bills stay open after GSTR-1 and in a NIL period – until GSTR-3B is filed)
+  var byPlat = {};
+  st.slots.forEach(function (s) { (byPlat[s.plat] = byPlat[s.plat] || []).push(s); });
+  Core.PLATFORM_ORDER.forEach(function (pk) {
       var P = Core.PLATFORMS[pk], slots = byPlat[pk];
+      if (!slots || (sm.data === 'NIL' && !P.afterFiling)) return;
+      var locked = P.afterFiling ? !!(sm.filed && sm.filed.gstr3b) : filed;
       var done = slots.filter(function (s) { return !s.optional && filesOf(s.id).length; }).length, req = slots.filter(function (s) { return !s.optional; }).length;
-      html += '<div class="card plat" style="--pc:' + P.color + '"><div class="ph"><h2 style="margin:0">' + esc(Core.platLabel(pk)) + '</h2><span class="pill ' + (done >= req ? 'COMPLETE' : done ? 'PARTIAL' : 'NONE') + '">' + done + '/' + req + '</span></div>';
+      var pur = pk === 'purchase', np = pur ? filesOf(slots[0].id).length : 0;
+      html += '<div class="card plat" style="--pc:' + P.color + '"><div class="ph"><h2 style="margin:0">' + esc(Core.platLabel(pk)) + '</h2>' +
+        (pur ? (np ? '<button class="btn sec sm" onclick="purExcel()">' + L('📥 Excel', '📥 Excel') + '</button>' : '') + '<span class="pill ' + (np ? 'COMPLETE' : 'NONE') + '">' + np + L(' बिल', ' bills') + '</span>' : '<span class="pill ' + (done >= req ? 'COMPLETE' : done ? 'PARTIAL' : 'NONE') + '">' + done + '/' + req + '</span>') + '</div>';
       slots.forEach(function (s) {
         var fs = filesOf(s.id);
         html += '<div class="slot" id="slot-' + s.id.replace(/\./g, '_') + '"><div class="sr"><div class="tick' + (fs.length ? ' y' : '') + '">' + (fs.length ? '✓' : '•') + '</div>' +
@@ -452,14 +474,15 @@ function render() {
           (locked ? '' : '<button class="btn sm' + (fs.length ? ' sec' : '') + '" onclick="pickFor(\'' + s.id + '\')">' + (fs.length ? L('+ और', '+ More') : L('⬆ अपलोड', '⬆ Upload')) + '</button>') + '</div>' +
           '<div class="hint">' + esc(s.hint) + '</div>' +
           (fs.length ? '<div class="files">' + fs.map(function (f) {
-            return '<div class="file">📄<span>' + esc(f.name) + '</span><small class="mute">' + fmtSize(f.size) + '</small>' + (locked ? '' : '<button class="x" onclick="delFile(\'' + f.id + '\')" aria-label="Remove">✕</button>') + '</div>';
+            return '<div class="file">📄<span' + (pur ? ' style="white-space:normal;word-break:break-word"' : '') + '>' + esc(f.name) + (pur ? '<br><small class="mute">' + purLine(f.pur) + '</small>' : '') + '</span><small class="mute">' + fmtSize(f.size) + '</small>' +
+              (pur && !locked ? '<button class="btn ghost sm" style="padding:2px 6px" onclick="openPur(\'' + f.id + '\')">✏️</button>' : '') + (locked ? '' : '<button class="x" onclick="delFile(\'' + f.id + '\')" aria-label="Remove">✕</button>') + '</div>';
           }).join('') + '</div>' : '') + '</div>';
       });
       html += '</div>';
-    });
-  }
-  var more = Core.PLATFORM_ORDER.filter(function (k) { return c.platforms.indexOf(k) < 0; });
-  if (!locked && sm.data !== 'NIL' && more.length) {
+  });
+  // after GSTR-1 / in a NIL period only the purchase section can still be added
+  var more = Core.PLATFORM_ORDER.filter(function (k) { return c.platforms.indexOf(k) < 0 && (Core.PLATFORMS[k].afterFiling ? !(sm.filed && sm.filed.gstr3b) : !locked && sm.data !== 'NIL'); });
+  if (more.length) {
     html += '<div class="card"><h3>' + L('कुछ और भी भेजना है?', 'Anything else to send?') + '</h3><div class="mute" style="margin:2px 0 10px">' + L('ऑफलाइन बिल, Vyapar, हमारा GST टूल या कोई और फाइल – सेक्शन जोड़ें:', 'Offline bills, Vyapar, our GST tool or any other file – add a section:') + '</div><div class="pick">' +
       more.map(function (k) { return '<button class="btn sec sm" style="flex:1 1 45%" onclick="addPlatform(\'' + k + '\')">+ ' + esc(Core.platLabel(k)) + '</button>'; }).join('') + '</div></div>';
   }
@@ -476,6 +499,22 @@ function render() {
   if (S.tab !== 'home') renderTab(S.tab);
   updateDots();
   if (S.shareAuto && S.shared.length) { S.shareAuto = false; openShare(); }
+  else if (!S.feeShown && st.dues.length && !S.office) { S.feeShown = true; feePopup(); }   // once every time the app is opened
+}
+function feePopup() {
+  var dues = S.st.dues, total = dues.reduce(function (s, d) { return s + d.due; }, 0);
+  $('resultHead').textContent = L('💰 फीस बाकी: ', '💰 Fee pending: ') + rupee(total);
+  $('resultList').innerHTML = dues.map(function (d) { return '<div class="file" style="background:#fff7ed">💰<span><b>' + esc(d.label) + '</b></span><b>' + rupee(d.due) + '</b></div>'; }).join('') +
+    '<div class="mute" style="margin:10px 0">' + L('"फीस भरनी है" दबाएँ – हम WhatsApp पर QR कोड भेज देंगे. पेमेंट कर दिया हो तो होम पर "मैंने पेमेंट कर दिया" दबाएँ.', 'Tap "I want to pay" – we will send a QR code on WhatsApp. If you have already paid, tap "I have paid" on the home screen.') + '</div>' +
+    '<button class="btn block" onclick="closeSheet(sResult);wantPay(\'' + dues[0].pid + '\')">' + L('💬 फीस भरनी है – QR भेजें', '💬 I want to pay – send QR') + '</button>';
+  openSheet(sResult);
+}
+function wantPay(pid) {
+  var d = S.st.dues.filter(function (x) { return x.pid === pid; })[0], total = S.st.dues.reduce(function (s, x) { return s + x.due; }, 0);
+  var who = (S.st.client.fullName || S.st.client.trade) + ' (' + S.st.client.gstin + ')';
+  // WhatsApp opens inside the tap; the office dashboard is told in the background
+  window.open(waOffice(L('नमस्ते, मुझे फीस भरनी है – कुल ₹' + total + ' (' + S.st.dues.map(function (x) { return x.label + ': ₹' + x.due; }).join(', ') + '). कृपया QR कोड भेजें. – ', 'Hello, I want to pay my fee – total ₹' + total + ' (' + S.st.dues.map(function (x) { return x.label + ': ₹' + x.due; }).join(', ') + '). Please send the QR code. – ') + who), '_blank');
+  if (d) call('payRequest', { pid: pid }).catch(function () {});
 }
 function filesOf(slotId) { return S.st.files.filter(function (f) { return f.slot === slotId || (f.covers || []).indexOf(slotId) >= 0; }); }
 function toggleHint(b) { b.closest('.slot').classList.toggle('open'); }
@@ -555,7 +594,13 @@ function runUpload(groups) {
       busy(true, L('अपलोड ', 'Uploading ') + i + '/' + out.ok.length + ': ' + f.name);
       return API.fileToB64(f).then(function (b64) {
         return call('upload', { pid: pid, slot: p.slot.id, name: f.name, mime: f.type, b64: b64, ftype: p.it.type || '', fmonths: p.it.months || [], covers: p.covers, taxable: p.it.taxable == null ? '' : p.it.taxable });
-      }).then(function () { done.push(p); }, function (e) { out.bad.push({ name: f.name, why: e.message }); }).then(next);
+      }).then(function (d) {
+        done.push(p);
+        // purchase PDF: read supplier GSTIN / bill no / amounts from the text so the office gets them in the Excel
+        if (p.slot.plat !== 'purchase' || !d || !d.file) return;
+        busy(true, L('बिल पढ़ रहे हैं… ', 'Reading the bill… ') + f.name);
+        return Detect.readBill(f, S.st.client.gstin).then(function (pur) { if (pur) return call('purSave', { pid: pid, id: d.file.id, pur: pur, auto: 1 }); }).catch(function () {});
+      }, function (e) { out.bad.push({ name: f.name, why: e.message }); }).then(next);
     })();
   }).then(function (done) {
     showResult(done || [], out.bad, clicked);
@@ -734,15 +779,129 @@ function getFile(id) {
 function openDocs() {
   var st = S.st, req = (st.docReq && st.docReq.types) || [];
   var types = Object.keys(st.docTypes).sort(function (a, b) { return (req.indexOf(b) >= 0) - (req.indexOf(a) >= 0); });
+  var rets = st.returnsAll || [];
   $('docsBody').innerHTML = (req.length ? '<div class="miss" style="margin-top:0">⚠ <b>' + L('ऑफिस ने ये माँगे हैं:', 'The office has asked for:') + '</b> ' + req.map(function (t) { return esc(st.docTypes[t]); }).join(', ') + (st.docReq.note ? '<br>' + esc(st.docReq.note) : '') + '</div>' : '') +
-    '<div class="mute" style="margin:8px 0">' + L('आपके डॉक्यूमेंट सुरक्षित रहते हैं – सिर्फ आप और Vishal Accounting Services देख सकते हैं.', 'Your documents are kept safe – only you and Vishal Accounting Services can see them.') + '</div>' +
+    '<div class="mute" style="margin:8px 0">' + L('GST ऑफिसर आज-कल बहुत से डॉक्यूमेंट माँगते हैं. सब यहाँ रखें – ऑफिसर आए तो फोन से ही दिखा दें. आपके डॉक्यूमेंट सुरक्षित रहते हैं – सिर्फ आप और Vishal Accounting Services देख सकते हैं.', 'GST officers ask for many documents these days. Keep them all here and show them from your phone when an officer visits. Your documents are kept safe – only you and Vishal Accounting Services can see them.') + '</div>' +
+    '<button class="btn sec block" style="margin-bottom:8px" onclick="closeSheet(sDocs);openVisit()">' + L('👮 GST ऑफिसर विज़िट – चेकलिस्ट और सवाल-जवाब', '👮 GST officer visit – checklist and Q&A') + '</button>' +
+    '<h3 style="margin:14px 0 4px">' + L('📄 GST रिटर्न रिपोर्ट (GSTR-3B / GSTR-1)', '📄 GST return reports (GSTR-3B / GSTR-1)') + '</h3>' +
+    (rets.length ? rets.map(function (r) { return '<div class="file" style="margin-top:6px">📄<span>' + esc(r.label) + ' • ' + esc(r.kind === 'GSTR3B' ? 'GSTR-3B' : r.kind === 'GSTR1' ? 'GSTR-1' : '') + ' ' + esc(r.name) + '</span><button class="x" style="color:var(--pri)" onclick="getFile(\'' + r.id + '\')">⬇</button></div>'; }).join('')
+      : '<div class="mute">' + L('रिटर्न फाइल होते ही ऑफिस यहाँ PDF भेज देगा.', 'The office sends the PDF here as soon as a return is filed.') + '</div>') +
+    '<h3 style="margin:16px 0 4px">' + L('🪪 डॉक्यूमेंट', '🪪 Documents') + '</h3>' +
     types.map(function (t) {
       var have = st.docs.filter(function (d) { return d.type === t; }), want = req.indexOf(t) >= 0;
       return '<div class="slot"><div class="sr"><div class="tick' + (have.length ? ' y' : '') + '">' + (have.length ? '✓' : want ? '!' : '•') + '</div><div class="nm"' + (want ? ' style="color:var(--warn)"' : '') + '>' + esc(st.docTypes[t]) + '</div>' +
         '<button class="btn sm' + (have.length ? ' sec' : '') + '" onclick="pickDoc(\'' + t + '\')">' + (have.length ? L('+ और', '+ More') : L('⬆ अपलोड', '⬆ Upload')) + '</button></div>' +
-        (have.length ? '<div class="files">' + have.map(function (d) { return '<div class="file">📄<span>' + esc(d.name) + '</span><button class="x" style="color:var(--pri)" onclick="getFile(\'' + d.id + '\')">⬇</button><button class="x" onclick="delDoc(\'' + d.id + '\')">✕</button></div>'; }).join('') + '</div>' : '') + '</div>';
+        (have.length ? '<div class="files">' + have.map(function (d) { return '<div class="file">📄<span>' + esc(d.name) + (d.by === 'office' ? ' <small class="pill FILED">' + L('ऑफिस से', 'from office') + '</small>' : '') + '</span><button class="x" style="color:var(--pri)" onclick="getFile(\'' + d.id + '\')">⬇</button>' + (d.by === 'office' ? '' : '<button class="x" onclick="delDoc(\'' + d.id + '\')">✕</button>') + '</div>'; }).join('') + '</div>' : '') + '</div>';
     }).join('');
   openSheet(sDocs);
+}
+
+/* ---------- GST officer visit: what must be on display / in hand, ticked from the vault ---------- */
+function visitList() {
+  return [
+    ['shop', null, L('दुकान / ऑफिस के बाहर बोर्ड – फर्म का नाम (ट्रेड नाम) और GSTIN साफ लिखा हो', 'A board outside the shop / office – firm (trade) name and GSTIN clearly written')],
+    ['shop', null, L('GST सर्टिफिकेट (REG-06) दुकान में ऐसी जगह लगा हो जहाँ सबको दिखे – हर ब्रांच / गोदाम में भी', 'GST certificate (REG-06) displayed where everyone can see it – at every branch / godown too')],
+    ['shop', null, L('जो माल बेचते हैं उसका थोड़ा स्टॉक / प्रोडक्ट वहाँ मौजूद हो (सर्विस है तो काम की जगह दिखे)', 'Some stock of what you sell should be there (for services, the work place should be visible)')],
+    ['shop', null, L('बिल बुक या बिलिंग सॉफ्टवेयर, और खरीद-बिक्री / स्टॉक का हिसाब उसी पते पर', 'Bill book or billing software, and purchase / sale / stock records at the same address')],
+    ['doc', 'gst_cert', ''], ['doc', 'aadhaar', ''], ['doc', 'pan', ''], ['doc', 'rent', ''], ['doc', 'noc', ''], ['doc', 'elec', ''],
+    ['doc', 'photo', ''], ['doc', 'bank', ''], ['doc', 'shop_photo', ''],
+    ['ret', null, L('पिछले GSTR-3B / GSTR-1 की कॉपी', 'Copies of recent GSTR-3B / GSTR-1')],
+    ['pur', null, L('खरीद बिल (इस ऐप में "खरीद बिल" सेक्शन में डालें)', 'Purchase bills (put them in this app\'s "Purchase bills" section)')]
+  ];
+}
+function visitScore() {
+  var st = S.st, have = 0, total = 0;
+  visitList().forEach(function (x) {
+    if (x[0] === 'shop') return;
+    total++;
+    if (x[0] === 'doc' ? st.docs.some(function (d) { return d.type === x[1]; }) : x[0] === 'ret' ? (st.returnsAll || []).length : st.files.some(function (f) { return f.slot.indexOf('purchase.') === 0; })) have++;
+  });
+  return { have: have, total: total };
+}
+var VISIT_QA = [
+  ['GST ऑफिसर क्यों आता है?', 'Why does a GST officer visit?',
+    'ज़्यादातर नए रजिस्ट्रेशन या पते की जाँच (physical verification) के लिए – ये देखने कि बिज़नेस सच में उसी पते पर चल रहा है. रिटर्न या ITC में कुछ गड़बड़ लगे तब भी जाँच हो सकती है.',
+    'Mostly to verify a new registration or the address (physical verification) – to see that the business really runs at that address. A check can also happen if something looks wrong in returns or ITC.'],
+  ['ऑफिसर आए तो सबसे पहले क्या करें?', 'What should I do first when an officer comes?',
+    'घबराएँ नहीं, इज़्ज़त से बात करें. उनका ID कार्ड देखें – जाँच / तलाशी हो तो लिखित ऑथराइज़ेशन (INS-01) भी. तुरंत हमें फोन / WhatsApp करें. जो डॉक्यूमेंट माँगें, इसी ऐप से दिखा दें.',
+    'Stay calm and be polite. Check their ID card – for an inspection / search also the written authorisation (INS-01). Call / WhatsApp us right away. Show the documents they ask for from this app.'],
+  ['किसी कागज़ पर साइन करना पड़े तो?', 'What if I am asked to sign something?',
+    'बिना पढ़े और बिना हमसे बात किए किसी बयान या कागज़ पर साइन न करें. जो कागज़ या माल ले जाएँ उसकी लिस्ट / रसीद ज़रूर लें.',
+    'Do not sign any statement or paper without reading it and talking to us. Always take a list / receipt of any papers or goods they take.'],
+  ['बोर्ड पर क्या लिखा होना चाहिए?', 'What should the board show?',
+    'फर्म का नाम और GSTIN. नियम के हिसाब से (CGST Rule 18) GSTIN बोर्ड पर और GST सर्टिफिकेट दुकान में दिखना ज़रूरी है.',
+    'The firm name and GSTIN. By the rules (CGST Rule 18) the GSTIN must be on the board and the GST certificate must be displayed in the shop.'],
+  ['जगह किराये की है या रिश्तेदार की?', 'The place is rented, or belongs to a relative?',
+    'किराये की: रेंट एग्रीमेंट + मालिक का बिजली बिल. रिश्तेदार / बिना किराये: मालिक का NOC (सहमति पत्र) + बिजली बिल या प्रॉपर्टी टैक्स रसीद. ये सब तिजोरी में डाल दें.',
+    'Rented: rent agreement + the owner\'s electricity bill. Relative / no rent: the owner\'s NOC (consent letter) + electricity bill or property tax receipt. Put them all in the vault.'],
+  ['ये सब तैयार न हो तो क्या होगा?', 'What if these are not ready?',
+    'पता सही न मिलने पर रजिस्ट्रेशन रद्द (cancel) करने का नोटिस आ सकता है या पेनल्टी लग सकती है. इसलिए पहले से तैयार रखें – कुछ कम हो तो हमें बताएँ.',
+    'If the address does not check out, a notice to cancel the registration or a penalty can follow. So keep everything ready in advance – tell us if something is missing.'],
+  ['कितने साल का रिकॉर्ड रखना है?', 'How many years of records must I keep?',
+    'GST में बिल और हिसाब कम से कम 6 साल (उस साल के सालाना रिटर्न की तारीख से 72 महीने) रखने होते हैं. ऐप की कॉपी के साथ अपनी कॉपी भी रखें.',
+    'GST bills and accounts must be kept for at least 6 years (72 months from the due date of that year\'s annual return). Keep your own copy as well as the app\'s.']
+];
+function openVisit() {
+  var st = S.st, vs = visitScore(), sec = { shop: L('🏪 दुकान / ऑफिस पर दिखना चाहिए', '🏪 Must be visible at the shop / office'), doc: L('📂 डॉक्यूमेंट (फाइल में भी, ऐप में भी)', '📂 Documents (on paper and in the app)') }, last = '';
+  var h = '<div class="banner" style="background:#ecfdf5;color:#065f46;margin-top:0"><span class="grow">' + L('आपकी तैयारी: <b>' + vs.have + '/' + vs.total + '</b> डॉक्यूमेंट ऐप में हैं', 'You are ready with <b>' + vs.have + '/' + vs.total + '</b> documents in the app') + '</span></div>';
+  visitList().forEach(function (x) {
+    var head = x[0] === 'shop' ? 'shop' : 'doc';
+    if (head !== last) { h += '<h3 style="margin:14px 0 4px">' + sec[head] + '</h3>'; last = head; }
+    var ok = x[0] === 'doc' ? st.docs.some(function (d) { return d.type === x[1]; }) : x[0] === 'ret' ? (st.returnsAll || []).length > 0 : x[0] === 'pur' ? st.files.some(function (f) { return f.slot.indexOf('purchase.') === 0; }) : null;
+    var txt = x[0] === 'doc' ? st.docTypes[x[1]] : x[2];
+    h += '<div class="slot"><div class="sr"><div class="tick' + (ok ? ' y' : '') + '">' + (ok ? '✓' : ok === null ? '☐' : '•') + '</div><div class="nm" style="font-weight:500">' + esc(txt) + '</div>' +
+      (x[0] === 'doc' && !ok ? '<button class="btn sm" onclick="closeSheet(sVisit);openDocs();pickDoc(\'' + x[1] + '\')">' + L('⬆ डालें', '⬆ Add') + '</button>' : '') + '</div></div>';
+  });
+  h += '<h3 style="margin:16px 0 4px">' + L('❓ सवाल-जवाब', '❓ Questions and answers') + '</h3>' +
+    VISIT_QA.map(function (q) { return '<details class="faq"><summary><span>👮</span><span>' + esc(L(q[0], q[1])) + '</span></summary><div>' + esc(L(q[2], q[3])) + '</div></details>'; }).join('') +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><a class="btn" style="flex:1" target="_blank" rel="noopener" href="' + waOffice(L('🚨 नमस्ते, मेरी दुकान पर GST ऑफिसर आए हैं. – ', '🚨 Hello, a GST officer has come to my shop. – ') + (st.client.fullName || st.client.trade) + ' (' + st.client.gstin + ')') + '">' + L('📞 ऑफिसर आए हैं – ऑफिस को बताएँ', '📞 Officer is here – tell the office') + '</a>' +
+    '<button class="btn sec" style="flex:1" onclick="closeSheet(sVisit);openDocs()">' + L('📁 डॉक्यूमेंट दिखाएँ', '📁 Show documents') + '</button></div>';
+  $('visitBody').innerHTML = h;
+  openSheet(sVisit);
+}
+
+/* ---------- HSN / SAC search: opens the official GST portal in the client's own browser (no embedding, no scraping) ---------- */
+var HSN_URL = 'https://services.gst.gov.in/services/searchhsnsac', RATE_URL = 'https://cbic-gst.gov.in/gst-goods-services-rates.html';
+function openHsn() {
+  $('hsnBody').innerHTML = '<div class="mute" style="margin:0 0 10px">' + L('हर सामान का HSN और हर सर्विस का SAC कोड होता है. बिल और GSTR-1 में ये कोड डालना ज़रूरी है – उसी से GST रेट भी तय होता है.', 'Every product has an HSN code and every service a SAC code. It must be on your bills and in GSTR-1 – it also decides the GST rate.') + '</div>' +
+    '<a class="btn block" target="_blank" rel="noopener" href="' + HSN_URL + '">' + L('🔎 GST पोर्टल पर HSN / SAC खोजें ↗', '🔎 Search HSN / SAC on the GST portal ↗') + '</a>' +
+    '<a class="btn sec block" style="margin-top:8px" target="_blank" rel="noopener" href="' + RATE_URL + '">' + L('📊 GST रेट देखें (CBIC – सरकारी साइट) ↗', '📊 See GST rates (CBIC – government site) ↗') + '</a>' +
+    '<div class="card" style="margin-top:12px;background:#f8fafc"><b>' + L('कैसे खोजें?', 'How to search?') + '</b><div class="mute" style="white-space:pre-line;margin-top:4px">' +
+    L('1. ऊपर वाला बटन दबाएँ – सरकारी GST पोर्टल खुलेगा (लॉगिन नहीं चाहिए).\n2. "HSN" या सर्विस के लिए "SAC" चुनें.\n3. प्रोडक्ट का नाम अंग्रेज़ी में लिखें – जैसे saree, mobile cover, LED bulb.\n4. लिस्ट में से अपने प्रोडक्ट से मिलता कोड चुनें.',
+      '1. Tap the button above – the government GST portal opens (no login needed).\n2. Choose "HSN", or "SAC" for a service.\n3. Type the product name in English – e.g. saree, mobile cover, LED bulb.\n4. Pick the code that matches your product from the list.') + '</div></div>' +
+    '<div class="miss">' + L('टर्नओवर ₹5 करोड़ तक: B2B बिल में कम से कम 4 अंक का HSN. ₹5 करोड़ से ऊपर: हर बिल में 6 अंक. गलत कोड से गलत रेट लग सकता है – शक हो तो हमसे पूछें.', 'Turnover up to ₹5 crore: at least a 4-digit HSN on B2B bills. Above ₹5 crore: 6 digits on every bill. A wrong code can mean a wrong rate – ask us if unsure.') + '</div>' +
+    '<label class="f">' + L('कोड नहीं मिला? प्रोडक्ट का नाम लिखें, हम बता देंगे:', 'Could not find it? Write the product name and we will tell you:') + '</label>' +
+    '<div style="display:flex;gap:8px"><input class="i" id="hsnQ" style="flex:1" placeholder="' + L('जैसे: कॉटन साड़ी, मोबाइल कवर', 'e.g. cotton saree, mobile cover') + '"><button class="btn" onclick="askHsn()">' + L('💬 पूछें', '💬 Ask') + '</button></div>';
+  openSheet(sHsn);
+}
+function askHsn() {
+  var q = $('hsnQ').value.trim(); if (!q) return toast(L('प्रोडक्ट का नाम लिखें', 'Write the product name'));
+  window.open(waOffice(L('नमस्ते, इस प्रोडक्ट का HSN कोड और GST रेट बताइए: ', 'Hello, please tell me the HSN code and GST rate for: ') + q + ' – ' + (S.st.client.fullName || S.st.client.trade) + ' (' + S.st.client.gstin + ')'), '_blank');
+}
+
+/* ---------- purchase bill details + Excel ---------- */
+function purLine(p) {
+  if (!p) return L('डिटेल बाकी – ✏️ दबाकर भरें (या ऑफिस भरेगा)', 'Details pending – tap ✏️ to fill (or the office will)');
+  return esc([p.gstin, p.inv && L('बिल ', 'Bill ') + p.inv, p.date && p.date.split('-').reverse().join('-'), p.total != null && rupee(p.total)].filter(Boolean).join(' • ')) + (p.by === 'auto' ? ' <span style="color:var(--warn)">' + L('(ऐप ने पढ़ा – जाँचें)', '(read by app – check)') + '</span>' : '');
+}
+function openPur(id) {
+  var f = S.st.files.filter(function (x) { return x.id === id; })[0]; if (!f) return;
+  var p = f.pur || {}, fld = function (k, hi, en, type) { return '<label class="f">' + L(hi, en) + '</label><input class="i" id="pu_' + k + '" type="' + (type || 'text') + '"' + (type === 'number' ? ' step="0.01" inputmode="decimal"' : '') + ' value="' + esc(p[k] == null ? '' : p[k]) + '">'; };
+  $('purBody').innerHTML = '<div class="mute">📄 ' + esc(f.name) + '</div>' + (p.by === 'auto' ? '<div class="miss">' + L('ये डिटेल ऐप ने PDF से अंदाज़ से पढ़ी हैं – बिल से मिलाकर ठीक करें और सेव करें.', 'The app guessed these details from the PDF – check them against the bill and save.') + '</div>' : '') +
+    fld('gstin', 'सप्लायर का GSTIN', 'Supplier GSTIN') + fld('party', 'सप्लायर का नाम', 'Supplier name') + fld('inv', 'बिल नंबर', 'Bill number') + fld('date', 'बिल की तारीख', 'Bill date', 'date') +
+    fld('taxable', 'Taxable राशि ₹', 'Taxable amount ₹', 'number') + fld('igst', 'IGST ₹', 'IGST ₹', 'number') + fld('cgst', 'CGST ₹', 'CGST ₹', 'number') + fld('sgst', 'SGST ₹', 'SGST ₹', 'number') + fld('total', 'बिल की कुल राशि ₹', 'Bill total ₹', 'number') +
+    '<button class="btn block ok" style="margin-top:14px" onclick="savePur(\'' + id + '\')">' + L('✔ सेव करें', '✔ Save') + '</button>';
+  openSheet(sPur);
+}
+function savePur(id) {
+  var pur = {}; ['gstin', 'party', 'inv', 'date', 'taxable', 'igst', 'cgst', 'sgst', 'total'].forEach(function (k) { pur[k] = $('pu_' + k).value.trim(); });
+  if (pur.gstin && !Core.gstinValid(pur.gstin.toUpperCase())) return toast(L('सप्लायर का GSTIN सही नहीं लग रहा', 'The supplier GSTIN does not look right'));
+  busy(true);
+  call('purSave', { pid: S.pid, id: id, pur: pur }).then(function () { closeSheet(sPur); toast(L('सेव ✓', 'Saved ✓')); return load(S.pid, true); }).catch(function (e) { toast(e.message, 4000); }).finally(function () { busy(false); });
+}
+function purExcel() {
+  var rows = S.st.files.filter(function (f) { return f.slot.indexOf('purchase.') === 0; }).map(function (f) { return { pur: f.pur, name: f.name, label: S.st.summary.label }; });
+  Detect.purchaseXlsx(rows, 'Purchase_' + S.st.client.gstin + '_' + S.pid + '.xlsx', (S.st.client.fullName || S.st.client.trade) + ' – ' + S.st.client.gstin + ' – Purchase bills ' + S.st.summary.label).catch(function (e) { toast(e.message, 4000); });
 }
 function pickDoc(t) { S.docType = t; var p = $('docPick'); p.value = ''; p.click(); }
 function docChosen(inp) {
@@ -795,6 +954,7 @@ function updateDots() {
 function renderTab(t) {
   var list = itemsOf(t), th = tabHead(t), h = '<div style="padding:14px 2px 4px"><h2 style="margin:0">' + th[0] + '</h2><div class="mute">' + th[1] + '</div></div>';
   if (t === 'faq') {
+    h += '<div class="pick" style="margin:8px 0"><button class="btn sec" style="flex:1 1 45%" onclick="openHsn()">' + L('🔎 HSN कोड खोजें', '🔎 Find HSN code') + '</button><button class="btn sec" style="flex:1 1 45%" onclick="openVisit()">' + L('👮 GST ऑफिसर आए तो', '👮 If a GST officer visits') + '</button></div>';
     h += list.map(function (x) { return '<details class="faq"><summary><span>' + esc(x.icon || '❔') + '</span><span>' + esc(x.title) + '</span></summary><div>' + esc(x.body) + '</div></details>'; }).join('');
     h += '<div class="card" style="text-align:center"><b>' + L('जवाब नहीं मिला?', 'Did not find your answer?') + '</b><div class="mute" style="margin:4px 0 10px">' + L('हमें सीधे WhatsApp करें', 'WhatsApp us directly') + '</div><a class="btn" target="_blank" rel="noopener" href="' + waOffice(L('नमस्ते, मुझे ऐप के बारे में एक सवाल पूछना है:', 'Hello, I have a question about the app:')) + '">' + L('💬 WhatsApp करें', '💬 WhatsApp us') + '</a></div>';
   } else if (t === 'service') {
@@ -930,8 +1090,15 @@ if (API.DEMO) $('demoNote').classList.remove('hide');
   r = r || store('vas_ref') || '';
   if (r) { $('rRef').value = r; authTab('reg'); }
 })();
-S.sessions = store('vas_sessions') || [];
-var act = store('vas_active');
+// office mode: the dashboard opens …/index.html#as={session} – this tab only, nothing saved on this browser
+(function () {
+  var m = /^#as=(.+)$/.exec(location.hash);
+  if (!m) return;
+  try { S.office = JSON.parse(decodeURIComponent(m[1])); } catch (e) {}
+  history.replaceState(null, '', location.pathname);
+})();
+S.sessions = S.office && S.office.token ? [S.office] : store('vas_sessions') || [];
+var act = S.office ? S.office.gstin : store('vas_active');
 S.active = S.sessions.filter(function (s) { return s.gstin === act; })[0] || S.sessions[0] || null;
 route();
 // opened from the phone's share sheet (…/index.html?share=1) or a share left over from earlier
