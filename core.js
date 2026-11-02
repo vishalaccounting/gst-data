@@ -5,7 +5,7 @@
    No DOM, no async, no modules – plain ES2019.
    ============================================================ */
 var Core = (function () {
-  var VERSION = '1.8.0';
+  var VERSION = '1.9.0';
 
   /* ---------- language: client picks हिंदी or English (q.lang per request, c.lang for notifications).
      T(hi, en) returns the text for the current LANG. The office / admin side always stays Hindi. ---------- */
@@ -1128,9 +1128,31 @@ var Core = (function () {
         ['How do I send a report I got on WhatsApp?', 'In WhatsApp, press and hold the file → Share → choose "Vishal GST". The app opens; Meesho / Amazon / Flipkart reports go to the right box by themselves, for other files pick the box and tap Upload. (Android phones)'])
     ];
   }
+  // v1.9: our own low-price e-commerce guides (PDF / Excel in H:\vishal gst\LEARNING PRODUCTS). "Buy" = WhatsApp → office sends QR → office sends the file.
+  function learnSeed() {
+    var t = '2026-11-02T00:00:0', n = 0;
+    function it(id, icon, title, body, price, en) {
+      n++;
+      return { id: 'learn-' + id, kind: 'learn', icon: icon, title: title, body: body, img: '', price: price, partner: 'Vishal Accounting', cta: 'खरीदें – ' + price, link: '', pinned: n === 1, active: true, order: n,
+        at: t + (6 - n) + '.000Z', titleEn: en[0], bodyEn: en[1], ctaEn: 'Buy – ' + price, priceEn: price };
+    }
+    return [
+      it('meesho', '🛍️', 'Meesho पर सुपरफ़ास्ट लिस्टिंग (PDF गाइड)', 'अकाउंट बनाने से लेकर पहला प्रोडक्ट लाइव होने तक – एक-एक स्टेप आसान हिंदी में. Single catalog, Excel से bulk upload, QC रिजेक्ट से कैसे बचें, फोटो-कीमत-वज़न की गलतियाँ और चेकलिस्ट.', '₹21',
+        ['Super-fast listing on Meesho (PDF guide)', 'From creating the account to your first live product – every step in simple Hindi. Single catalog, bulk upload with Excel, avoiding QC rejection, photo / price / weight mistakes and a checklist.']),
+      it('profit', '🧮', 'Profit Calculator – Meesho / Amazon / Flipkart (Excel)', 'एक ही प्रोडक्ट का तीनों प्लेटफॉर्म पर असली मुनाफ़ा – कमीशन, शिपिंग, फीस पर GST, रिटर्न का नुकसान और ऐड खर्च घटाकर. साथ में "इतनी कीमत रखें" वाला खाना और रिटर्न क्लेम रजिस्टर.', '₹29',
+        ['Profit calculator – Meesho / Amazon / Flipkart (Excel)', 'Real profit of one product on all three platforms – after commission, shipping, GST on fees, return losses and ad spend. Includes a "keep at least this price" box and a return-claim register.']),
+      it('amazon', '📦', 'Amazon पर लिस्टिंग कैसे करें (PDF गाइड)', 'Seller Central अकाउंट, पहले से बिक रहे प्रोडक्ट पर बेचना, अपना नया प्रोडक्ट और GTIN छूट, टाइटल-बुलेट-फोटो का फ़ॉर्मूला, फीस का हिसाब और आम गलतियाँ.', '₹21',
+        ['How to list on Amazon (PDF guide)', 'Seller Central account, selling on an existing listing, creating your own product and GTIN exemption, the title / bullet / photo formula, fees and common mistakes.']),
+      it('flipkart', '🛒', 'Flipkart पर लिस्टिंग कैसे करें (PDF गाइड)', 'Seller Hub रजिस्ट्रेशन, single और Excel से bulk listing, Brand approval, वज़न-नाप की सही सेटिंग, फीस का हिसाब और चेकलिस्ट.', '₹21',
+        ['How to list on Flipkart (PDF guide)', 'Seller Hub registration, single and Excel bulk listing, brand approval, correct weight / size settings, fees and a checklist.']),
+      it('claim', '↩️', 'गलत रिटर्न का क्लेम कैसे डालें (PDF गाइड)', 'खाली डिब्बा, पुराना / नकली / टूटा माल लौटा? Unboxing वीडियो के 7 नियम, Meesho टिकट, Amazon SAFE-T और Flipkart SPF क्लेम – हर स्टेप, तैयार मैसेज के साथ.', '₹21',
+        ['How to claim for a wrong return (PDF guide)', 'Empty box, old / fake / damaged item returned? 7 rules for the unboxing video, Meesho ticket, Amazon SAFE-T and Flipkart SPF claims – every step, with ready messages.'])
+    ];
+  }
   function ensure(db) {
     if (!db.content) db.content = seedContent();
     if (!db.leads) db.leads = [];
+    if (!db.meta.learn1) { db.meta.learn1 = 1; learnSeed().forEach(function (s) { if (!db.content.some(function (i) { return i.id === s.id; })) db.content.push(s); }); }
     // v1.6: give the default items their English text (only if the office has not edited the Hindi), and add new default FAQs
     if (!db.meta.seedEn) {
       db.meta.seedEn = 1;

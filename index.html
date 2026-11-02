@@ -942,7 +942,7 @@ function shareRef() {
 S.tab = 'home';
 function tabHead(t) {
   return {
-    learn: [L('🎓 सीखें और ऑफर', '🎓 Learn and offers'), L('E-commerce कोर्स, बिज़नेस आइडिया और खास ऑफर – हमारे पार्टनर्स के साथ.', 'E-commerce courses, business ideas and special offers – with our partners.')],
+    learn: [L('🎓 सीखें और ऑफर', '🎓 Learn and offers'), L('Meesho, Amazon, Flipkart पर बेचना सीखें – छोटी कीमत की आसान हिंदी गाइड, कैलकुलेटर और खास ऑफर.', 'Learn to sell on Meesho, Amazon, Flipkart – low-price simple guides, calculators and special offers.')],
     news: [L('📰 GST और E-commerce न्यूज़', '📰 GST and e-commerce news'), L('नए नियम, रेट में बदलाव और सेलर्स के लिए ज़रूरी अपडेट.', 'New rules, rate changes and important updates for sellers.')],
     service: [L('💼 हमारी सेवाएँ', '💼 Our services'), L('Vishal Accounting Services से ये सब काम करवाएँ – एक टैप में पूछताछ करें.', 'Get all this done by Vishal Accounting Services – enquire with one tap.')],
     faq: [L('❓ मदद – सवाल-जवाब', '❓ Help – questions and answers'), L('ऐप इस्तेमाल करने से जुड़े आम सवाल.', 'Common questions about using the app.')]
@@ -990,9 +990,14 @@ function waOffice(text) { return 'https://wa.me/91' + ((S.st && S.st.settings.ph
 function askLead(id) {
   var x = ((S.st && S.st.content) || []).filter(function (i) { return i.id === id; })[0]; if (!x) return;
   // open first (inside the tap so the browser allows it), tell the office in the background
-  var who = S.st.client.fullName || S.st.client.trade;
-  window.open(x.link || waOffice(L('नमस्ते, मुझे "' + x.title + '" के बारे में जानकारी चाहिए. – ', 'Hello, I would like to know about "' + x.title + '". – ') + who + ' (' + S.st.client.gstin + ')'), '_blank');
-  call('lead', { id: id }).then(function () { toast(L('धन्यवाद! हमारी टीम आपसे संपर्क करेगी 🙏', 'Thank you! Our team will contact you 🙏'), 3500); }).catch(function () {});
+  var who = S.st.client.fullName || S.st.client.trade, buy = x.kind === 'learn' && x.price && !x.link;
+  // our own guides: the WhatsApp asks for the payment QR; the office sends the file after payment
+  var msg = buy ? L('नमस्ते, मुझे "' + x.title + '" (' + x.price + ') खरीदना है. कृपया पेमेंट का QR भेजें. – ', 'Hello, I want to buy "' + x.title + '" (' + x.price + '). Please send the payment QR. – ')
+    : L('नमस्ते, मुझे "' + x.title + '" के बारे में जानकारी चाहिए. – ', 'Hello, I would like to know about "' + x.title + '". – ');
+  window.open(x.link || waOffice(msg + who + ' (' + S.st.client.gstin + ')'), '_blank');
+  call('lead', { id: id }).then(function () {
+    toast(buy ? L('QR मिलते ही पेमेंट करें – फ़ाइल आपको WhatsApp पर मिल जाएगी 🙏', 'Pay when you get the QR – the file comes to you on WhatsApp 🙏') : L('धन्यवाद! हमारी टीम आपसे संपर्क करेगी 🙏', 'Thank you! Our team will contact you 🙏'), 4000);
+  }).catch(function () {});
 }
 
 /* ---------- inbox / profile ---------- */
