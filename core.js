@@ -5,7 +5,7 @@
    No DOM, no async, no modules – plain ES2019.
    ============================================================ */
 var Core = (function () {
-  var VERSION = '1.10.0';
+  var VERSION = '1.10.1';
 
   /* ---------- language: client picks हिंदी or English (q.lang per request, c.lang for notifications).
      T(hi, en) returns the text for the current LANG. The office / admin side always stays Hindi. ---------- */
@@ -63,16 +63,13 @@ var Core = (function () {
           hintEn: 'Seller Hub → Reports → Tax Reports → GST Report (the GSTR-1 & GSTR-8 one), choose the month.' }
       ]
     },
-    // no sample report yet, so there is no detect: rule – any Excel / CSV / PDF is taken (other marketplaces' reports are still refused)
+    // v1.10.1: real sample (S8ca84_OCT_2026_….xlsx) – ONE monthly file with GSTR-1 sheets + GSTR-8 TCS sheet, detected as SNAP_GST
     snapdeal: {
       label: 'Snapdeal', group: 'online', color: '#e40046',
       reports: [
-        { key: 'sales', name: 'Sales / GST Report', perMonth: true, unzip: true, accept: '.xlsx,.xls,.csv,.pdf,.zip',
-          hint: 'Snapdeal Seller Panel से इस महीने की Sales / GST रिपोर्ट डाउनलोड करके यहाँ डालें. ZIP आई हो तो वैसे ही डाल दें.',
-          hintEn: 'Download this month\'s Sales / GST report from the Snapdeal Seller Panel and upload it here. If it came as a ZIP, upload it as it is.' },
-        { key: 'tcs', name: 'TCS Report', perMonth: true, optional: true, unzip: true, accept: '.xlsx,.xls,.csv,.pdf,.zip',
-          hint: 'Snapdeal Seller Panel से इस महीने की TCS रिपोर्ट (अगर मिलती हो).',
-          hintEn: 'This month\'s TCS report from the Snapdeal Seller Panel (if you get one).' }
+        { key: 'sales', name: 'GST Report (GSTR-1 + GSTR-8)', perMonth: true, accept: '.xlsx,.xls,.zip', detect: 'SNAP_GST',
+          hint: 'Snapdeal Seller Panel से इस महीने की GSTR-1 / GSTR-8 रिपोर्ट (Excel, नाम जैसे S…_OCT_2026_….xlsx) डाउनलोड करके डालें. इसी एक फाइल में Sale, Return और TCS सब है.',
+          hintEn: 'Download this month\'s GSTR-1 / GSTR-8 report (Excel, named like S…_OCT_2026_….xlsx) from the Snapdeal Seller Panel and upload it. Sale, return and TCS are all in this one file.' }
       ]
     },
     vyapar: {

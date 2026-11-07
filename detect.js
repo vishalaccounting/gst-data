@@ -16,7 +16,8 @@ var Detect = (function () {
     AMZ_B2B: ['amazon', 'mtr_b2b', 'Amazon – MTR B2B'],
     AMZ_GSTR1: ['amazon', 'gstr1', 'Amazon – GSTR-1 (monthly GST) Report'],
     FK_SALES: ['flipkart', 'sales', 'Flipkart – Sales Report'],
-    FK_GST: ['flipkart', 'gst', 'Flipkart – GSTR Return Report']
+    FK_GST: ['flipkart', 'gst', 'Flipkart – GSTR Return Report'],
+    SNAP_GST: ['snapdeal', 'sales', 'Snapdeal – GSTR-1 / GSTR-8 Report']
   };
 
   var loading = {};
@@ -97,11 +98,21 @@ var Detect = (function () {
     }
     m = /(\d{4})-(\d{2})-\d{2}_TO_(\d{4})-(\d{2})-\d{2}/.exec(u);
     if (m && m[1] + m[2] === m[3] + m[4]) return [m[1] + '-' + m[2]];
+    // Snapdeal: S8ca84_OCT_2026_11540101_445751.xlsx
+    m = /(?:^|[_\-\s])(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]*[_\-\s](\d{4})(?:[_\-\s.]|$)/.exec(u);
+    if (m) return [mid(+m[2], MONTHS.map(function (x) { return x.slice(0, 3); }).indexOf(m[1]) + 1)];
     return [];
   }
+  function sheetNamed(sheets, re) { return sheets.filter(function (s) { return re.test(s.name); })[0]; }
 
   function classify(name, sheets) {
     var names = sheets.map(function (s) { return s.name; });
+    // Snapdeal's monthly report uses the same "Section … in GSTR-1/8" sheet names as Flipkart, so check it first
+    if (sheets.some(function (s) { return s.head.some(function (h) { return /snapdeal/.test(h); }); })) {
+      var g8 = sheetNamed(sheets, /in GSTR-8$/i), b2cl = sheetNamed(sheets, /^Section 5B/i);
+      var sm = nameMonths(name)[0] || (b2cl ? colMonth(b2cl, 'order invoice date') : '');
+      return { type: 'SNAP_GST', months: sm ? [sm] : [], taxable: g8 ? colSum(g8, 'net taxable value') : null };
+    }
     if (names.some(function (n) { return /^Section .* in GSTR-(1|8)$/i.test(n); })) return { type: 'FK_GST', months: nameMonths(name) };
     if (names.indexOf('B2C Small') >= 0 && names.indexOf('HSN Summary') >= 0) return { type: 'AMZ_GSTR1', months: nameMonths(name) };
     for (var i = 0; i < sheets.length; i++) {
