@@ -1,7 +1,7 @@
 /* Service worker: offline shell + auto-update + (optional) Firebase push.
    Network-first: whenever the phone is online it loads the newest files from GitHub Pages,
    so every push to GitHub reaches all clients automatically. Bump CACHE on each release. */
-var CACHE = 'vas-gst-1.9.0';
+var CACHE = 'vas-gst-1.10.0';
 var SHARE = 'vas-share';   // files shared to the app (WhatsApp → Share → Vishal GST), read by index.html
 var SHELL = ['./', 'index.html', 'core.js', 'api.js', 'detect.js', 'config.js', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 

@@ -5,7 +5,7 @@
    No DOM, no async, no modules – plain ES2019.
    ============================================================ */
 var Core = (function () {
-  var VERSION = '1.9.0';
+  var VERSION = '1.10.0';
 
   /* ---------- language: client picks हिंदी or English (q.lang per request, c.lang for notifications).
      T(hi, en) returns the text for the current LANG. The office / admin side always stays Hindi. ---------- */
@@ -18,10 +18,14 @@ var Core = (function () {
   /* ---------- Platforms and the reports each one must send ----------
      perMonth:true  -> one report per month (quarterly client = 3 slots)
      optional:true  -> not counted in "बाकी" (missing)
-     multi:true     -> many files expected (bills)                     */
+     multi:true     -> many files expected (bills)
+     unzip:true     -> a slot without detection: a ZIP is opened and the Excel/CSV inside are saved
+     zipNote        -> platform shows the big "ZIP डालें" button on the home screen */
   var PLATFORMS = {
     meesho: {
       label: 'Meesho', group: 'online', color: '#c2187a',
+      zipNote: 'gst_…zip और …TAX_INVOICE.zip दोनों चुन सकते हैं. TCS Sales, TCS Return और Tax Invoice अपने आप अलग होकर सही खाने में चली जाएँगी. अनज़िप करने की ज़रूरत नहीं.',
+      zipNoteEn: 'You can pick both gst_…zip and …TAX_INVOICE.zip. TCS Sales, TCS Return and Tax Invoice split by themselves and go to the right boxes. No need to unzip.',
       reports: [
         { key: 'tcs_sales', name: 'TCS Sales Report', perMonth: true, accept: '.xlsx,.xls,.csv,.zip', detect: 'MEESHO_SALE',
           hint: 'Meesho Supplier Panel → GST Report डाउनलोड करें (महीना चुनें). पूरी ZIP (gst_…zip) डाल दें – tcs_sales और tcs_sales_return दोनों अपने आप सही खाने में चली जाएँगी.',
@@ -35,6 +39,8 @@ var Core = (function () {
     },
     amazon: {
       label: 'Amazon', group: 'online', color: '#e88a00',
+      zipNote: 'Amazon से आई ZIP सीधे डालें – रिपोर्ट अपने आप सही खाने में चली जाएगी. अनज़िप करने की ज़रूरत नहीं.',
+      zipNoteEn: 'Upload the ZIP from Amazon as it is – the report goes to the right box by itself. No need to unzip.',
       reports: [
         { key: 'mtr_b2c', name: 'MTR B2C Report', perMonth: true, accept: '.csv,.xlsx,.xls,.zip', detect: 'AMZ_B2C',
           hint: 'Seller Central → Reports → Tax Document Library → GST MTR (B2C), महीना चुनें. CSV या ZIP दोनों चलेंगी.',
@@ -55,6 +61,18 @@ var Core = (function () {
         { key: 'gst', name: 'GSTR Return Report', perMonth: true, accept: '.xlsx,.xls,.zip', detect: 'FK_GST',
           hint: 'Seller Hub → Reports → Tax Reports → GST Report (GSTR-1 & GSTR-8 वाली), महीना चुनें.',
           hintEn: 'Seller Hub → Reports → Tax Reports → GST Report (the GSTR-1 & GSTR-8 one), choose the month.' }
+      ]
+    },
+    // no sample report yet, so there is no detect: rule – any Excel / CSV / PDF is taken (other marketplaces' reports are still refused)
+    snapdeal: {
+      label: 'Snapdeal', group: 'online', color: '#e40046',
+      reports: [
+        { key: 'sales', name: 'Sales / GST Report', perMonth: true, unzip: true, accept: '.xlsx,.xls,.csv,.pdf,.zip',
+          hint: 'Snapdeal Seller Panel से इस महीने की Sales / GST रिपोर्ट डाउनलोड करके यहाँ डालें. ZIP आई हो तो वैसे ही डाल दें.',
+          hintEn: 'Download this month\'s Sales / GST report from the Snapdeal Seller Panel and upload it here. If it came as a ZIP, upload it as it is.' },
+        { key: 'tcs', name: 'TCS Report', perMonth: true, optional: true, unzip: true, accept: '.xlsx,.xls,.csv,.pdf,.zip',
+          hint: 'Snapdeal Seller Panel से इस महीने की TCS रिपोर्ट (अगर मिलती हो).',
+          hintEn: 'This month\'s TCS report from the Snapdeal Seller Panel (if you get one).' }
       ]
     },
     vyapar: {
@@ -97,7 +115,7 @@ var Core = (function () {
       ]
     }
   };
-  var PLATFORM_ORDER = ['meesho', 'amazon', 'flipkart', 'vyapar', 'tool', 'pdf', 'purchase', 'other'];
+  var PLATFORM_ORDER = ['meesho', 'amazon', 'flipkart', 'snapdeal', 'vyapar', 'tool', 'pdf', 'purchase', 'other'];
   function isPurSlot(id) { return String(id || '').indexOf('purchase.') === 0; }
 
   var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -184,7 +202,7 @@ var Core = (function () {
           out.push({
             id: pk + '.' + r.key + (mid ? '.' + mid : ''), plat: pk, key: r.key, month: mid,
             name: T(r.name, r.nameEn) + (mid && months.length > 1 ? ' (' + monthLabel(mid).slice(0, 3) + ')' : ''),
-            optional: !!r.optional, multi: !!r.multi, accept: r.accept, hint: T(r.hint, r.hintEn), detect: r.detect || ''
+            optional: !!r.optional, multi: !!r.multi, unzip: !!r.unzip, accept: r.accept, hint: T(r.hint, r.hintEn), detect: r.detect || ''
           });
         });
       });
@@ -331,8 +349,8 @@ var Core = (function () {
     var body = sm.files
       ? T('नमस्ते ' + who + ', ' + sm.label + ' के GST रिटर्न के लिए ' + sm.missing.length + ' रिपोर्ट अभी बाकी हैं – ' + missingText(sm) + '. सब डालकर "डेटा भेज दिया" दबाएँ.',
         'Hello ' + who + ', ' + sm.missing.length + ' report(s) are still pending for your ' + sm.label + ' GST return – ' + missingText(sm) + '. Upload them all and tap "Data sent".')
-      : T('नमस्ते ' + who + ', ' + sm.label + ' का GST डेटा (Meesho / Amazon / Flipkart रिपोर्ट या बिल) ऐप में अपलोड करें. इस अवधि में कोई सेल नहीं थी तो "NIL" चुनें.',
-        'Hello ' + who + ', please upload your ' + sm.label + ' GST data (Meesho / Amazon / Flipkart reports or bills) in the app. If there were no sales in this period, choose "NIL".');
+      : T('नमस्ते ' + who + ', ' + sm.label + ' का GST डेटा (Meesho / Amazon / Flipkart / Snapdeal रिपोर्ट या बिल) ऐप में अपलोड करें. इस अवधि में कोई सेल नहीं थी तो "NIL" चुनें.',
+        'Hello ' + who + ', please upload your ' + sm.label + ' GST data (Meesho / Amazon / Flipkart / Snapdeal reports or bills) in the app. If there were no sales in this period, choose "NIL".');
     return { title: T(sm.label + ' का GST डेटा भेजें', 'Send your ' + sm.label + ' GST data'), body: body };
   }
   function payReminder(c, sm) {
@@ -498,7 +516,7 @@ var Core = (function () {
       client: publicClient(c), pid: pid, current: cur, needConsent: needConsent(c), privacyUrl: PRIVACY_URL,
       periods: choices.map(function (p) { var s = summary(c, p, all[p] || emptyRec()); return { pid: p, label: s.label, data: s.data, work: s.work, done: s.done, required: s.required, running: p === choices[0] && p !== cur }; }),
       summary: summary(c, pid, rec), slots: slotsFor(c, pid),
-      files: (rec.files || []).map(function (f) { return { id: f.id, slot: f.slot, covers: f.covers, name: f.name, size: f.size, at: f.at, pur: f.pur || null }; }),
+      files: (rec.files || []).map(function (f) { return { id: f.id, slot: f.slot, covers: f.covers, name: f.name, size: f.size, at: f.at, pur: f.pur || null, by: f.by || '' }; }),
       returnsAll: Object.keys(all).sort().reverse().reduce(function (out, p) { (all[p].returns || []).forEach(function (r) { out.push({ id: r.id, kind: r.kind, name: r.name, at: r.at, label: periodLabel(p) }); }); return out; }, []),
       inbox: (c.inbox || []).slice(0, 30), unread: (c.inbox || []).filter(function (n) { return !n.read; }).length,
       dues: dues, settings: { upi: db.settings.upi, payeeName: db.settings.payeeName, phone: db.settings.phone, firm: db.settings.firm },
@@ -527,8 +545,10 @@ var Core = (function () {
       notifyAdmin(db, ctx, 'COMPLETE', displayName(c) + ' – ' + sm.label + ' का डेटा पूरा', 'सारी ' + sm.required + ' रिपोर्ट अपलोड हो गईं. फाइलिंग शुरू कर सकते हैं.', c.gstin);
     }
   }
-  A.upload = function (db, q, ctx) {
-    var c = byToken(db, q.token), pid = str(q.pid, 10);
+  A.upload = function (db, q, ctx) { return saveUpload(db, byToken(db, q.token), q, ctx, ''); };
+  // same folder and same record whoever uploads: client app (by '') or office dashboard (by 'office')
+  function saveUpload(db, c, q, ctx, by) {
+    var pid = str(q.pid, 10);
     if (!isPid(pid)) fail(T('अवधि सही नहीं', 'Wrong period'));
     var slot = slotsFor(c, pid).filter(function (s) { return s.id === q.slot; })[0];
     if (!slot) fail(T('यह रिपोर्ट आपकी प्रोफाइल में नहीं है', 'This report is not in your profile'));
@@ -549,6 +569,7 @@ var Core = (function () {
     var f = { id: ctx.uuid(), slot: slot.id, name: name, size: size, mime: str(q.mime, 100), at: ctx.now.toISOString(), fileId: stored.fileId, url: stored.url || '',
       taxable: q.taxable == null || q.taxable === '' || !isFinite(Number(q.taxable)) ? null : num(q.taxable),
       type: str(q.ftype, 20), months: (Array.isArray(q.fmonths) ? q.fmonths : []).map(function (m) { return str(m, 7); }).slice(0, 12) };
+    if (by) f.by = by;
     // one quarterly report (e.g. Amazon GSTR1-OCTOBER-DECEMBER) can fill the same report's slot for every month
     if (Array.isArray(q.covers)) {
       var ids = slotsFor(c, pid).map(function (s) { return s.id; });
@@ -560,15 +581,49 @@ var Core = (function () {
     checkComplete(db, ctx, c, pid, rec);
     if (P.afterFiling && rec.work === 'FILED') notifyAdmin(db, ctx, 'PURCHASE', displayName(c) + ' – ' + periodLabel(pid) + ': नया खरीद बिल', name + ' (GSTR-1 के बाद आया – 3B से पहले ITC में लें)', c.gstin);
     return { file: { id: f.id, slot: f.slot, covers: f.covers, name: f.name, size: f.size, at: f.at } };
-  };
-  A.deleteFile = function (db, q, ctx) {
-    var c = byToken(db, q.token), f = (getRec(db, c.gstin, str(q.pid, 10), false).files || []).filter(function (x) { return x.id === q.id; })[0];
+  }
+  function removeFile(db, c, q, ctx) {
+    var f = (getRec(db, c.gstin, str(q.pid, 10), false).files || []).filter(function (x) { return x.id === q.id; })[0];
     if (!f) fail(T('फाइल नहीं मिली', 'File not found'));
     var rec = editableRec(db, c, str(q.pid, 10), f.slot.split('.')[0]);
     rec.files = rec.files.filter(function (x) { return x.id !== q.id; });
     ctx.deleteFile(f.fileId);
     if (rec.completeNotified && summary(c, q.pid, rec).data !== 'COMPLETE') rec.completeNotified = '';
     return {};
+  }
+  A.deleteFile = function (db, q, ctx) {
+    var c = byToken(db, q.token), f = (getRec(db, c.gstin, str(q.pid, 10), false).files || []).filter(function (x) { return x.id === q.id; })[0];
+    // data the office added stays until the office removes it (office mode in the client's app may remove it)
+    if (f && f.by === 'office' && c.officeToken !== q.token) fail(T('ये फाइल ऑफिस ने डाली है – हटाने के लिए ऑफिस से बात करें', 'The office added this file – talk to the office to remove it'));
+    return removeFile(db, c, q, ctx);
+  };
+  /* ---------- office adds data that came on WhatsApp (dashboard → client) ----------
+     aUpload = same as the client's upload: same Drive folder (<client>\<FY>\<PERIOD>\INPUT), and it shows in the client's app.
+     The platform is added to the client's profile when it isn't there yet.
+     aDataReceived runs once per period after the batch: tells the client and (start) puts the period into filing. */
+  A.aUpload = function (db, q, ctx) {
+    var c = client(db, q.gstin), plat = str(q.slot, 60).split('.')[0];
+    if (!PLATFORMS[plat]) fail('ये खाना सही नहीं');
+    if ((c.platforms || []).indexOf(plat) < 0) c.platforms = (c.platforms || []).concat([plat]);
+    return saveUpload(db, c, q, ctx, 'office');
+  };
+  A.aDeleteFile = function (db, q, ctx) { return removeFile(db, client(db, q.gstin), q, ctx); };
+  A.aDataReceived = function (db, q, ctx) {
+    var c = client(db, q.gstin), pid = str(q.pid, 10);
+    if (!isPid(pid)) fail('अवधि सही नहीं');
+    var rec = getRec(db, c.gstin, pid, true), sm = summary(c, pid, rec), n = Math.max(0, Math.round(num(q.count))), started = false;
+    // purchase bills alone (or a period already filed) never start filing
+    if (q.start && !rec.nil && sm.files && rec.work !== 'FILED') {
+      rec.submittedAt = rec.submittedAt || ctx.now.toISOString();
+      rec.completeNotified = rec.completeNotified || rec.submittedAt;
+      if (!rec.work) { rec.work = 'PROCESS'; rec.processNotified = rec.processNotified || ctx.now.toISOString(); started = true; }
+    }
+    asClient(c, function () {
+      notifyClient(db, ctx, c, sm.label + T(': आपका डेटा ऐप में जोड़ दिया', ': your data is added to the app'),
+        T('आपका भेजा हुआ ' + sm.label + ' का डेटा (' + n + ' फाइल) हमने आपके ऐप में जोड़ दिया है.' + (started ? ' रिटर्न तैयार किया जा रहा है.' : ''),
+          'We have added the ' + sm.label + ' data you sent (' + n + ' file(s)) to your app.' + (started ? ' Your return is being prepared.' : '')));
+    });
+    return { summary: summary(c, pid, rec) };
   };
   A.setNil = function (db, q, ctx) {
     var c = byToken(db, q.token), pid = str(q.pid, 10), rec = editableRec(db, c, pid);
@@ -1286,7 +1341,7 @@ var Core = (function () {
     VERSION: VERSION, PLATFORMS: PLATFORMS, PLATFORM_ORDER: PLATFORM_ORDER, STATES: STATES, KINDS: KINDS, DOC_TYPES: DOC_TYPES, periodDirs: periodDirs, isPid: isPid,
     newDb: newDb, handle: handle, tick: tick,
     gstinValid: gstinValid, gstinInfo: gstinInfo, sha256: sha256,
-    monthsOf: monthsOf, monthLabel: monthLabel, periodLabel: periodLabel, currentPid: currentPid, pidFor: pidFor,
+    monthsOf: monthsOf, monthLabel: monthLabel, periodLabel: periodLabel, currentPid: currentPid, pidFor: pidFor, periodChoices: periodChoices,
     lastMonth: lastMonth, quarterOf: quarterOf, addMonth: addMonth, slotsFor: slotsFor, summary: summary, missingText: missingText,
     setLang: setLang, T: T, platLabel: platLabel
   };

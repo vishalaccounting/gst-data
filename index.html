@@ -480,6 +480,7 @@ function render() {
       var pur = pk === 'purchase', np = pur ? filesOf(slots[0].id).length : 0;
       html += '<div class="card plat" style="--pc:' + P.color + '"><div class="ph"><h2 style="margin:0">' + esc(Core.platLabel(pk)) + '</h2>' +
         (pur ? (np ? '<button class="btn sec sm" onclick="purExcel()">' + L('📥 Excel', '📥 Excel') + '</button>' : '') + '<span class="pill ' + (np ? 'COMPLETE' : 'NONE') + '">' + np + L(' बिल', ' bills') + '</span>' : '<span class="pill ' + (done >= req ? 'COMPLETE' : done ? 'PARTIAL' : 'NONE') + '">' + done + '/' + req + '</span>') + '</div>';
+      if (P.zipNote && !locked) html += '<div style="margin:10px 0 4px;padding:10px;border-radius:12px;background:#f1f5f9"><button class="btn block" onclick="pickZip(\'' + pk + '\')">' + L('📦 ZIP फाइल अपलोड करें', '📦 Upload the ZIP file') + '</button><div class="mute" style="margin-top:6px;font-size:12.5px">' + esc(L(P.zipNote, P.zipNoteEn)) + '</div></div>';
       slots.forEach(function (s) {
         var fs = filesOf(s.id);
         html += '<div class="slot" id="slot-' + s.id.replace(/\./g, '_') + '"><div class="sr"><div class="tick' + (fs.length ? ' y' : '') + '">' + (fs.length ? '✓' : '•') + '</div>' +
@@ -487,8 +488,8 @@ function render() {
           (locked ? '' : '<button class="btn sm' + (fs.length ? ' sec' : '') + '" onclick="pickFor(\'' + s.id + '\')">' + (fs.length ? L('+ और', '+ More') : L('⬆ अपलोड', '⬆ Upload')) + '</button>') + '</div>' +
           '<div class="hint">' + esc(s.hint) + '</div>' +
           (fs.length ? '<div class="files">' + fs.map(function (f) {
-            return '<div class="file">📄<span' + (pur ? ' style="white-space:normal;word-break:break-word"' : '') + '>' + esc(f.name) + (pur ? '<br><small class="mute">' + purLine(f.pur) + '</small>' : '') + '</span><small class="mute">' + fmtSize(f.size) + '</small>' +
-              (pur && !locked ? '<button class="btn ghost sm" style="padding:2px 6px" onclick="openPur(\'' + f.id + '\')">✏️</button>' : '') + (locked ? '' : '<button class="x" onclick="delFile(\'' + f.id + '\')" aria-label="Remove">✕</button>') + '</div>';
+            return '<div class="file">📄<span' + (pur ? ' style="white-space:normal;word-break:break-word"' : '') + '>' + esc(f.name) + (pur ? '<br><small class="mute">' + purLine(f.pur) + '</small>' : '') + (f.by === 'office' ? ' <small style="color:var(--ok)">' + L('(ऑफिस ने डाला)', '(added by office)') + '</small>' : '') + '</span><small class="mute">' + fmtSize(f.size) + '</small>' +
+              (pur && !locked ? '<button class="btn ghost sm" style="padding:2px 6px" onclick="openPur(\'' + f.id + '\')">✏️</button>' : '') + (locked || (f.by === 'office' && !S.office) ? '' : '<button class="x" onclick="delFile(\'' + f.id + '\')" aria-label="Remove">✕</button>') + '</div>';
           }).join('') + '</div>' : '') + '</div>';
       });
       html += '</div>';
@@ -536,7 +537,16 @@ function toggleHint(b) { b.closest('.slot').classList.toggle('open'); }
 function pickFor(slotId) {
   var s = S.st.slots.filter(function (x) { return x.id === slotId; })[0];
   S.uploadSlot = slotId;
-  var fp = $('filePick'); fp.value = ''; fp.accept = s.accept || ''; fp.click();
+  var fp = $('filePick'); fp.value = ''; fp.accept = pickAccept(s.accept); fp.click();
+}
+// phones grey out a ZIP in the picker when only ".zip" is listed and WhatsApp saved it under another type
+var ZIP_TYPES = ',application/zip,application/x-zip-compressed,application/x-zip,multipart/x-zip,application/octet-stream';
+function pickAccept(a) { return a && a.indexOf('.zip') >= 0 ? a + ZIP_TYPES : a || ''; }
+// the big ZIP button of a platform: the reports inside find their own box
+function pickZip(pk) {
+  var s = S.st.slots.filter(function (x) { return x.plat === pk; })[0]; if (!s) return;
+  S.uploadSlot = s.id;
+  var fp = $('filePick'); fp.value = ''; fp.accept = '.zip' + ZIP_TYPES; fp.click();
 }
 /* Every file is checked before upload: a marketplace slot only takes that marketplace's report
    (a ZIP is opened and each report inside goes to its own slot), wrong platform / wrong month is refused,
@@ -578,28 +588,45 @@ function runUpload(groups) {
   var all = [].concat.apply([], groups.map(function (g) { return g.files; }));
   var big = all.filter(function (f) { return f.size > CONFIG.MAX_FILE_MB * 1048576; });
   if (big.length) return toast(big[0].name + L(' – ' + CONFIG.MAX_FILE_MB + ' MB से बड़ी फाइल नहीं चलेगी', ' – files above ' + CONFIG.MAX_FILE_MB + ' MB are not allowed'), 4000);
-  var pid = S.pid, first = null;
-  var out = { ok: [], bad: [] };
+  var pid = S.pid, clicked = null, moved = '';
+  var out = { ok: [], bad: [] }, read = [];   // read = [{ from: slot the file was put in, it, whole: keep the file as it is }]
   S.uploading++;
   busy(true, L('फाइल जाँच रहे हैं…', 'Checking files…'));
   var chain = Promise.resolve();
   groups.forEach(function (g) {
-    var clicked = S.st.slots.filter(function (s) { return s.id === g.slot; })[0];
-    first = first || clicked;
+    var from = S.st.slots.filter(function (s) { return s.id === g.slot; })[0];
     g.files.forEach(function (f) {
       chain = chain.then(function () {
         var isSheet = /\.(xlsx|xls|csv)$/i.test(f.name), isZip = /\.zip$/i.test(f.name);
-        if (!clicked.detect && !isSheet) { out.ok.push({ it: { file: f, type: '', months: [] }, slot: clicked, covers: null }); return; }   // bills, photos, ZIP of PDFs
+        var whole = function () { read.push({ from: from, it: { file: f, type: '', months: [] }, whole: true }); };
+        if (!from.detect && !isSheet && !(isZip && from.unzip)) return whole();   // bills, photos, ZIP of PDFs
         return Detect.inspect(f).then(function (r) {
-          if (r.zip && !r.items.length) return out.bad.push({ name: f.name, why: L('ZIP में कोई Excel/CSV रिपोर्ट नहीं मिली', 'No Excel/CSV report found in the ZIP') });
-          if (!clicked.detect && isZip) return out.ok.push({ it: { file: f, type: '', months: [] }, slot: clicked, covers: null });
-          r.items.forEach(function (it) { planFor(clicked, it, out); });
-        });
+          if (r.zip && !r.items.length) {
+            if (from.unzip) return whole();
+            return out.bad.push({ name: f.name, why: L('ZIP में कोई Excel/CSV रिपोर्ट नहीं मिली', 'No Excel/CSV report found in the ZIP') });
+          }
+          r.items.forEach(function (it) { read.push({ from: from, it: it }); });
+        }, function (e) { out.bad.push({ name: f.name, why: isZip ? L('ये ZIP खुल नहीं रही – फिर से डाउनलोड करके डालें', 'This ZIP does not open – download it again and upload') : e.message }); });
       });
     });
   });
-  var clicked = groups.length > 1 ? null : first;   // several groups = shared files, no single slot was clicked
   chain.then(function () {
+    // the reports know their own month: on the wrong month's screen, go to the right month instead of refusing
+    var pids = {};
+    read.forEach(function (x) { if (x.it.type && Detect.TYPES[x.it.type][0] === x.from.plat) (x.it.months || []).forEach(function (m) { pids[Core.pidFor(S.st.client.freq, m)] = 1; }); });
+    var only = Object.keys(pids);
+    if (only.length === 1 && only[0] !== S.pid && S.st.periods.some(function (p) { return p.pid === only[0]; })) {
+      return load(only[0], true).then(function () { if (S.pid === only[0]) moved = S.st.summary.label; });
+    }
+  }).then(function () {
+    pid = S.pid;
+    // slot ids carry the month, so after a move the same box of the new period has another id
+    var fresh = function (s) { return S.st.slots.filter(function (x) { return x.id === s.id; })[0] || S.st.slots.filter(function (x) { return x.plat === s.plat && x.key === s.key; })[0] || s; };
+    read.forEach(function (x) {
+      var from = fresh(x.from);
+      if (x.whole) out.ok.push({ it: x.it, slot: from, covers: null }); else planFor(from, x.it, out);
+    });
+    if (groups.length === 1 && read.length) clicked = fresh(read[0].from);   // several groups = shared files, no single slot was clicked
     var done = [], i = 0;
     return (function next() {
       if (i >= out.ok.length) return done;
@@ -616,12 +643,13 @@ function runUpload(groups) {
       }, function (e) { out.bad.push({ name: f.name, why: e.message }); }).then(next);
     })();
   }).then(function (done) {
-    showResult(done || [], out.bad, clicked);
+    showResult(done || [], out.bad, clicked, moved);
   }).catch(function (e) { toast(e.message, 5000); }).finally(function () { S.uploading--; busy(false); load(pid, true); });
 }
-function showResult(done, bad, clicked) {
-  if (clicked && !bad.length && done.length && done.every(function (p) { return p.slot.id === clicked.id && !p.covers; })) return toast(done.length + L(' फाइल अपलोड ✓', ' file(s) uploaded ✓'));
+function showResult(done, bad, clicked, moved) {
+  if (!moved && clicked && !bad.length && done.length && done.every(function (p) { return p.slot.id === clicked.id && !p.covers; })) return toast(done.length + L(' फाइल अपलोड ✓', ' file(s) uploaded ✓'));
   $('resultList').innerHTML =
+    (moved && done.length ? '<div class="miss" style="margin-bottom:8px">' + L('📅 ये रिपोर्ट ' + esc(moved) + ' की है, इसलिए ' + esc(moved) + ' में डाल दी.', '📅 These reports are for ' + esc(moved) + ', so they went into ' + esc(moved) + '.') + '</div>' : '') +
     done.map(function (p) { return '<div class="file" style="background:var(--okbg)">✅<span><b>' + esc(slotName(p.slot)) + (p.covers ? L(' (पूरी तिमाही)', ' (whole quarter)') : '') + '</b><br>' + esc(p.it.file.name) + (clicked && p.slot.id !== clicked.id ? ' <small>' + L('– सही खाने में डाली', '– put in the right box') + '</small>' : '') + '</span></div>'; }).join('') +
     bad.map(function (b) { return '<div class="file" style="background:var(--badbg);white-space:normal">❌<span style="white-space:normal"><b>' + esc(b.name) + '</b><br>' + esc(b.why) + '</span></div>'; }).join('');
   $('resultHead').textContent = bad.length ? (done.length ? L(done.length + ' अपलोड, ' + bad.length + ' नहीं ली गईं', done.length + ' uploaded, ' + bad.length + ' not accepted') : L('फाइल नहीं ली गई', 'File not accepted')) : done.length + L(' फाइल अपलोड ✓', ' file(s) uploaded ✓');

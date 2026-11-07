@@ -364,6 +364,11 @@ function openClient(g, keep, focusPid) {
     var h = '';
     var kv = function (l, v) { return '<div><span class="mute">' + l + '</span><div><b>' + (v || '<span class="mute">–</span>') + '</b></div></div>'; };
     h += '<div class="per" style="background:#eef4fb"><div class="row"><b>📱 क्लाइंट का ऐप खुद चलाएँ</b><span class="mute grow">टिक / अनटिक, फाइल डालना-हटाना, NIL – सब वैसे ही जैसे क्लाइंट करता है</span><button class="btn sm" onclick="openAsClient(\'' + c.gstin + '\')">📱 क्लाइंट का ऐप खोलें ↗</button></div></div>';
+    // data that came on WhatsApp – keep the chosen files when the drawer redraws
+    if (!WI || WI.g !== c.gstin) WI = { g: c.gstin, rows: [], def: focusPid || Core.currentPid(c.freq, new Date()), start: true };
+    WI.c = c; WI.have = {};
+    d.periods.forEach(function (p) { WI.have[p.summary.pid] = p.files; });
+    h += '<div class="per" style="background:#ecfdf5;border-color:#a7f3d0" ondragover="event.preventDefault()" ondrop="event.preventDefault();wiAdd(event.dataTransfer.files)"><div class="row"><h3>📥 WhatsApp से आया डेटा जोड़ें</h3><span class="mute grow">ZIP / Excel / PDF चुनें या यहाँ खींचकर छोड़ें. महीना और खाना ऐप खुद पहचानेगा, फोल्डर अपने आप बनेगा और क्लाइंट के ऐप में भी दिखेगा.</span><label class="btn sm">📂 फाइल चुनें<input type="file" multiple style="display:none" onchange="wiAdd(this.files);this.value=\'\'"></label></div><div id="wiBody"></div></div>';
     h += '<div class="per"><div class="row"><h3>📋 रजिस्ट्रेशन में क्या डाला</h3><span class="grow"></span>' +
       (c.verified ? '<button class="btn sec sm" onclick="quickVerify(\'' + c.gstin + '\',false)">Verify हटाएँ</button>' : '<button class="btn ok sm" onclick="quickVerify(\'' + c.gstin + '\',true)">✓ GST पोर्टल से मिला लिया (Verify)</button>') + '</div>' +
       '<div class="grid2" style="margin-top:8px">' + kv('👤 बात करने वाले', esc(c.owner)) + kv('🪪 GST धारक (लीगल नाम)', esc(c.legal)) + kv('🏪 फर्म (ट्रेड नाम)', esc(c.trade)) +
@@ -418,6 +423,7 @@ function openClient(g, keep, focusPid) {
     h += '<div class="per"><h3>क्लाइंट को मैसेज (ऐप में + नोटिफिकेशन)</h3><input class="i" id="msgT" placeholder="शीर्षक" style="width:100%;margin-top:8px"><textarea class="i" id="msgB" rows="2" placeholder="मैसेज" style="width:100%;margin-top:6px"></textarea>' +
       '<div class="row" style="margin-top:6px"><button class="btn" onclick="sendMsg(\'' + c.gstin + '\')">भेजें</button><span class="mute">' + (c.push ? '🔔 नोटिफिकेशन चालू (' + c.push + ' फोन)' : 'इस क्लाइंट ने नोटिफिकेशन चालू नहीं किया – सिर्फ ऐप में दिखेगा') + '</span></div></div>';
     $('dBody').innerHTML = h;
+    wiRender();
     if (!keep) { $('drawer').classList.add('on'); $('shade').classList.add('on'); $('dBody').scrollTop = 0; }
   }).catch(function (e) { toast(e.message); });
 }
@@ -430,9 +436,9 @@ function periodBlock(c, p, focus, prev) {
     var fs = bySlot[sl.id] || [];
     delete bySlot[sl.id];
     return '<div class="sl"><span>' + (fs.length ? '✅' : sl.optional ? '➖' : '❌') + '</span><span class="nm">' + esc(Core.PLATFORMS[sl.plat].label + ' – ' + sl.name) + '</span><span>' +
-      (fs.map(function (f) { return fileLink(f); }).join('<br>') || '<span class="mute">' + (sl.optional ? 'वैकल्पिक' : 'नहीं आया') + '</span>') + '</span></div>';
+      (fs.map(function (f) { return fileLink(f) + fileDel(g, pid, f); }).join('<br>') || '<span class="mute">' + (sl.optional ? 'वैकल्पिक' : 'नहीं आया') + '</span>') + '</span></div>';
   }).join('');
-  var orphan = Object.keys(bySlot).map(function (k) { return bySlot[k].map(function (f) { return '<div class="sl"><span>📎</span><span class="nm mute">' + esc(k) + '</span><span>' + fileLink(f) + '</span></div>'; }).join(''); }).join('');
+  var orphan = Object.keys(bySlot).map(function (k) { return bySlot[k].map(function (f) { return '<div class="sl"><span>📎</span><span class="nm mute">' + esc(k) + '</span><span>' + fileLink(f) + fileDel(g, pid, f) + '</span></div>'; }).join(''); }).join('');
   var pays = p.payments.map(function (x) { return '<div class="mute">' + esc(x.date) + ' • ' + rupee(x.amt) + ' • ' + esc(x.mode) + (x.note ? ' • ' + esc(x.note) : '') + ' <button class="btn sec sm" style="padding:1px 6px" onclick="delPay(\'' + g + '\',\'' + pid + '\',\'' + x.id + '\')">✕</button></div>'; }).join('');
   var id = pid.replace(/\W/g, '');
   return '<div class="per" style="' + (focus ? 'border-color:var(--pri2);box-shadow:0 0 0 2px #cfe0f2' : '') + '">' +
@@ -466,9 +472,134 @@ function periodBlock(c, p, focus, prev) {
 }
 function fileLink(f) {
   var tl = f.type && Detect.TYPES[f.type] ? ' ✔ ' + Detect.TYPES[f.type][2] + (f.months && f.months.length ? ' ' + f.months.map(Core.monthLabel).join(', ') : '') : '';
-  var t = esc(f.name) + ' <span class="mute">(' + fmtDate(f.at) + esc(tl) + (f.covers ? ' • पूरी तिमाही' : '') + ')</span>';
+  var t = esc(f.name) + ' <span class="mute">(' + fmtDate(f.at) + esc(tl) + (f.covers ? ' • पूरी तिमाही' : '') + (f.by === 'office' ? ' • ऑफिस ने डाला' : '') + ')</span>';
   if (f.url && f.url.indexOf('demo:') !== 0) return '<a href="' + esc(f.url) + '" target="_blank" rel="noopener">📄 ' + t + '</a>';
   return '<button class="lnk" onclick="demoDownload(\'' + esc(f.fileId) + '\')">📄 ' + t + '</button>';
+}
+function fileDel(g, pid, f) { return f.id ? ' <button class="btn sec sm" style="padding:1px 6px" title="ये फाइल हटाएँ" onclick="wiDelFile(\'' + g + '\',\'' + pid + '\',\'' + f.id + '\')">✕</button>' : ''; }
+function wiDelFile(g, pid, id) { if (confirm('ये फाइल हटाएँ? क्लाइंट के ऐप और Drive फोल्डर से भी हट जाएगी.')) after(A('aDeleteFile', { gstin: g, pid: pid, id: id }), 'फाइल हटा दी'); }
+
+/* ---------- data that came on WhatsApp: the office puts it in for the client ----------
+   Every report (a ZIP gives one row per report inside) finds its own period and box from its contents;
+   anything the app can't recognise (Snapdeal, PDF bills …) waits for the office to choose the box.
+   Saved by aUpload = the same Drive folder and record as a client upload. */
+var WI = null;
+function wiSlots(pid) { return Core.slotsFor({ platforms: Core.PLATFORM_ORDER }, pid); }
+function wiPeriods(r) {
+  var list = Core.periodChoices(WI.c.freq, new Date(), 12);
+  if (r.pid && list.indexOf(r.pid) < 0) list.push(r.pid);
+  return list;
+}
+function wiPlace(r) {
+  var T = r.type && Detect.TYPES[r.type];
+  r.pid = T && r.months.length ? Core.pidFor(WI.c.freq, r.months[0]) : WI.def;
+  wiBox(r);
+}
+function wiBox(r, keepKey) {
+  var T = r.type && Detect.TYPES[r.type], sl = wiSlots(r.pid);
+  r.covers = null;
+  if (T) {
+    var cand = sl.filter(function (s) { return s.plat === T[0] && s.key === T[1]; });
+    var hit = r.months.length ? cand.filter(function (s) { return r.months.indexOf(s.month) >= 0; }) : cand;
+    r.slot = (hit[0] || cand[0] || {}).id || '';
+    if (r.months.length && hit.length > 1) r.covers = hit.map(function (s) { return s.id; });
+  } else if (keepKey) {
+    r.slot = (sl.filter(function (s) { return s.id.indexOf(keepKey) === 0; })[0] || {}).id || '';
+  }
+}
+function wiAdd(files) {
+  var list = Array.prototype.slice.call(files || []); if (!list.length || !WI) return;
+  var big = list.filter(function (f) { return f.size > CONFIG.MAX_FILE_MB * 1048576; });
+  if (big.length) return toast(big[0].name + ' – ' + CONFIG.MAX_FILE_MB + ' MB से बड़ी फाइल नहीं चलेगी', 4000);
+  toast('फाइल जाँच रहे हैं…', 8000);
+  var w = WI, chain = Promise.resolve();
+  list.forEach(function (f) {
+    chain = chain.then(function () { return Detect.inspect(f); }).then(function (r) {
+      var items = r.items.length ? r.items : [{ file: f, type: '', months: [] }];   // ZIP of PDFs: keep the ZIP as it is
+      items.forEach(function (it) {
+        var row = { file: it.file, from: r.zip ? f.name : '', type: it.type || '', months: it.months || [], taxable: it.taxable == null ? '' : it.taxable, label: it.label || '', st: '' };
+        wiPlace(row); w.rows.push(row);
+      });
+    }, function () {
+      if (/\.zip$/i.test(f.name)) { w.rows.push({ file: f, from: '', type: '', months: [], taxable: '', label: '', pid: w.def, slot: '', st: 'bad', err: 'ये ZIP खुल नहीं रही' }); return; }
+      var row = { file: f, from: '', type: '', months: [], taxable: '', label: '', st: '' };
+      wiPlace(row); w.rows.push(row);
+    });
+  });
+  chain.then(function () {
+    // a file with no month (PDF, Snapdeal …) that came with dated reports most likely belongs to the same period
+    var pids = {};
+    w.rows.forEach(function (r) { if (r.months.length) pids[r.pid] = 1; });
+    var only = Object.keys(pids);
+    if (only.length === 1) w.rows.forEach(function (r) { if (!r.months.length && !r.slot && !r.st) r.pid = only[0]; });
+    toast('फाइलें देख लें, फिर "जोड़ें" दबाएँ'); wiRender();
+  });
+}
+function wiMissing(pid, rows) {
+  var plats = (WI.c.platforms || []).slice();
+  rows.forEach(function (r) { var k = String(r.slot).split('.')[0]; if (k && plats.indexOf(k) < 0) plats.push(k); });
+  var have = {};
+  (WI.have[pid] || []).forEach(function (f) { (f.covers || [f.slot]).forEach(function (s) { have[s] = 1; }); });
+  rows.forEach(function (r) { (r.covers || [r.slot]).forEach(function (s) { have[s] = 1; }); });
+  return Core.slotsFor({ platforms: plats }, pid).filter(function (s) { return !s.optional && !have[s.id]; }).map(function (s) { return Core.PLATFORMS[s.plat].label + ' – ' + s.name; });
+}
+function wiRender() {
+  var box = $('wiBody'); if (!box || !WI) return;
+  if (!WI.rows.length) { box.innerHTML = ''; return; }
+  var todo = WI.rows.filter(function (r) { return r.st !== 'ok' && r.st !== 'bad'; });
+  var html = '<div class="slots">' + WI.rows.map(function (r, i) {
+    var T = r.type && Detect.TYPES[r.type];
+    var tag = r.st === 'ok' ? '✅ जुड़ गई' : r.st === 'bad' ? '❌ ' + esc(r.err) : r.st === 'up' ? '⏳ अपलोड हो रही है…' : T ? '✔ ' + esc(r.label) + (r.months.length ? ' • ' + esc(r.months.map(Core.monthLabel).join(', ')) : '') : r.slot ? 'आपने खाना चुना' : '<b style="color:var(--bad)">❔ पहचान नहीं हुई – खाना चुनें</b>';
+    var fixed = r.st === 'ok' || r.st === 'up' || WI.busy;
+    var opts = Core.PLATFORM_ORDER.map(function (pk) {
+      return '<optgroup label="' + esc(Core.PLATFORMS[pk].label) + '">' + wiSlots(r.pid).filter(function (s) { return s.plat === pk; }).map(function (s) { return '<option value="' + s.id + '"' + (s.id === r.slot ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</optgroup>';
+    }).join('');
+    return '<div class="sl" style="flex-wrap:wrap;background:#fff"><span class="nm" style="width:auto;flex:1 1 220px;word-break:break-word">' + esc(r.file.name) + (r.from ? ' <span class="mute" style="font-weight:400">(' + esc(r.from) + ' में से)</span>' : '') + '<div class="mute" style="font-weight:400">' + tag + '</div></span>' +
+      '<select class="i" ' + (fixed ? 'disabled ' : '') + 'onchange="wiPeriod(' + i + ',this.value)">' + wiPeriods(r).map(function (p) { return '<option value="' + p + '"' + (p === r.pid ? ' selected' : '') + '>' + esc(Core.periodLabel(p)) + '</option>'; }).join('') + '</select>' +
+      '<select class="i" ' + (fixed ? 'disabled ' : '') + 'onchange="wiSet(' + i + ',this.value)"><option value="">– खाना चुनें –</option>' + opts + '</select>' +
+      (fixed ? '' : '<button class="btn sec sm" onclick="wiDrop(' + i + ')">✕</button>') + '</div>';
+  }).join('') + '</div>';
+  if (todo.length) {
+    var byPid = {};
+    todo.forEach(function (r) { (byPid[r.pid] = byPid[r.pid] || []).push(r); });
+    Object.keys(byPid).forEach(function (p) {
+      var miss = wiMissing(p, byPid[p]);
+      if (miss.length) html += '<div class="mute" style="color:#b45309;margin-bottom:4px">⚠ ' + esc(Core.periodLabel(p)) + ' में फिर भी बाकी: ' + esc(miss.join(', ')) + '</div>';
+    });
+    html += '<div class="row"><label><input type="checkbox"' + (WI.start ? ' checked' : '') + (WI.busy ? ' disabled' : '') + ' onchange="WI.start=this.checked"> डेटा पूरा है – फाइलिंग शुरू करें</label><span class="grow"></span>' +
+      '<button class="btn ok sm"' + (WI.busy ? ' disabled' : '') + ' onclick="wiGo()">⬆ ' + todo.length + ' फाइल क्लाइंट के खाते में जोड़ें</button></div>';
+  } else if (!WI.busy) html += '<div class="row"><span class="grow"></span><button class="btn sec sm" onclick="WI.rows=[];wiRender()">साफ़ करें</button></div>';
+  box.innerHTML = html;
+}
+function wiPeriod(i, pid) {
+  var r = WI.rows[i], key = String(r.slot).split('.').slice(0, 2).join('.');
+  r.pid = pid; wiBox(r, key); wiRender();
+}
+function wiSet(i, slot) { var r = WI.rows[i]; r.slot = slot; r.covers = null; if (r.st === 'bad') { r.st = ''; r.err = ''; } wiRender(); }
+function wiDrop(i) { WI.rows.splice(i, 1); wiRender(); }
+function wiGo() {
+  var w = WI, todo = w.rows.filter(function (r) { return r.st !== 'ok' && r.st !== 'bad'; });
+  if (todo.some(function (r) { return !r.slot; })) return toast('पहले हर फाइल का खाना चुनें', 3500);
+  w.busy = true; wiRender();
+  var count = {}, i = 0;
+  (function next() {
+    if (i >= todo.length) return Promise.resolve();
+    var r = todo[i++];
+    r.st = 'up'; wiRender();
+    return API.fileToB64(r.file).then(function (b64) {
+      return A('aUpload', { gstin: w.g, pid: r.pid, slot: r.slot, name: r.file.name, mime: r.file.type, b64: b64, ftype: r.type, fmonths: r.months, covers: r.covers, taxable: r.taxable });
+    }).then(function () { r.st = 'ok'; count[r.pid] = (count[r.pid] || 0) + 1; }, function (e) { r.st = 'bad'; r.err = e.message; }).then(next);
+  })().then(function () {
+    // once per period: tell the client and (ticked) put the period into filing
+    return Object.keys(count).reduce(function (p, pid) {
+      return p.then(function () { return A('aDataReceived', { gstin: w.g, pid: pid, start: w.start, count: count[pid] }); }).catch(function (e) { toast(e.message, 4000); });
+    }, Promise.resolve());
+  }).then(function () {
+    w.busy = false;
+    var ok = todo.filter(function (r) { return r.st === 'ok'; }).length, bad = todo.length - ok;
+    toast(ok + ' फाइल जुड़ गईं ✓' + (bad ? ' • ' + bad + ' नहीं जुड़ीं' : ''), 4000);
+    return refresh();
+  }).then(wiRender, function (e) { w.busy = false; toast(e.message, 4000); wiRender(); });
 }
 function demoDownload(id) {
   API.demoFile(id).then(function (f) { var a = document.createElement('a'); a.href = URL.createObjectURL(f.blob); a.download = f.name; a.click(); }).catch(function (e) { toast(e.message); });
