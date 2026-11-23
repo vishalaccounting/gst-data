@@ -1,16 +1,17 @@
 /* Service worker: offline shell + auto-update + (optional) Firebase push.
    Network-first: whenever the phone is online it loads the newest files from GitHub Pages,
    so every push to GitHub reaches all clients automatically. Bump CACHE on each release. */
-var CACHE = 'vas-gst-1.10.1';
+var CACHE = 'vas-gst-1.11.0';
 var SHARE = 'vas-share';   // files shared to the app (WhatsApp → Share → Vishal GST), read by index.html
-var SHELL = ['./', 'index.html', 'core.js', 'api.js', 'detect.js', 'config.js', 'manifest.json', 'icon-192.png', 'icon-512.png'];
+var OFFICE = 'vas-office'; // v1.11: office.html puts 'flag' here on the office phone → shared files open office.html instead
+var SHELL = ['./', 'index.html', 'office.html','core.js', 'api.js', 'detect.js', 'config.js', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL.map(function (u) { return new Request(u, { cache: 'reload' }); })); }).then(function () { return self.skipWaiting(); }));
 });
 self.addEventListener('activate', function (e) {
   e.waitUntil(caches.keys().then(function (keys) {
-    return Promise.all(keys.filter(function (k) { return k !== CACHE && k !== SHARE; }).map(function (k) { return caches.delete(k); }));
+    return Promise.all(keys.filter(function (k) { return k !== CACHE && k !== SHARE && k !== OFFICE; }).map(function (k) { return caches.delete(k); }));
   }).then(function () { return self.clients.claim(); }));
 });
 self.addEventListener('fetch', function (e) {
@@ -38,7 +39,9 @@ function takeShare(req) {
       return Promise.all(files.map(function (f, i) { return c.put('share/' + list[i].k, new Response(f)); }))
         .then(function () { return c.put('share/list', new Response(JSON.stringify({ at: Date.now(), files: list }))); });
     });
-  }).catch(function () {}).then(function () { return Response.redirect(new URL('index.html?share=1', self.registration.scope).href, 303); });
+  }).catch(function () {})
+    .then(function () { return caches.open(OFFICE).then(function (c) { return c.match('flag'); }).catch(function () { return null; }); })
+    .then(function (flag) { return Response.redirect(new URL(flag ? 'office.html?share=1' : 'index.html?share=1', self.registration.scope).href, 303); });
 }
 
 /* ---- push ---- */

@@ -37,6 +37,8 @@ var API = (function () {
         pending.push(idbDo('readwrite', function (st) { return st.put({ meta: meta, b64: b64 }, id); }));
         return { fileId: id, url: 'demo:' + id };
       },
+      // demo stand-in for Munshi's _office/*.json files in Drive
+      readText: function (folders, name) { return localStorage.getItem('vas_demo_' + folders.join('/') + '/' + name) || ''; },
       deleteFile: function (id) { if (id) pending.push(idbDo('readwrite', function (st) { return st.delete(id); })); },
       renameFolder: function (a, b) { console.log('[demo] folder rename', a, '→', b); },
       saveImage: function (b64, mime) { return 'data:' + mime + ';base64,' + b64; },

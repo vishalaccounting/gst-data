@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d3b66">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<title>फ़ोन मुनीम</title>
+<!-- v1.11 office phone: share WhatsApp files for ANY GST REPORT TOOL client → Drive _office/inbox → Munshi puts them
+     in the client's folder and makes the report after "डेटा पूरा". Office-only (admin password). Hindi only. -->
+<style>
+:root { --bg:#f4f6f9; --card:#fff; --ink:#1b2430; --mute:#6b7685; --line:#e3e7ee; --brand:#0d3b66; --brand2:#1d5c96;
+  --ok:#1e8e4e; --okbg:#e3f5ea; --warn:#a86400; --warnbg:#fff2d9; --bad:#c0392b; --badbg:#fde5e2; --info:#1d5c96; --infobg:#e3eefa; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 system-ui, "Nirmala UI", "Noto Sans Devanagari", sans-serif; }
+.hide { display:none !important; }
+header { position:sticky; top:0; z-index:5; background:var(--brand); color:#fff; padding:10px 16px 10px; }
+header h1 { margin:0; font-size:18px; display:flex; align-items:center; gap:8px; }
+header h1 .grow { flex:1; }
+.hb { font-size:12.5px; opacity:.92; margin-top:2px; }
+.hb.bad { color:#ffd2cc; font-weight:600; }
+.mon { display:flex; align-items:center; gap:6px; margin-top:8px; }
+.mon button { background:rgba(255,255,255,.16); color:#fff; border:0; border-radius:8px; width:38px; height:36px; font-size:18px; }
+.mon select { flex:1; height:36px; border-radius:8px; border:0; font:inherit; padding:0 8px; }
+main { padding:12px 16px 90px; max-width:720px; margin:0 auto; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:10px; }
+input[type=search], input[type=password] { width:100%; height:44px; border:1px solid var(--line); border-radius:10px; padding:0 12px; font:inherit; background:#fff; }
+.chips { display:flex; gap:6px; overflow-x:auto; padding:8px 0 4px; }
+.chip { flex:none; border:1px solid var(--line); background:#fff; border-radius:999px; padding:5px 11px; font-size:13.5px; }
+.chip.on { background:var(--brand); color:#fff; border-color:var(--brand); }
+.row { display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid var(--line); cursor:pointer; }
+.row:last-child { border-bottom:0; }
+.row .nm { font-weight:600; }
+.row .sub { font-size:12.5px; color:var(--mute); }
+.grow { flex:1; min-width:0; }
+.ell { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tag { display:inline-block; font-size:12px; border-radius:6px; padding:2px 7px; white-space:nowrap; }
+.t-ok { background:var(--okbg); color:var(--ok); } .t-warn { background:var(--warnbg); color:var(--warn); }
+.t-bad { background:var(--badbg); color:var(--bad); } .t-info { background:var(--infobg); color:var(--info); } .t-mute { background:#eef0f3; color:var(--mute); }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:0 16px; border-radius:10px; border:1px solid var(--line); background:#fff; font:inherit; font-weight:600; color:var(--ink); }
+.btn.pri { background:var(--brand); color:#fff; border-color:var(--brand); }
+.btn.ok { background:var(--ok); color:#fff; border-color:var(--ok); }
+.btn.wide { width:100%; }
+.btn:disabled { opacity:.5; }
+.banner { background:var(--warnbg); border:1px solid #f0d49a; color:#6b4300; border-radius:12px; padding:10px 12px; margin-bottom:10px; font-size:14px; }
+.banner.info { background:var(--infobg); border-color:#bcd5f0; color:#14406b; }
+.banner.bad { background:var(--badbg); border-color:#f3b9b1; color:#7d1f14; }
+.sheet { position:fixed; inset:0; background:rgba(10,20,35,.45); z-index:20; display:flex; align-items:flex-end; justify-content:center; }
+.sheet .in { background:var(--bg); width:100%; max-width:720px; max-height:94vh; overflow:auto; border-radius:16px 16px 0 0; padding:14px 16px 24px; }
+.sheet h2 { margin:0 0 2px; font-size:18px; }
+.x { float:right; border:0; background:#e6e9ee; border-radius:50%; width:34px; height:34px; font-size:18px; }
+.f { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px dashed var(--line); font-size:14px; }
+.f:last-child { border-bottom:0; }
+.f .del { border:0; background:none; color:var(--bad); font-size:18px; padding:4px 8px; }
+.toggle { display:flex; align-items:center; gap:12px; padding:14px 12px; border-radius:12px; border:2px solid var(--line); background:#fff; font-weight:700; font-size:16px; cursor:pointer; }
+.toggle.on { border-color:var(--ok); background:var(--okbg); color:#0f5a30; }
+.toggle .box { width:28px; height:28px; border-radius:8px; border:2px solid #9aa4b2; display:flex; align-items:center; justify-content:center; font-size:18px; flex:none; background:#fff; }
+.toggle.on .box { border-color:var(--ok); background:var(--ok); color:#fff; }
+.steps { list-style:none; margin:0; padding:0; }
+.steps li { display:flex; gap:10px; padding:6px 0; font-size:14px; color:var(--mute); }
+.steps li.done { color:var(--ink); }
+.steps li .d { width:22px; text-align:center; }
+.lbl { font-size:12.5px; color:var(--mute); font-weight:600; margin:12px 0 4px; text-transform:none; }
+#toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:#1b2430; color:#fff; padding:10px 16px; border-radius:10px; z-index:50; max-width:92vw; font-size:14px; }
+#busy { position:fixed; inset:0; background:rgba(255,255,255,.75); z-index:40; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; font-weight:600; text-align:center; padding:16px; }
+.spin { width:36px; height:36px; border:4px solid #cfd8e3; border-top-color:var(--brand); border-radius:50%; animation:sp 1s linear infinite; }
+@keyframes sp { to { transform:rotate(360deg); } }
+.foot { text-align:center; font-size:12.5px; color:var(--mute); margin-top:16px; }
+.foot a { color:var(--brand2); }
+</style>
+</head>
+<body>
+
+<div id="login" class="hide">
+  <header><h1>📲 फ़ोन मुनीम</h1><div class="hb">सिर्फ़ ऑफिस के लिए</div></header>
+  <main>
+    <div class="card">
+      <p style="margin-top:0">डैशबोर्ड वाला <b>एडमिन पासवर्ड</b> डालें। इसके बाद इस फ़ोन पर WhatsApp से Share करने पर फ़ाइलें यहीं आएँगी।</p>
+      <input id="pw" type="password" placeholder="एडमिन पासवर्ड" autocomplete="current-password">
+      <div style="height:10px"></div>
+      <button class="btn pri wide" onclick="login()">खोलें</button>
+    </div>
+    <div class="foot"><a href="index.html?client=1">क्लाइंट वाला ऐप खोलें</a></div>
+  </main>
+</div>
+
+<div id="app" class="hide">
+  <header>
+    <h1><span class="grow">📲 फ़ोन मुनीम</span><button class="x" style="background:rgba(255,255,255,.18);color:#fff" onclick="load()" title="ताज़ा करें">↻</button></h1>
+    <div id="hb" class="hb">…</div>
+    <div class="mon">
+      <button onclick="stepMonth(-1)">‹</button>
+      <select id="mon" onchange="S.mid=this.value;render()"></select>
+      <button onclick="stepMonth(1)">›</button>
+    </div>
+  </header>
+  <main>
+    <div id="shareBox" class="banner hide"></div>
+    <input id="q" type="search" placeholder="🔍 क्लाइंट का नाम या GSTIN" oninput="S.q=this.value;renderList()">
+    <div class="chips" id="chips"></div>
+    <div class="card" style="padding:4px 10px" id="list"></div>
+    <div class="foot">
+      <span id="cnt"></span><br>
+      <a href="admin.html">पूरा डैशबोर्ड</a> · <a href="index.html?client=1">क्लाइंट ऐप</a> · <a href="#" onclick="logout();return false">लॉग आउट</a>
+    </div>
+  </main>
+</div>
+
+<div id="sheet" class="sheet hide" onclick="if(event.target===this)closeSheet()"><div class="in" id="sheetIn"></div></div>
+<input id="pick" type="file" multiple class="hide" onchange="addFiles(this.files);this.value=''">
+<div id="busy" class="hide"><div class="spin"></div><div id="busyT"></div></div>
+<div id="toast" class="hide"></div>
+
+<script src="config.js"></script>
+<script src="core.js"></script>
+<script src="api.js"></script>
+<script src="detect.js"></script>
+<script>
+var MON = ['जनवरी','फ़रवरी','मार्च','अप्रैल','मई','जून','जुलाई','अगस्त','सितंबर','अक्टूबर','नवंबर','दिसंबर'];
+var S = { key: '', mid: Core.lastMonth(new Date()), d: null, q: '', filter: 'all', shared: [], sharedInfo: [], sel: null, pend: [], doneAfter: false };
+function $(id) { return document.getElementById(id); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function toast(t, ms) { var e = $('toast'); e.textContent = t; e.classList.remove('hide'); clearTimeout(toast.h); toast.h = setTimeout(function () { e.classList.add('hide'); }, ms || 3000); }
+function busy(on, t) { $('busy').classList.toggle('hide', !on); $('busyT').textContent = t || ''; }
+function A(action, p) { return API.call(action, Object.assign({ adminKey: S.key }, p || {})); }
+function err(e) {
+  if (e.code === 'ADMIN_KEY_WRONG') { logout(); toast('पासवर्ड गलत है', 4000); return; }
+  if (e.code === 'ADMIN_LOCKED') { toast('🔒 10 बार गलत पासवर्ड – 15 मिनट बाद खोलें', 6000); return; }
+  toast(e.message || String(e), 5000);
+}
+function mLabel(mid) { return MON[+mid.slice(5, 7) - 1] + ' ' + mid.slice(0, 4); }
+function kb(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+function ago(iso) {
+  var m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  return m < 1 ? 'अभी' : m < 60 ? m + ' मिनट पहले' : m < 1440 ? Math.round(m / 60) + ' घंटे पहले' : Math.round(m / 1440) + ' दिन पहले';
+}
+
+/* ---------- login / office flag (installed app + WhatsApp share open this page on this phone) ---------- */
+function setFlag(on) {
+  try { if (on) localStorage.setItem('vas_office', '1'); else localStorage.removeItem('vas_office'); } catch (e) {}
+  if ('caches' in window) { if (on) caches.open('vas-office').then(function (c) { return c.put('flag', new Response('1')); }).catch(function () {}); else caches.delete('vas-office').catch(function () {}); }
+}
+function login() {
+  var k = $('pw').value.trim(); if (!k) return;
+  S.key = k; busy(true, 'खोल रहे हैं…');
+  A('aOffice', { mid: S.mid }).then(function (d) {
+    try { localStorage.setItem('vas_admin_key', k); } catch (e) {}
+    setFlag(true); S.d = d; showApp();
+  }).catch(err).then(function () { busy(false); });
+}
+function logout() {
+  try { localStorage.removeItem('vas_admin_key'); } catch (e) {}
+  setFlag(false); S.key = ''; $('app').classList.add('hide'); $('login').classList.remove('hide');
+}
+function showApp() { $('login').classList.add('hide'); $('app').classList.remove('hide'); fillMonths(); render(); }
+
+/* ---------- data ---------- */
+function load(quiet) {
+  if (!quiet) busy(true, 'ताज़ा कर रहे हैं…');
+  return A('aOffice', { mid: S.mid }).then(function (d) { S.d = d; render(); if (S.sel) renderSheet(); }).catch(err).then(function () { busy(false); });
+}
+function fillMonths() {
+  var sel = $('mon'), cur = Core.addMonth(Core.lastMonth(new Date()), 1), h = '';
+  for (var i = 0; i < 15; i++) { var m = Core.addMonth(cur, -i); h += '<option value="' + m + '">' + mLabel(m) + '</option>'; }
+  sel.innerHTML = h; sel.value = S.mid;
+}
+function stepMonth(k) { var m = Core.addMonth(S.mid, k), sel = $('mon'); if (![].some.call(sel.options, function (o) { return o.value === m; })) return; S.mid = m; sel.value = m; render(); }
+function pidOf(c) { return Core.pidFor(c.f, S.mid); }
+function key(c) { return c.g + '|' + pidOf(c); }
+
+// one client's state for the picked month
+function stateOf(c) {
+  var d = S.d, pid = pidOf(c), k = c.g + '|' + pid;
+  var files = d.files.filter(function (f) { return f.g === c.g && f.pid === pid; });
+  var done = d.done[k] || null;
+  var st = d.status && d.status.items ? d.status.items[k] : null;
+  // a status written before the latest tick belongs to the older run
+  if (st && done && st.at && st.at < done.at && st.st !== 'RUN') st = Object.assign({}, st, { old: true });
+  var app = d.app[c.g] && d.app[c.g].pid === pid ? d.app[c.g] : null;
+  var s = { pid: pid, files: files, done: done, st: st, app: app, stage: 'none', tag: '', cls: 't-mute' };
+  if (st && !st.old && (st.st === 'MADE' || st.st === 'WARN')) { s.stage = 'made'; s.tag = st.st === 'MADE' ? '📄 शीट बनी' : '📄 शीट बनी ⚠'; s.cls = st.st === 'MADE' ? 't-ok' : 't-warn'; }
+  else if (st && !st.old && st.st === 'ERR') { s.stage = 'err'; s.tag = '✗ गलती'; s.cls = 't-bad'; }
+  else if (st && !st.old && st.st === 'NOCLIENT') { s.stage = 'err'; s.tag = '⚠ Report Tool में नहीं'; s.cls = 't-bad'; }
+  else if (st && !st.old && st.st === 'SKIP' && done) { s.stage = 'err'; s.tag = '⚠ रुका'; s.cls = 't-warn'; }
+  else if (done) { s.stage = 'done'; s.tag = st && st.st === 'RUN' ? '⚙️ शीट बन रही' : '✅ पूरा – मुंशी का इंतज़ार'; s.cls = 't-info'; }
+  else if (files.length) { s.stage = 'files'; s.tag = '📥 ' + files.length + ' फ़ाइल'; s.cls = 't-warn'; }
+  else if (app && app.files) { s.stage = 'app'; s.tag = '📲 ऐप: ' + app.files + ' फ़ाइल' + (app.data === 'SUBMITTED' || app.data === 'COMPLETE' ? ' ✓' : ''); s.cls = 't-info'; }
+  else if (app && app.data === 'NIL') { s.stage = 'app'; s.tag = '○ NIL (ऐप)'; s.cls = 't-mute'; }
+  return s;
+}
+
+/* ---------- main list ---------- */
+var FILTERS = [['all', 'सब'], ['files', '📥 फ़ाइल आईं'], ['done', '✅ पूरा'], ['made', '📄 शीट बनी'], ['err', '⚠ गलती'], ['none', 'बाकी']];
+function render() {
+  if (!S.d) return;
+  var st = S.d.status, hb = $('hb');
+  if (!st || !st.at) { hb.textContent = '🖥️ मुंशी (लैपटॉप) से अभी कोई ख़बर नहीं आई'; hb.className = 'hb bad'; }
+  else {
+    var min = (Date.now() - new Date(st.at).getTime()) / 60000;
+    hb.textContent = (min > 10 ? '⚠ मुंशी ने आख़िरी बार ' : '🖥️ मुंशी चालू – आख़िरी बार ') + ago(st.at) + ' देखा' + (min > 10 ? ' – लैपटॉप / मुंशी बंद है?' : '');
+    hb.className = 'hb' + (min > 10 ? ' bad' : '');
+  }
+  renderShare(); renderList();
+}
+function renderShare() {
+  var b = $('shareBox');
+  if (!S.shared.length) { b.classList.add('hide'); return; }
+  b.classList.remove('hide');
+  b.innerHTML = '📎 <b>WhatsApp से ' + S.shared.length + ' फ़ाइल आईं</b> – नीचे क्लाइंट ढूँढ़कर उस पर दबाएँ।' +
+    '<div class="sub" style="margin-top:4px;font-size:12.5px">' + S.shared.map(function (f) { return esc(f.name); }).join(' • ') + '</div>' +
+    '<div style="margin-top:8px"><button class="btn" style="min-height:36px" onclick="dropShared()">✕ हटाएँ</button></div>';
+}
+function renderList() {
+  if (!S.d) return;
+  var q = S.q.trim().toLowerCase(), counts = {}, rows = [];
+  S.d.clients.slice().sort(function (a, b) { return a.n.localeCompare(b.n); }).forEach(function (c) {
+    var s = stateOf(c), grp = s.stage === 'app' ? 'none' : s.stage;
+    counts[grp] = (counts[grp] || 0) + 1; counts.all = (counts.all || 0) + 1;
+    if (S.filter !== 'all' && grp !== S.filter) return;
+    if (q && (c.n + ' ' + c.l + ' ' + c.g).toLowerCase().indexOf(q) < 0) return;
+    rows.push([c, s]);
+  });
+  $('chips').innerHTML = FILTERS.map(function (f) {
+    return '<button class="chip' + (S.filter === f[0] ? ' on' : '') + '" onclick="S.filter=\'' + f[0] + '\';renderList()">' + f[1] + ' ' + (counts[f[0]] || 0) + '</button>';
+  }).join('');
+  $('list').innerHTML = rows.length ? rows.slice(0, 300).map(function (r) {
+    var c = r[0], s = r[1];
+    return '<div class="row" onclick="openClient(\'' + c.g + '\')"><div class="grow"><div class="nm ell">' + esc(c.n) + '</div>' +
+      '<div class="sub ell">' + c.g + ' · ' + (c.f === 'Q' ? 'तिमाही ' + Core.periodLabel(s.pid) : 'मासिक') + ' · ' + locText(c) + '</div></div>' +
+      (s.tag ? '<span class="tag ' + s.cls + '">' + s.tag + '</span>' : '') + '</div>';
+  }).join('') : '<div class="sub" style="padding:14px 4px">कोई क्लाइंट नहीं मिला</div>';
+  $('cnt').textContent = 'कुल ' + S.d.clients.length + ' क्लाइंट' + (S.d.listAt ? ' · लिस्ट ' + ago(S.d.listAt) + ' मुंशी से आई' : ' · मुंशी से लिस्ट अभी नहीं आई');
+}
+function locText(c) { return c.loc === 'H' ? '💻 H: फ़ोल्डर' : c.loc === 'G' ? '☁️ Drive फ़ोल्डर' : c.noTool ? '📲 सिर्फ़ ऐप' : '💻 Report Tool'; }
+
+/* ---------- WhatsApp share ---------- */
+function readShared() {
+  if (!('caches' in window)) return Promise.resolve([]);
+  return caches.open('vas-share').then(function (c) {
+    return c.match('share/list').then(function (r) {
+      if (!r) return [];
+      return r.json().then(function (m) {
+        if (Date.now() - m.at > 3 * 86400000) return [];
+        return Promise.all(m.files.map(function (x) {
+          return c.match('share/' + x.k).then(function (r2) { return r2 ? r2.blob() : null; })
+            .then(function (b) { return b ? new File([b], x.name, { type: x.type || b.type }) : null; });
+        }));
+      });
+    });
+  }).then(function (l) { return l.filter(Boolean); }).catch(function () { return []; });
+}
+function dropShared() { S.shared = []; if ('caches' in window) caches.delete('vas-share').catch(function () {}); history.replaceState(null, '', 'office.html'); renderShare(); }
+
+/* ---------- one client ---------- */
+function cl(g) { return S.d.clients.filter(function (c) { return c.g === g; })[0]; }
+function openClient(g) {
+  S.sel = g; S.doneAfter = false;
+  S.pend = [];
+  var add = S.shared.length ? S.shared.slice() : [];
+  $('sheet').classList.remove('hide');
+  renderSheet();
+  if (add.length) addFiles(add, true);
+}
+function closeSheet() { S.sel = null; S.pend = []; $('sheet').classList.add('hide'); renderList(); }
+// read each picked / shared file: which report + which month (ZIPs are sent whole – GST Report Tool opens them itself)
+function addFiles(list, fromShare) {
+  list = [].slice.call(list || []); if (!list.length) return;
+  busy(true, 'फ़ाइल जाँच रहे हैं…');
+  Promise.all(list.map(function (f) {
+    return Detect.inspect(f).then(function (r) {
+      var months = [], labels = [];
+      r.items.forEach(function (it) { (it.months || []).forEach(function (m) { if (months.indexOf(m) < 0) months.push(m); }); if (it.label && labels.indexOf(it.label) < 0) labels.push(it.label); });
+      return { file: f, months: months.sort(), label: labels.join(', '), type: r.items.length === 1 ? (r.items[0].type || '') : (r.zip ? 'ZIP' : ''), share: !!fromShare };
+    }).catch(function () { return { file: f, months: [], label: '', type: '', share: !!fromShare }; });
+  })).then(function (items) {
+    S.pend = S.pend.concat(items);
+    autoMonth();
+    renderSheet();
+  }).then(function () { busy(false); });
+}
+// all files belong to one other month/quarter → move the picker there (like the client app does)
+function autoMonth() {
+  var c = cl(S.sel); if (!c) return;
+  var ms = []; S.pend.forEach(function (p) { p.months.forEach(function (m) { if (ms.indexOf(m) < 0) ms.push(m); }); });
+  if (!ms.length) { S.monthNote = ''; return; }
+  var pids = {}; ms.forEach(function (m) { pids[Core.pidFor(c.f, m)] = 1; });
+  var keys = Object.keys(pids);
+  if (keys.length === 1 && keys[0] !== pidOf(c)) {
+    var target = ms.sort()[ms.length - 1];
+    S.mid = target; $('mon').value = target;
+    S.monthNote = '📅 ये रिपोर्ट ' + Core.periodLabel(keys[0]) + ' की है – अवधि अपने आप बदल दी।';
+  } else if (keys.length > 1) S.monthNote = '⚠ फ़ाइलें अलग-अलग महीनों की हैं (' + keys.map(Core.periodLabel).join(', ') + ') – सबको ' + Core.periodLabel(pidOf(c)) + ' में डालेंगे। ठीक न हो तो अलग-अलग डालें।';
+  else S.monthNote = '';
+}
+function renderSheet() {
+  var c = cl(S.sel); if (!c) return;
+  var s = stateOf(c), pid = s.pid, h = '';
+  h += '<button class="x" onclick="closeSheet()">✕</button><h2>' + esc(c.n) + '</h2>';
+  h += '<div class="sub" style="color:var(--mute);font-size:13px">' + c.g + ' · ' + locText(c) + '</div>';
+  h += '<div class="lbl">अवधि</div><div class="card" style="display:flex;align-items:center;gap:8px;padding:8px 10px">' +
+    '<button class="btn" style="min-height:36px;padding:0 12px" onclick="stepMonth(' + (c.f === 'Q' ? -3 : -1) + ');renderSheet()">‹</button>' +
+    '<b class="grow" style="text-align:center">' + Core.periodLabel(pid) + (c.f === 'Q' ? ' (तिमाही)' : '') + '</b>' +
+    '<button class="btn" style="min-height:36px;padding:0 12px" onclick="stepMonth(' + (c.f === 'Q' ? 3 : 1) + ');renderSheet()">›</button></div>';
+  if (c.noTool) h += '<div class="banner bad">⚠ ये क्लाइंट GST Report Tool में नहीं है। मुंशी इसकी फ़ाइल नहीं रख पाएगा – पहले लैपटॉप पर Report Tool में जोड़ें।</div>';
+  if (S.monthNote && S.pend.length) h += '<div class="banner info">' + S.monthNote + '</div>';
+
+  // files waiting to be sent
+  if (S.pend.length) {
+    h += '<div class="lbl">भेजनी हैं (' + S.pend.length + ')</div><div class="card">';
+    S.pend.forEach(function (p, i) {
+      h += '<div class="f"><span>' + (p.label ? '📊' : '📄') + '</span><div class="grow"><div class="ell">' + esc(p.file.name) + '</div><div class="sub" style="font-size:12px;color:var(--mute)">' +
+        (p.label ? esc(p.label) : 'पहचान नहीं हुई – फिर भी भेज देंगे') + (p.months.length ? ' · ' + p.months.map(mLabel).join(', ') : '') + ' · ' + kb(p.file.size) + '</div></div>' +
+        '<button class="del" onclick="S.pend.splice(' + i + ',1);autoMonth();renderSheet()">✕</button></div>';
+    });
+    h += '<label style="display:flex;gap:10px;align-items:center;margin-top:10px;font-weight:600"><input type="checkbox" style="width:22px;height:22px" ' + (S.doneAfter ? 'checked' : '') +
+      ' onchange="S.doneAfter=this.checked"> सारा डेटा आ गया – साथ में "डेटा पूरा" भी कर दो</label>';
+    h += '<div style="height:10px"></div><button class="btn pri wide" onclick="sendAll()">⬆️ ' + S.pend.length + ' फ़ाइल भेजें</button></div>';
+  }
+  h += '<button class="btn wide" onclick="$(\'pick\').click()">📂 फ़ाइल चुनें (Excel / ZIP / PDF)</button>';
+
+  // sent files
+  h += '<div class="lbl">फ़ोन से भेजी गईं (' + s.files.length + ')</div><div class="card">';
+  h += s.files.length ? s.files.map(function (f) {
+    return '<div class="f"><span>📎</span><div class="grow"><div class="ell">' + esc(f.name) + '</div><div class="sub" style="font-size:12px;color:var(--mute)">' + kb(f.size) + ' · ' + ago(f.at) + '</div></div>' +
+      '<button class="del" onclick="delFile(\'' + f.id + '\')">✕</button></div>';
+  }).join('') : '<div class="sub" style="color:var(--mute);font-size:13.5px">अभी कोई फ़ाइल नहीं</div>';
+  if (s.app && s.app.files) h += '<div class="sub" style="margin-top:6px;font-size:13px;color:var(--info)">📲 क्लाइंट ने ख़ुद ऐप में ' + s.app.files + ' फ़ाइल डाली हैं (वो पहले से उसके फ़ोल्डर में हैं)</div>';
+  h += '</div>';
+
+  // the "data complete" tick
+  h += '<div class="toggle' + (s.done ? ' on' : '') + '" onclick="toggleDone()"><span class="box">' + (s.done ? '✓' : '') + '</span><div class="grow">डेटा पूरा' +
+    '<div style="font-weight:400;font-size:13px">' + (s.done ? 'टिक ' + ago(s.done.at) + ' – मुंशी शीट बनाएगा' : 'टिक करते ही मुंशी लैपटॉप पर शीट बनाएगा') + '</div></div></div>';
+
+  // progress
+  var st = s.st && !s.st.old ? s.st : null, moved = st ? (st.moved || 0) : 0;
+  var steps = [
+    [s.files.length > 0 || (s.app && s.app.files), '📥', s.files.length ? s.files.length + ' फ़ाइल फ़ोन से आईं' : 'फ़ाइल आनी हैं'],
+    [s.files.length > 0 && moved >= s.files.length, '🚚', moved ? moved + ' फ़ाइल क्लाइंट के फ़ोल्डर में पहुँचीं' : 'मुंशी फ़ाइल क्लाइंट के फ़ोल्डर में रखेगा'],
+    [!!s.done, '✅', s.done ? 'डेटा पूरा (टिक हो गया)' : 'डेटा पूरा का टिक बाकी'],
+    [s.stage === 'made', '📄', st && st.st === 'RUN' ? 'शीट बन रही है…' : st && (st.st === 'MADE' || st.st === 'WARN') ? esc(st.msg || 'शीट बनी') : 'मुंशी GSTR-1 शीट बनाएगा'],
+    [false, '🔁', 'TCS मिलान + अपलोड – लैपटॉप पर (क्लाइंट का OTP)']
+  ];
+  h += '<div class="lbl">काम कहाँ तक</div><div class="card"><ul class="steps">' + steps.map(function (x) { return '<li class="' + (x[0] ? 'done' : '') + '"><span class="d">' + (x[0] ? x[1] : '○') + '</span><span>' + x[2] + '</span></li>'; }).join('') + '</ul>';
+  if (st && (st.st === 'ERR' || st.st === 'SKIP' || st.st === 'NOCLIENT')) h += '<div class="banner bad" style="margin:8px 0 0">' + esc(st.msg || 'गलती – मुंशी का log देखें') + '</div>';
+  h += '</div>';
+  $('sheetIn').innerHTML = h;
+}
+function sendAll() {
+  var c = cl(S.sel), pid = pidOf(c), list = S.pend.slice(), i = 0, sent = 0, undone = false;
+  if (!list.length) return;
+  function next() {
+    if (i >= list.length) return Promise.resolve();
+    var p = list[i++];
+    busy(true, 'भेज रहे हैं ' + i + '/' + list.length + '…\n' + p.file.name);
+    return API.fileToB64(p.file).then(function (b64) {
+      return A('aOfficeUpload', { gstin: c.g, pid: pid, name: p.file.name, mime: p.file.type, b64: b64, ftype: p.type });
+    }).then(function (r) { sent++; if (r.undone) undone = true; S.pend.splice(S.pend.indexOf(p), 1); }, function (e) { toast(p.file.name + ': ' + (e.message || e), 5000); })
+      .then(next);
+  }
+  next().then(function () {
+    if (sent && S.doneAfter) return A('aOfficeDone', { gstin: c.g, pid: pid, done: true });
+  }).then(function () {
+    if (sent && S.shared.length && list.some(function (p) { return p.share; })) dropShared();
+    toast('✓ ' + sent + ' फ़ाइल भेजीं' + (S.doneAfter ? ' + डेटा पूरा' : undone ? ' – "डेटा पूरा" फिर से टिक करें' : ''), 4000);
+    S.doneAfter = false;
+    return load(true);
+  }).catch(err).then(function () { busy(false); });
+}
+function delFile(id) {
+  if (!confirm('ये फ़ाइल हटाएँ? (अगर मुंशी उसे फ़ोल्डर में रख चुका है तो वहाँ से लैपटॉप पर हटानी होगी)')) return;
+  busy(true, 'हटा रहे हैं…');
+  A('aOfficeDelete', { id: id }).then(function () { return load(true); }).catch(err).then(function () { busy(false); });
+}
+function toggleDone() {
+  var c = cl(S.sel), s = stateOf(c);
+  if (S.pend.length && !s.done) { toast('पहले "फ़ाइल भेजें" दबाएँ'); return; }
+  var on = !s.done, force = false;
+  if (on && !s.files.length) {
+    if (!confirm('फ़ोन से इस अवधि की कोई फ़ाइल नहीं भेजी। क्या डेटा पहले से फ़ोल्डर में है और मुंशी शीट बना दे?')) return;
+    force = true;
+  }
+  busy(true, on ? 'डेटा पूरा कर रहे हैं…' : 'टिक हटा रहे हैं…');
+  A('aOfficeDone', { gstin: c.g, pid: s.pid, done: on, force: force }).then(function () { toast(on ? '✅ डेटा पूरा – मुंशी शीट बनाएगा' : 'टिक हटाया'); return load(true); }).catch(err).then(function () { busy(false); });
+}
+
+/* ---------- start ---------- */
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+try { S.key = localStorage.getItem('vas_admin_key') || ''; } catch (e) {}
+(/[?&]share=1/.test(location.search) ? readShared() : Promise.resolve([])).then(function (files) {
+  S.shared = files;
+  if (!S.key) { $('login').classList.remove('hide'); return; }
+  busy(true, 'खोल रहे हैं…');
+  return A('aOffice', { mid: S.mid }).then(function (d) { setFlag(true); S.d = d; showApp(); }).catch(function (e) { $('login').classList.remove('hide'); err(e); }).then(function () { busy(false); });
+});
+setInterval(function () { if (S.d && !document.hidden && $('busy').classList.contains('hide')) load(true); }, 60000);
+</script>
+</body>
+</html>

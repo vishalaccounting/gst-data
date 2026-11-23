@@ -5,7 +5,7 @@
    No DOM, no async, no modules – plain ES2019.
    ============================================================ */
 var Core = (function () {
-  var VERSION = '1.10.1';
+  var VERSION = '1.11.0';
 
   /* ---------- language: client picks हिंदी or English (q.lang per request, c.lang for notifications).
      T(hi, en) returns the text for the current LANG. The office / admin side always stays Hindi. ---------- */
@@ -1274,7 +1274,96 @@ var Core = (function () {
     return { lead: l };
   };
 
-  var READ_ONLY = { state: 1, aList: 1, aClient: 1, aInbox: 1, aPayments: 1, aContent: 1, aCalendar: 1, fileGet: 1 };
+  /* ---------- v1.11 office phone (office.html, "फ़ोन मुनीम") ----------
+     The office shares WhatsApp files from its own phone for ANY client of GST REPORT TOOL (not only app clients).
+     Files go to Drive  _office/inbox/<GSTIN>/<pid>/ . Munshi on the office laptop (Drive for Desktop) moves them into the
+     client's own folder – H:\vishal gst\... or the app folder, whatever the Report Tool says – and, once the office ticks
+     "डेटा पूरा", makes the GSTR-1 report. Munshi writes _office/clients.json (names, GSTIN, M/Q – never passwords)
+     and _office/status.json (what it moved / made); the server only reads them (ctx.readText). */
+  function office(db) {
+    if (!db.office) db.office = { files: [], done: {}, list: [], listAt: '' };
+    return db.office;
+  }
+  function readOfficeJson(ctx, name) {
+    try { var t = ctx.readText ? ctx.readText(['_office'], name) : ''; return t ? JSON.parse(String(t).replace(/^\uFEFF/, '')) : null; } catch (e) { return null; }
+  }
+  function officeClients(db, ctx) {
+    var o = office(db), raw = readOfficeJson(ctx, 'clients.json'), out = {};
+    var list = raw && Array.isArray(raw.clients) ? raw.clients : o.list;
+    list.forEach(function (x) {
+      var g = str(x.g, 15).toUpperCase();
+      if (/^\d{2}[A-Z0-9]{13}$/.test(g)) out[g] = { g: g, n: str(x.n, 120) || g, l: str(x.l, 120), f: x.f === 'Q' ? 'Q' : 'M', loc: str(x.loc, 4) };
+    });
+    // app clients that are not in the Report Tool yet still show (Munshi will say "Report Tool में जोड़ें")
+    Object.keys(db.clients).forEach(function (g) {
+      var c = db.clients[g];
+      if (out[g]) out[g].app = 1;
+      else out[g] = { g: g, n: displayName(c), l: '', f: c.freq === 'Q' ? 'Q' : 'M', loc: 'APP', app: 1, noTool: 1 };
+    });
+    return { list: Object.keys(out).map(function (g) { return out[g]; }), at: raw ? str(raw.at, 40) : o.listAt };
+  }
+  function pruneOffice(o, ctx) {
+    var old = new Date(ctx.now.getTime() - 200 * 86400000).toISOString();
+    o.files = o.files.filter(function (f) { return f.at > old; });
+    Object.keys(o.done).forEach(function (k) { if (o.done[k].at < old) delete o.done[k]; });
+  }
+  // everything the office phone shows; mid = the month picked on the phone (quarterly clients use its quarter)
+  A.aOffice = function (db, q, ctx) {
+    var o = office(db), cl = officeClients(db, ctx), mid = /^\d{4}-(0[1-9]|1[0-2])$/.test(str(q.mid, 7)) ? str(q.mid, 7) : lastMonth(ctx.now), app = {};
+    cl.list.forEach(function (x) {
+      var c = db.clients[x.g]; if (!c) return;
+      var pid = pidFor(c.freq, mid), rec = (db.periods[x.g] || {})[pid];
+      if (rec) { var sm = summary(c, pid, rec); app[x.g] = { pid: pid, data: sm.data, files: sm.files, work: rec.work || '' }; }
+    });
+    return { clients: cl.list, listAt: cl.at, files: o.files, done: o.done, status: readOfficeJson(ctx, 'status.json'), app: app, now: ctx.now.toISOString() };
+  };
+  A.aOfficeUpload = function (db, q, ctx) {
+    var o = office(db), g = str(q.gstin, 15).toUpperCase(), pid = str(q.pid, 10);
+    if (!/^\d{2}[A-Z0-9]{13}$/.test(g)) fail('GSTIN सही नहीं');
+    if (!isPid(pid)) fail('अवधि सही नहीं');
+    var name = safeName(str(q.name, 150).replace(/[\\\/:*?"<>|]/g, '_') || 'file');
+    if (!q.b64) fail('फाइल खाली है');
+    var size = Math.round(String(q.b64).length * 0.75);
+    if (size > 30 * 1048576) fail('फाइल 30 MB से बड़ी है');
+    if (o.files.some(function (f) { return f.g === g && f.pid === pid && f.name === name && Math.abs(f.size - size) < 4; })) fail('ये फाइल पहले से डाली हुई है: ' + name);
+    var st = ctx.saveFile({ folders: ['_office', 'inbox', g, pid], name: name, mime: str(q.mime, 100) || 'application/octet-stream' }, q.b64);
+    var f = { id: ctx.uuid(), g: g, pid: pid, name: name, size: size, at: ctx.now.toISOString(), fileId: st.fileId, type: str(q.ftype, 20) };
+    o.files.push(f);
+    // a file added after "डेटा पूरा" = the office must tick again (so Munshi makes the report with this file too)
+    var k = g + '|' + pid, undone = !!o.done[k];
+    if (undone) delete o.done[k];
+    pruneOffice(o, ctx);
+    return { file: f, undone: undone };
+  };
+  A.aOfficeDelete = function (db, q, ctx) {
+    var o = office(db), f = o.files.filter(function (x) { return x.id === q.id; })[0];
+    if (!f) fail('फाइल नहीं मिली');
+    o.files = o.files.filter(function (x) { return x.id !== q.id; });
+    ctx.deleteFile(f.fileId);   // already moved by Munshi → nothing left in Drive inbox (remove it from the client folder by hand)
+    var k = f.g + '|' + f.pid;
+    if (o.done[k]) delete o.done[k];
+    return {};
+  };
+  A.aOfficeDone = function (db, q, ctx) {
+    var o = office(db), g = str(q.gstin, 15).toUpperCase(), pid = str(q.pid, 10), k = g + '|' + pid;
+    if (!/^\d{2}[A-Z0-9]{13}$/.test(g) || !isPid(pid)) fail('क्लाइंट / अवधि सही नहीं');
+    if (!q.done) { delete o.done[k]; return { done: null }; }
+    var n = o.files.filter(function (f) { return f.g === g && f.pid === pid; }).length;
+    if (!n && !q.force) fail('इस क्लाइंट की इस अवधि में फ़ोन से कोई फाइल नहीं डाली गई');
+    o.done[k] = { at: ctx.now.toISOString(), n: n };
+    return { done: o.done[k] };
+  };
+  // the list normally comes from Munshi's _office/clients.json; this keeps a copy in db (demo / test / fallback)
+  A.aOfficeSetList = function (db, q, ctx) {
+    var o = office(db);
+    o.list = (Array.isArray(q.clients) ? q.clients : []).slice(0, 2000).map(function (x) {
+      return { g: str(x.g, 15).toUpperCase(), n: str(x.n, 120), l: str(x.l, 120), f: x.f === 'Q' ? 'Q' : 'M', loc: str(x.loc, 4) };
+    });
+    o.listAt = ctx.now.toISOString();
+    return { count: o.list.length };
+  };
+
+  var READ_ONLY = { state: 1, aList: 1, aClient: 1, aInbox: 1, aPayments: 1, aContent: 1, aCalendar: 1, fileGet: 1, aOffice: 1 };
 
   /* ---------- daily reminders (Apps Script time trigger / admin button) ---------- */
   function tick(db, ctx, force) {

@@ -95,6 +95,14 @@ function makeCtx() {
   };
   ctx.deleteFile = function (id) { if (!id) return; try { DriveApp.getFileById(id).setTrashed(true); } catch (e) {} };
   ctx.readFile = function (id) { return Utilities.base64Encode(DriveApp.getFileById(id).getBlob().getBytes()); };
+  // v1.11: small text files Munshi writes from the office laptop (_office/clients.json, _office/status.json); '' if missing
+  ctx.readText = function (folders, name) {
+    var folder = rootFolder();
+    for (var i = 0; i < folders.length; i++) { var it = folder.getFoldersByName(folders[i]); if (!it.hasNext()) return ''; folder = it.next(); }
+    var fi = folder.getFilesByName(name), best = null;
+    while (fi.hasNext()) { var f = fi.next(); if (!best || f.getLastUpdated() > best.getLastUpdated()) best = f; }
+    return best ? best.getBlob().getDataAsString('UTF-8') : '';
+  };
   ctx.renameFolder = function (oldName, newName) {
     var it = rootFolder().getFoldersByName(oldName);
     if (it.hasNext()) it.next().setName(newName);

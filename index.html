@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d3b66">
+<script>
+/* v1.11: on the office phone (office.html set 'vas_office') the installed app opens the office screen.
+   ?client=1 or the dashboard's #as= office mode still open the client app. */
+try { if (localStorage.getItem('vas_office') === '1' && !/[?&]client=1/.test(location.search) && !/as=/.test(location.hash))
+  location.replace('office.html' + (/[?&]share=1/.test(location.search) ? '?share=1' : '')); } catch (e) {}
+</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Vishal GST">
 <link rel="manifest" href="manifest.json">
