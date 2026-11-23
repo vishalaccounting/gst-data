@@ -5,7 +5,7 @@
    No DOM, no async, no modules – plain ES2019.
    ============================================================ */
 var Core = (function () {
-  var VERSION = '1.11.0';
+  var VERSION = '1.11.1';
 
   /* ---------- language: client picks हिंदी or English (q.lang per request, c.lang for notifications).
      T(hi, en) returns the text for the current LANG. The office / admin side always stays Hindi. ---------- */
@@ -1317,23 +1317,37 @@ var Core = (function () {
     });
     return { clients: cl.list, listAt: cl.at, files: o.files, done: o.done, status: readOfficeJson(ctx, 'status.json'), app: app, now: ctx.now.toISOString() };
   };
+  // v1.11.1: one request carries ALL files of a batch (q.files) + the "डेटा पूरा" tick (q.done) → db.json is read/saved once.
+  // A bad file does not stop the others: it comes back in errors[]. Old single-file calls (q.name + q.b64) still work.
   A.aOfficeUpload = function (db, q, ctx) {
-    var o = office(db), g = str(q.gstin, 15).toUpperCase(), pid = str(q.pid, 10);
+    var o = office(db), g = str(q.gstin, 15).toUpperCase(), pid = str(q.pid, 10), k = g + '|' + pid;
     if (!/^\d{2}[A-Z0-9]{13}$/.test(g)) fail('GSTIN सही नहीं');
     if (!isPid(pid)) fail('अवधि सही नहीं');
-    var name = safeName(str(q.name, 150).replace(/[\\\/:*?"<>|]/g, '_') || 'file');
-    if (!q.b64) fail('फाइल खाली है');
-    var size = Math.round(String(q.b64).length * 0.75);
-    if (size > 30 * 1048576) fail('फाइल 30 MB से बड़ी है');
-    if (o.files.some(function (f) { return f.g === g && f.pid === pid && f.name === name && Math.abs(f.size - size) < 4; })) fail('ये फाइल पहले से डाली हुई है: ' + name);
-    var st = ctx.saveFile({ folders: ['_office', 'inbox', g, pid], name: name, mime: str(q.mime, 100) || 'application/octet-stream' }, q.b64);
-    var f = { id: ctx.uuid(), g: g, pid: pid, name: name, size: size, at: ctx.now.toISOString(), fileId: st.fileId, type: str(q.ftype, 20) };
-    o.files.push(f);
-    // a file added after "डेटा पूरा" = the office must tick again (so Munshi makes the report with this file too)
-    var k = g + '|' + pid, undone = !!o.done[k];
+    var list = Array.isArray(q.files) ? q.files.slice(0, 50) : [{ name: q.name, mime: q.mime, b64: q.b64, ftype: q.ftype }];
+    var saved = [], errors = [], total = 0;
+    list.forEach(function (x) {
+      var nm = str(x && x.name, 150) || 'file';
+      try {
+        var name = safeName(nm.replace(/[\\\/:*?"<>|]/g, '_'));
+        if (!x.b64) fail('फाइल खाली है');
+        var size = Math.round(String(x.b64).length * 0.75);
+        if (size > 30 * 1048576) fail('फाइल 30 MB से बड़ी है');
+        total += size; if (total > 45 * 1048576) fail('एक बार में 45 MB से ज़्यादा नहीं – बाकी फ़ाइलें दोबारा भेजें');
+        if (o.files.some(function (f) { return f.g === g && f.pid === pid && f.name === name && Math.abs(f.size - size) < 4; })) fail('ये फाइल पहले से डाली हुई है');
+        var st = ctx.saveFile({ folders: ['_office', 'inbox', g, pid], name: name, mime: str(x.mime, 100) || 'application/octet-stream' }, x.b64);
+        var f = { id: ctx.uuid(), g: g, pid: pid, name: name, size: size, at: ctx.now.toISOString(), fileId: st.fileId, type: str(x.ftype, 20) };
+        o.files.push(f); saved.push(f);
+      } catch (e) { errors.push({ name: nm, error: e.user ? e.message : 'Server error: ' + e.message }); }
+    });
+    // a file added after "डेटा पूरा" = the tick goes (so Munshi remakes the report with this file too) unless this batch ticks again
+    var undone = !!(saved.length && o.done[k]);
     if (undone) delete o.done[k];
+    if (q.done && (saved.length || o.files.some(function (f) { return f.g === g && f.pid === pid; }))) {
+      o.done[k] = { at: ctx.now.toISOString(), n: o.files.filter(function (f) { return f.g === g && f.pid === pid; }).length };
+      undone = false;
+    }
     pruneOffice(o, ctx);
-    return { file: f, undone: undone };
+    return { saved: saved, errors: errors, undone: undone, file: saved[0], files: o.files.filter(function (f) { return f.g === g && f.pid === pid; }), done: o.done[k] || null };
   };
   A.aOfficeDelete = function (db, q, ctx) {
     var o = office(db), f = o.files.filter(function (x) { return x.id === q.id; })[0];
@@ -1342,7 +1356,7 @@ var Core = (function () {
     ctx.deleteFile(f.fileId);   // already moved by Munshi → nothing left in Drive inbox (remove it from the client folder by hand)
     var k = f.g + '|' + f.pid;
     if (o.done[k]) delete o.done[k];
-    return {};
+    return { files: o.files.filter(function (x) { return x.g === f.g && x.pid === f.pid; }), done: null };
   };
   A.aOfficeDone = function (db, q, ctx) {
     var o = office(db), g = str(q.gstin, 15).toUpperCase(), pid = str(q.pid, 10), k = g + '|' + pid;

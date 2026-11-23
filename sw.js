@@ -1,7 +1,7 @@
 /* Service worker: offline shell + auto-update + (optional) Firebase push.
    Network-first: whenever the phone is online it loads the newest files from GitHub Pages,
    so every push to GitHub reaches all clients automatically. Bump CACHE on each release. */
-var CACHE = 'vas-gst-1.11.0';
+var CACHE = 'vas-gst-1.11.1';
 var SHARE = 'vas-share';   // files shared to the app (WhatsApp → Share → Vishal GST), read by index.html
 var OFFICE = 'vas-office'; // v1.11: office.html puts 'flag' here on the office phone → shared files open office.html instead
 var SHELL = ['./', 'index.html', 'office.html','core.js', 'api.js', 'detect.js', 'config.js', 'manifest.json', 'icon-192.png', 'icon-512.png'];
@@ -32,16 +32,21 @@ self.addEventListener('fetch', function (e) {
 /* ---- share target: Android share sheet POSTs the files here (manifest share_target).
    They are parked in the SHARE cache and the app opens with ?share=1 to ask which slot they go in. ---- */
 function takeShare(req) {
-  return req.formData().then(function (fd) {
+  var flag = null;
+  return caches.open(OFFICE).then(function (c) { return c.match('flag'); }).catch(function () { return null; }).then(function (f) { flag = f; return req.formData(); }).then(function (fd) {
     var files = fd.getAll('files').filter(function (f) { return f && typeof f !== 'string' && f.size; });
-    var list = files.map(function (f, i) { return { k: 'f' + i, name: f.name || ('file-' + (i + 1)), type: f.type || '' }; });
-    return caches.delete(SHARE).then(function () { return caches.open(SHARE); }).then(function (c) {
-      return Promise.all(files.map(function (f, i) { return c.put('share/' + list[i].k, new Response(f)); }))
-        .then(function () { return c.put('share/list', new Response(JSON.stringify({ at: Date.now(), files: list }))); });
+    // v1.11.1 office phone: WhatsApp shares one document at a time, so shares within 30 min are collected in one basket
+    var old = flag ? caches.open(SHARE).then(function (c) { return c.match('share/list'); }).then(function (r) { return r ? r.json() : null; }).catch(function () { return null; }) : Promise.resolve(null);
+    return old.then(function (prev) {
+      var keep = prev && Date.now() - prev.at < 30 * 60000 ? prev.files : [], start = Date.now();
+      var list = files.map(function (f, i) { return { k: 'f' + start + '_' + i, name: f.name || ('file-' + (i + 1)), type: f.type || '' }; });
+      return (keep.length ? caches.open(SHARE) : caches.delete(SHARE).then(function () { return caches.open(SHARE); })).then(function (c) {
+        return Promise.all(files.map(function (f, i) { return c.put('share/' + list[i].k, new Response(f)); }))
+          .then(function () { return c.put('share/list', new Response(JSON.stringify({ at: Date.now(), files: keep.concat(list) }))); });
+      });
     });
   }).catch(function () {})
-    .then(function () { return caches.open(OFFICE).then(function (c) { return c.match('flag'); }).catch(function () { return null; }); })
-    .then(function (flag) { return Response.redirect(new URL(flag ? 'office.html?share=1' : 'index.html?share=1', self.registration.scope).href, 303); });
+    .then(function () { return Response.redirect(new URL(flag ? 'office.html?share=1' : 'index.html?share=1', self.registration.scope).href, 303); });
 }
 
 /* ---- push ---- */

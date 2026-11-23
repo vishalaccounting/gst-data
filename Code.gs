@@ -97,6 +97,14 @@ function makeCtx() {
   ctx.readFile = function (id) { return Utilities.base64Encode(DriveApp.getFileById(id).getBlob().getBytes()); };
   // v1.11: small text files Munshi writes from the office laptop (_office/clients.json, _office/status.json); '' if missing
   ctx.readText = function (folders, name) {
+    // the client list changes rarely: keep it 5 min in the script cache (status.json is always read fresh)
+    var ck = name === 'clients.json' ? 'rt_' + folders.join('/') + '/' + name : '', cache = CacheService.getScriptCache();
+    if (ck) { var hit = cache.get(ck); if (hit != null) return hit; }
+    var txt = readTextNow(folders, name);
+    if (ck && txt.length < 90000) cache.put(ck, txt, 300);
+    return txt;
+  };
+  function readTextNow(folders, name) {
     var folder = rootFolder();
     for (var i = 0; i < folders.length; i++) { var it = folder.getFoldersByName(folders[i]); if (!it.hasNext()) return ''; folder = it.next(); }
     var fi = folder.getFilesByName(name), best = null;

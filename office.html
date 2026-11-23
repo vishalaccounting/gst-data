@@ -150,7 +150,7 @@ function login() {
   }).catch(err).then(function () { busy(false); });
 }
 function logout() {
-  try { localStorage.removeItem('vas_admin_key'); } catch (e) {}
+  try { localStorage.removeItem('vas_admin_key'); localStorage.removeItem('vas_office_cache'); localStorage.removeItem('vas_office_last'); } catch (e) {}
   setFlag(false); S.key = ''; $('app').classList.add('hide'); $('login').classList.remove('hide');
 }
 function showApp() { $('login').classList.add('hide'); $('app').classList.remove('hide'); fillMonths(); render(); }
@@ -158,8 +158,18 @@ function showApp() { $('login').classList.add('hide'); $('app').classList.remove
 /* ---------- data ---------- */
 function load(quiet) {
   if (!quiet) busy(true, 'ताज़ा कर रहे हैं…');
-  return A('aOffice', { mid: S.mid }).then(function (d) { S.d = d; render(); if (S.sel) renderSheet(); }).catch(err).then(function () { busy(false); });
+  return A('aOffice', { mid: S.mid }).then(function (d) { S.d = d; saveCache(); render(); if (S.sel) renderSheet(); }).catch(err).then(function () { busy(false); });
 }
+// v1.11.1: the last list is kept on the phone → the screen opens at once, fresh data comes in the background
+function saveCache() { try { localStorage.setItem('vas_office_cache', JSON.stringify(S.d)); } catch (e) {} }
+function readCache() { try { return JSON.parse(localStorage.getItem('vas_office_cache') || 'null'); } catch (e) { return null; } }
+// server replies with this client/period's files + tick → merge, no full reload
+function mergePair(g, pid, files, done) {
+  S.d.files = S.d.files.filter(function (f) { return !(f.g === g && f.pid === pid); }).concat(files || []);
+  var k = g + '|' + pid; if (done) S.d.done[k] = done; else delete S.d.done[k];
+  saveCache(); render(); if (S.sel) renderSheet();
+}
+function lastClient() { try { var l = JSON.parse(localStorage.getItem('vas_office_last') || 'null'); return l && Date.now() - l.at < 3 * 3600000 ? l.g : ''; } catch (e) { return ''; } }
 function fillMonths() {
   var sel = $('mon'), cur = Core.addMonth(Core.lastMonth(new Date()), 1), h = '';
   for (var i = 0; i < 15; i++) { var m = Core.addMonth(cur, -i); h += '<option value="' + m + '">' + mLabel(m) + '</option>'; }
@@ -207,9 +217,13 @@ function renderShare() {
   var b = $('shareBox');
   if (!S.shared.length) { b.classList.add('hide'); return; }
   b.classList.remove('hide');
-  b.innerHTML = '📎 <b>WhatsApp से ' + S.shared.length + ' फ़ाइल आईं</b> – नीचे क्लाइंट ढूँढ़कर उस पर दबाएँ।' +
+  var lg = lastClient(), lc = lg && S.d ? cl(lg) : null;
+  b.innerHTML = '📎 <b>' + S.shared.length + ' फ़ाइल जमा हैं</b>' +
     '<div class="sub" style="margin-top:4px;font-size:12.5px">' + S.shared.map(function (f) { return esc(f.name); }).join(' • ') + '</div>' +
-    '<div style="margin-top:8px"><button class="btn" style="min-height:36px" onclick="dropShared()">✕ हटाएँ</button></div>';
+    '<div style="margin-top:6px;font-size:13px">और फ़ाइल हों तो WhatsApp पर वापस जाकर अगली फ़ाइल भी Share करें – सब यहीं जुड़ती जाएँगी। सब हो जाए तो नीचे क्लाइंट चुनें।</div>' +
+    '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">' +
+    (lc ? '<button class="btn pri" style="min-height:40px" onclick="openClient(\'' + lc.g + '\')">➡ ' + esc(lc.n) + ' में डालें</button>' : '') +
+    '<button class="btn" style="min-height:40px" onclick="dropShared()">✕ हटाएँ</button></div>';
 }
 function renderList() {
   if (!S.d) return;
@@ -264,20 +278,21 @@ function openClient(g) {
 }
 function closeSheet() { S.sel = null; S.pend = []; $('sheet').classList.add('hide'); renderList(); }
 // read each picked / shared file: which report + which month (ZIPs are sent whole – GST Report Tool opens them itself)
+// v1.11.1: the files show at once; the check (which report / month) fills in by itself a moment later
 function addFiles(list, fromShare) {
   list = [].slice.call(list || []); if (!list.length) return;
-  busy(true, 'फ़ाइल जाँच रहे हैं…');
-  Promise.all(list.map(function (f) {
-    return Detect.inspect(f).then(function (r) {
-      var months = [], labels = [];
-      r.items.forEach(function (it) { (it.months || []).forEach(function (m) { if (months.indexOf(m) < 0) months.push(m); }); if (it.label && labels.indexOf(it.label) < 0) labels.push(it.label); });
-      return { file: f, months: months.sort(), label: labels.join(', '), type: r.items.length === 1 ? (r.items[0].type || '') : (r.zip ? 'ZIP' : ''), share: !!fromShare };
-    }).catch(function () { return { file: f, months: [], label: '', type: '', share: !!fromShare }; });
-  })).then(function (items) {
-    S.pend = S.pend.concat(items);
-    autoMonth();
-    renderSheet();
-  }).then(function () { busy(false); });
+  var items = list.map(function (f) { return { file: f, months: [], label: '', type: '', share: !!fromShare, checking: true }; });
+  S.pend = S.pend.concat(items);
+  renderSheet();
+  S.checking = (S.checking || Promise.resolve()).then(function () {
+    return Promise.all(items.map(function (p) {
+      return Detect.inspect(p.file).then(function (r) {
+        var months = [], labels = [];
+        r.items.forEach(function (it) { (it.months || []).forEach(function (m) { if (months.indexOf(m) < 0) months.push(m); }); if (it.label && labels.indexOf(it.label) < 0) labels.push(it.label); });
+        p.months = months.sort(); p.label = labels.join(', '); p.type = r.items.length === 1 ? (r.items[0].type || '') : (r.zip ? 'ZIP' : '');
+      }).catch(function () {}).then(function () { p.checking = false; });
+    }));
+  }).then(function () { autoMonth(); if (S.sel) renderSheet(); });
 }
 // all files belong to one other month/quarter → move the picker there (like the client app does)
 function autoMonth() {
@@ -310,7 +325,7 @@ function renderSheet() {
     h += '<div class="lbl">भेजनी हैं (' + S.pend.length + ')</div><div class="card">';
     S.pend.forEach(function (p, i) {
       h += '<div class="f"><span>' + (p.label ? '📊' : '📄') + '</span><div class="grow"><div class="ell">' + esc(p.file.name) + '</div><div class="sub" style="font-size:12px;color:var(--mute)">' +
-        (p.label ? esc(p.label) : 'पहचान नहीं हुई – फिर भी भेज देंगे') + (p.months.length ? ' · ' + p.months.map(mLabel).join(', ') : '') + ' · ' + kb(p.file.size) + '</div></div>' +
+        (p.checking ? 'जाँच रहे हैं…' : p.label ? esc(p.label) : 'पहचान नहीं हुई – फिर भी भेज देंगे') + (p.months.length ? ' · ' + p.months.map(mLabel).join(', ') : '') + ' · ' + kb(p.file.size) + '</div></div>' +
         '<button class="del" onclick="S.pend.splice(' + i + ',1);autoMonth();renderSheet()">✕</button></div>';
     });
     h += '<label style="display:flex;gap:10px;align-items:center;margin-top:10px;font-weight:600"><input type="checkbox" style="width:22px;height:22px" ' + (S.doneAfter ? 'checked' : '') +
@@ -346,31 +361,43 @@ function renderSheet() {
   h += '</div>';
   $('sheetIn').innerHTML = h;
 }
+// v1.11.1: all files (+ the tick) go in ONE request (several only above ~12 MB) instead of one request per file
 function sendAll() {
-  var c = cl(S.sel), pid = pidOf(c), list = S.pend.slice(), i = 0, sent = 0, undone = false;
+  var c = cl(S.sel), pid = pidOf(c), list = S.pend.slice(), sent = 0, bad = [], undone = false, wantDone = S.doneAfter;
   if (!list.length) return;
-  function next() {
-    if (i >= list.length) return Promise.resolve();
-    var p = list[i++];
-    busy(true, 'भेज रहे हैं ' + i + '/' + list.length + '…\n' + p.file.name);
-    return API.fileToB64(p.file).then(function (b64) {
-      return A('aOfficeUpload', { gstin: c.g, pid: pid, name: p.file.name, mime: p.file.type, b64: b64, ftype: p.type });
-    }).then(function (r) { sent++; if (r.undone) undone = true; S.pend.splice(S.pend.indexOf(p), 1); }, function (e) { toast(p.file.name + ': ' + (e.message || e), 5000); })
-      .then(next);
-  }
-  next().then(function () {
-    if (sent && S.doneAfter) return A('aOfficeDone', { gstin: c.g, pid: pid, done: true });
+  busy(true, 'फ़ाइल तैयार कर रहे हैं…');
+  try { localStorage.setItem('vas_office_last', JSON.stringify({ g: c.g, at: Date.now() })); } catch (e) {}
+  (S.checking || Promise.resolve()).then(function () {   // the month check finishes first (it can move the period)
+    pid = pidOf(c);
+    return Promise.all(list.map(function (p) { return API.fileToB64(p.file).then(function (b64) { return { p: p, x: { name: p.file.name, mime: p.file.type, b64: b64, ftype: p.type } }; }); }));
+  }).then(function (all) {
+    var groups = [], cur = [], size = 0;
+    all.forEach(function (a) { if (cur.length && size + a.x.b64.length > 12 * 1048576) { groups.push(cur); cur = []; size = 0; } cur.push(a); size += a.x.b64.length; });
+    if (cur.length) groups.push(cur);
+    var gi = 0;
+    function next() {
+      if (gi >= groups.length) return Promise.resolve();
+      var grp = groups[gi++], last = gi === groups.length;
+      busy(true, 'भेज रहे हैं' + (groups.length > 1 ? ' (' + gi + '/' + groups.length + ')' : '') + '… ' + all.length + ' फ़ाइल');
+      return A('aOfficeUpload', { gstin: c.g, pid: pid, files: grp.map(function (a) { return a.x; }), done: last && wantDone }).then(function (r) {
+        sent += r.saved.length; bad = bad.concat(r.errors); if (r.undone) undone = true;
+        grp.forEach(function (a) { if (!r.errors.some(function (e) { return e.name === a.x.name; })) S.pend.splice(S.pend.indexOf(a.p), 1); });
+        mergePair(c.g, pid, r.files, r.done);
+      }).then(next);
+    }
+    return next();
   }).then(function () {
     if (sent && S.shared.length && list.some(function (p) { return p.share; })) dropShared();
-    toast('✓ ' + sent + ' फ़ाइल भेजीं' + (S.doneAfter ? ' + डेटा पूरा' : undone ? ' – "डेटा पूरा" फिर से टिक करें' : ''), 4000);
-    S.doneAfter = false;
-    return load(true);
+    if (bad.length) toast('⚠ ' + bad.map(function (e) { return e.name + ': ' + e.error; }).join(' • '), 7000);
+    else toast('✓ ' + sent + ' फ़ाइल भेजीं' + (wantDone ? ' + डेटा पूरा' : undone ? ' – "डेटा पूरा" फिर से टिक करें' : ''), 4000);
+    S.doneAfter = false; renderSheet();
   }).catch(err).then(function () { busy(false); });
 }
 function delFile(id) {
   if (!confirm('ये फ़ाइल हटाएँ? (अगर मुंशी उसे फ़ोल्डर में रख चुका है तो वहाँ से लैपटॉप पर हटानी होगी)')) return;
+  var f = S.d.files.filter(function (x) { return x.id === id; })[0];
   busy(true, 'हटा रहे हैं…');
-  A('aOfficeDelete', { id: id }).then(function () { return load(true); }).catch(err).then(function () { busy(false); });
+  A('aOfficeDelete', { id: id }).then(function (r) { if (f && r.files) mergePair(f.g, f.pid, r.files, null); else return load(true); }).catch(err).then(function () { busy(false); });
 }
 function toggleDone() {
   var c = cl(S.sel), s = stateOf(c);
@@ -381,7 +408,10 @@ function toggleDone() {
     force = true;
   }
   busy(true, on ? 'डेटा पूरा कर रहे हैं…' : 'टिक हटा रहे हैं…');
-  A('aOfficeDone', { gstin: c.g, pid: s.pid, done: on, force: force }).then(function () { toast(on ? '✅ डेटा पूरा – मुंशी शीट बनाएगा' : 'टिक हटाया'); return load(true); }).catch(err).then(function () { busy(false); });
+  A('aOfficeDone', { gstin: c.g, pid: s.pid, done: on, force: force }).then(function (r) {
+    toast(on ? '✅ डेटा पूरा – मुंशी शीट बनाएगा' : 'टिक हटाया');
+    var k = c.g + '|' + s.pid; if (r.done) S.d.done[k] = r.done; else delete S.d.done[k]; saveCache(); render(); renderSheet();
+  }).catch(err).then(function () { busy(false); });
 }
 
 /* ---------- start ---------- */
@@ -390,8 +420,11 @@ try { S.key = localStorage.getItem('vas_admin_key') || ''; } catch (e) {}
 (/[?&]share=1/.test(location.search) ? readShared() : Promise.resolve([])).then(function (files) {
   S.shared = files;
   if (!S.key) { $('login').classList.remove('hide'); return; }
-  busy(true, 'खोल रहे हैं…');
-  return A('aOffice', { mid: S.mid }).then(function (d) { setFlag(true); S.d = d; showApp(); }).catch(function (e) { $('login').classList.remove('hide'); err(e); }).then(function () { busy(false); });
+  // saved list first (instant), fresh data right after
+  var cached = readCache();
+  if (cached && cached.clients) { S.d = cached; showApp(); } else busy(true, 'खोल रहे हैं…');
+  return A('aOffice', { mid: S.mid }).then(function (d) { setFlag(true); S.d = d; saveCache(); if (cached && cached.clients) { render(); if (S.sel) renderSheet(); } else showApp(); })
+    .catch(function (e) { if (!(cached && cached.clients)) $('login').classList.remove('hide'); err(e); }).then(function () { busy(false); });
 });
 setInterval(function () { if (S.d && !document.hidden && $('busy').classList.contains('hide')) load(true); }, 60000);
 </script>
