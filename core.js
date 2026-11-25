@@ -5,7 +5,7 @@
    No DOM, no async, no modules – plain ES2019.
    ============================================================ */
 var Core = (function () {
-  var VERSION = '1.11.1';
+  var VERSION = '1.11.2';
 
   /* ---------- language: client picks हिंदी or English (q.lang per request, c.lang for notifications).
      T(hi, en) returns the text for the current LANG. The office / admin side always stays Hindi. ---------- */

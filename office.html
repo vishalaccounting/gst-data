@@ -47,7 +47,7 @@ input[type=search], input[type=password] { width:100%; height:44px; border:1px s
 .banner.info { background:var(--infobg); border-color:#bcd5f0; color:#14406b; }
 .banner.bad { background:var(--badbg); border-color:#f3b9b1; color:#7d1f14; }
 .sheet { position:fixed; inset:0; background:rgba(10,20,35,.45); z-index:20; display:flex; align-items:flex-end; justify-content:center; }
-.sheet .in { background:var(--bg); width:100%; max-width:720px; max-height:94vh; overflow:auto; border-radius:16px 16px 0 0; padding:14px 16px 24px; }
+.sheet .in { background:var(--bg); width:100%; max-width:720px; max-height:94vh; max-height:94dvh; overflow:auto; border-radius:16px 16px 0 0; padding:14px 16px 24px; }
 .sheet h2 { margin:0 0 2px; font-size:18px; }
 .x { float:right; border:0; background:#e6e9ee; border-radius:50%; width:34px; height:34px; font-size:18px; }
 .f { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px dashed var(--line); font-size:14px; }
@@ -66,6 +66,17 @@ input[type=search], input[type=password] { width:100%; height:44px; border:1px s
 #busy { position:fixed; inset:0; background:rgba(255,255,255,.75); z-index:40; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; font-weight:600; text-align:center; padding:16px; }
 .spin { width:36px; height:36px; border:4px solid #cfd8e3; border-top-color:var(--brand); border-radius:50%; animation:sp 1s linear infinite; }
 @keyframes sp { to { transform:rotate(360deg); } }
+/* v1.11.2: while typing a name everything above the search box shrinks, so the results stay above the phone keyboard */
+.typing .hb, .typing .mon, .typing .chips { display:none !important; }
+.typing header { padding:6px 16px; }
+.typing #list { margin-top:8px; }
+.sbar { display:flex; align-items:center; gap:8px; }
+.sbar .x { float:none; flex:none; }
+.typing .shelp { display:none; }
+.put { display:inline-block; background:var(--ok); color:#fff; font-size:13px; font-weight:700; border-radius:8px; padding:7px 10px; white-space:nowrap; }
+.f input[type=checkbox] { width:24px; height:24px; flex:none; }
+.f.off { opacity:.6; }
+.sendbar { position:sticky; bottom:-24px; background:var(--bg); padding:10px 0 24px; margin-bottom:-24px; z-index:2; }
 .foot { text-align:center; font-size:12.5px; color:var(--mute); margin-top:16px; }
 .foot a { color:var(--brand2); }
 </style>
@@ -97,12 +108,12 @@ input[type=search], input[type=password] { width:100%; height:44px; border:1px s
   </header>
   <main>
     <div id="shareBox" class="banner hide"></div>
-    <input id="q" type="search" placeholder="🔍 क्लाइंट का नाम या GSTIN" oninput="S.q=this.value;renderList()">
+    <input id="q" type="search" placeholder="🔍 क्लाइंट का नाम या GSTIN" oninput="S.q=this.value;typing();renderList()" onfocus="typing()" onblur="setTimeout(typing,400)" autocomplete="off">
     <div class="chips" id="chips"></div>
     <div class="card" style="padding:4px 10px" id="list"></div>
     <div class="foot">
       <span id="cnt"></span><br>
-      <a href="admin.html">पूरा डैशबोर्ड</a> · <a href="index.html?client=1">क्लाइंट ऐप</a> · <a href="#" onclick="logout();return false">लॉग आउट</a>
+      <a href="admin.html">पूरा डैशबोर्ड</a> · <a href="index.html?client=1">क्लाइंट ऐप</a> · <a href="#" onclick="logout();return false">लॉग आउट</a><br><span id="ver"></span>
     </div>
   </main>
 </div>
@@ -153,7 +164,7 @@ function logout() {
   try { localStorage.removeItem('vas_admin_key'); localStorage.removeItem('vas_office_cache'); localStorage.removeItem('vas_office_last'); } catch (e) {}
   setFlag(false); S.key = ''; $('app').classList.add('hide'); $('login').classList.remove('hide');
 }
-function showApp() { $('login').classList.add('hide'); $('app').classList.remove('hide'); fillMonths(); render(); }
+function showApp() { $('ver').textContent = 'v' + Core.VERSION; $('login').classList.add('hide'); $('app').classList.remove('hide'); fillMonths(); render(); }
 
 /* ---------- data ---------- */
 function load(quiet) {
@@ -169,7 +180,8 @@ function mergePair(g, pid, files, done) {
   var k = g + '|' + pid; if (done) S.d.done[k] = done; else delete S.d.done[k];
   saveCache(); render(); if (S.sel) renderSheet();
 }
-function lastClient() { try { var l = JSON.parse(localStorage.getItem('vas_office_last') || 'null'); return l && Date.now() - l.at < 3 * 3600000 ? l.g : ''; } catch (e) { return ''; } }
+// 400 ms after blur: a tap on a result blurs the box first, so the list must not jump before that tap lands
+function typing() { document.body.classList.toggle('typing', !!S.q || document.activeElement === $('q')); }
 function fillMonths() {
   var sel = $('mon'), cur = Core.addMonth(Core.lastMonth(new Date()), 1), h = '';
   for (var i = 0; i < 15; i++) { var m = Core.addMonth(cur, -i); h += '<option value="' + m + '">' + mLabel(m) + '</option>'; }
@@ -217,13 +229,11 @@ function renderShare() {
   var b = $('shareBox');
   if (!S.shared.length) { b.classList.add('hide'); return; }
   b.classList.remove('hide');
-  var lg = lastClient(), lc = lg && S.d ? cl(lg) : null;
-  b.innerHTML = '📎 <b>' + S.shared.length + ' फ़ाइल जमा हैं</b>' +
-    '<div class="sub" style="margin-top:4px;font-size:12.5px">' + S.shared.map(function (f) { return esc(f.name); }).join(' • ') + '</div>' +
-    '<div style="margin-top:6px;font-size:13px">और फ़ाइल हों तो WhatsApp पर वापस जाकर अगली फ़ाइल भी Share करें – सब यहीं जुड़ती जाएँगी। सब हो जाए तो नीचे क्लाइंट चुनें।</div>' +
-    '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">' +
-    (lc ? '<button class="btn pri" style="min-height:40px" onclick="openClient(\'' + lc.g + '\')">➡ ' + esc(lc.n) + ' में डालें</button>' : '') +
-    '<button class="btn" style="min-height:40px" onclick="dropShared()">✕ हटाएँ</button></div>';
+  // v1.11.2: one short bar, no "put in the last client" button – the client is always picked by name
+  b.innerHTML = '<div class="sbar"><div class="grow"><div>📎 <b>' + S.shared.length + ' फ़ाइल आई – किस क्लाइंट की है?</b></div>' +
+    '<div class="sub ell" style="font-size:12.5px">' + S.shared.map(function (f) { return esc(f.name); }).join(' • ') + '</div></div>' +
+    '<button class="x" onclick="cancelShared()" title="हटाएँ">✕</button></div>' +
+    '<div class="shelp" style="margin-top:4px;font-size:12.5px">नीचे नाम लिखें और क्लाइंट पर दबाएँ। और फ़ाइल हो तो पहले WhatsApp से वो भी Share कर दें।</div>';
 }
 function renderList() {
   if (!S.d) return;
@@ -242,51 +252,97 @@ function renderList() {
     var c = r[0], s = r[1];
     return '<div class="row" onclick="openClient(\'' + c.g + '\')"><div class="grow"><div class="nm ell">' + esc(c.n) + '</div>' +
       '<div class="sub ell">' + c.g + ' · ' + (c.f === 'Q' ? 'तिमाही ' + Core.periodLabel(s.pid) : 'मासिक') + ' · ' + locText(c) + '</div></div>' +
-      (s.tag ? '<span class="tag ' + s.cls + '">' + s.tag + '</span>' : '') + '</div>';
+      (S.shared.length ? '<span class="put">⬆️ डालें</span>' : s.tag ? '<span class="tag ' + s.cls + '">' + s.tag + '</span>' : '') + '</div>';
   }).join('') : '<div class="sub" style="padding:14px 4px">कोई क्लाइंट नहीं मिला</div>';
   $('cnt').textContent = 'कुल ' + S.d.clients.length + ' क्लाइंट' + (S.d.listAt ? ' · लिस्ट ' + ago(S.d.listAt) + ' मुंशी से आई' : ' · मुंशी से लिस्ट अभी नहीं आई');
 }
 function locText(c) { return c.loc === 'H' ? '💻 H: फ़ोल्डर' : c.loc === 'G' ? '☁️ Drive फ़ोल्डर' : c.noTool ? '📲 सिर्फ़ ऐप' : '💻 Report Tool'; }
 
 /* ---------- WhatsApp share ---------- */
+/* v1.11.2 rules: the basket is read EVERY time the page opens or comes back to the front (not only with ?share=1);
+   it lives 30 minutes from the last share; a file leaves it as soon as the server has answered for it; it never belongs to a client. */
+var BASKET_MS = 30 * 60000, OLD_SHARE_MS = 5 * 60000;
 function readShared() {
   if (!('caches' in window)) return Promise.resolve([]);
   return caches.open('vas-share').then(function (c) {
     return c.match('share/list').then(function (r) {
       if (!r) return [];
       return r.json().then(function (m) {
-        if (Date.now() - m.at > 3 * 86400000) return [];
+        if (Date.now() - m.at > BASKET_MS) {
+          return caches.delete('vas-share').then(function () { if (m.files.length) toast('पुरानी Share की हुई फ़ाइल (30 मिनट से पहले की) हटा दी – चाहिए तो दोबारा Share करें', 5000); return []; });
+        }
         return Promise.all(m.files.map(function (x) {
           return c.match('share/' + x.k).then(function (r2) { return r2 ? r2.blob() : null; })
-            .then(function (b) { return b ? new File([b], x.name, { type: x.type || b.type }) : null; });
+            .then(function (b) { if (!b) return null; var f = new File([b], x.name, { type: x.type || b.type }); f.k = x.k; f.at = x.at || m.at; return f; });
         }));
       });
     });
   }).then(function (l) { return l.filter(Boolean); }).catch(function () { return []; });
 }
-function dropShared() { S.shared = []; if ('caches' in window) caches.delete('vas-share').catch(function () {}); history.replaceState(null, '', 'office.html'); renderShare(); }
+// take these files (by key) out of the basket, on screen and in the phone's store
+function takeOut(keys) {
+  S.shared = S.shared.filter(function (f) { return keys.indexOf(f.k) < 0; });
+  render();
+  if (!('caches' in window) || !keys.length) return Promise.resolve();
+  // one after the other: two at once would write an already removed file back
+  return S.outQ = (S.outQ || Promise.resolve()).then(function () { return caches.open('vas-share'); }).then(function (c) {
+    return c.match('share/list').then(function (r) { return r ? r.json() : null; }).then(function (m) {
+      var left = m ? m.files.filter(function (x) { return keys.indexOf(x.k) < 0; }) : [];
+      if (!left.length) return caches.delete('vas-share');
+      return Promise.all(keys.map(function (k) { return c.delete('share/' + k); }))
+        .then(function () { return c.put('share/list', new Response(JSON.stringify({ at: m.at, files: left }))); });
+    });
+  }).catch(function () {});
+}
+function dropShared() { return takeOut(S.shared.map(function (f) { return f.k; })); }
+function cancelShared() { dropShared(); S.pend = S.pend.filter(function (p) { return !p.share; }); closeSheet(); toast('Share की हुई फ़ाइल हटा दी'); }
+// back on this screen (from WhatsApp / recent apps / Back button): is there something new in the basket?
+function refreshShared() {
+  if (!$('busy').classList.contains('hide')) return Promise.resolve();
+  return (S.outQ || Promise.resolve()).then(readShared).then(function (files) {
+    var id = function (l) { return l.map(function (f) { return f.k; }).join(); };
+    if (id(files) === id(S.shared)) return;
+    S.shared = files;
+    // never add to the client whose sheet happens to be open: close it, the client is picked again
+    if (S.sel && files.length && S.pend.every(function (p) { return p.share; })) closeSheet(); else S.pend = S.pend.filter(function (p) { return !p.share; });
+    if (S.d) { render(); if (S.sel) renderSheet(); }
+  });
+}
 
 /* ---------- one client ---------- */
 function cl(g) { return S.d.clients.filter(function (c) { return c.g === g; })[0]; }
 function openClient(g) {
-  S.sel = g; S.doneAfter = false;
+  S.sel = g; S.doneAfter = false; S.monthNote = '';
   S.pend = [];
   var add = S.shared.length ? S.shared.slice() : [];
+  $('q').blur();
   $('sheet').classList.remove('hide');
+  if (!(history.state && history.state.sheet)) history.pushState({ sheet: 1 }, '');   // phone's Back button closes the sheet, not the page
   renderSheet();
+  $('sheetIn').scrollTop = 0;   // else it stays scrolled where the last client's sheet was
   if (add.length) addFiles(add, true);
 }
-function closeSheet() { S.sel = null; S.pend = []; $('sheet').classList.add('hide'); renderList(); }
+function hideSheet() { S.sel = null; S.pend = []; $('sheet').classList.add('hide'); render(); }
+function closeSheet() { var was = S.sel; hideSheet(); if (was && history.state && history.state.sheet) history.back(); }
+window.addEventListener('popstate', function () {
+  if (S.sel && !$('busy').classList.contains('hide')) { history.pushState({ sheet: 1 }, ''); return; }   // Back while sending: stay
+  if (S.sel && !(history.state && history.state.sheet)) hideSheet();
+});
 // read each picked / shared file: which report + which month (ZIPs are sent whole – GST Report Tool opens them itself)
 // v1.11.1: the files show at once; the check (which report / month) fills in by itself a moment later
 function addFiles(list, fromShare) {
   list = [].slice.call(list || []); if (!list.length) return;
-  var items = list.map(function (f) { return { file: f, months: [], label: '', type: '', share: !!fromShare, checking: true }; });
+  // shares are one batch while each came within 5 minutes of the next; files from before a longer gap may be another
+  // client's, so they stay unticked until the office ticks them
+  var from = 0;
+  if (fromShare) list.map(function (f) { return f.at || 0; }).sort(function (a, b) { return b - a; }).some(function (t, i) { if (i && from - t > OLD_SHARE_MS) return true; from = t; });
+  var items = list.map(function (f) { return { file: f, months: [], label: '', type: '', share: !!fromShare, checking: true, off: !!fromShare && (!!f.stale || (f.at || 0) < from) }; });
   S.pend = S.pend.concat(items);
   renderSheet();
   S.checking = (S.checking || Promise.resolve()).then(function () {
     return Promise.all(items.map(function (p) {
-      return Detect.inspect(p.file).then(function (r) {
+      // a slow internet must not hold the file back: after 20 s it goes without the check
+      return Promise.race([Promise.resolve().then(function () { return Detect.inspect(p.file); }), new Promise(function (res, rej) { setTimeout(function () { rej(new Error('timeout')); }, 20000); })]).then(function (r) {
         var months = [], labels = [];
         r.items.forEach(function (it) { (it.months || []).forEach(function (m) { if (months.indexOf(m) < 0) months.push(m); }); if (it.label && labels.indexOf(it.label) < 0) labels.push(it.label); });
         p.months = months.sort(); p.label = labels.join(', '); p.type = r.items.length === 1 ? (r.items[0].type || '') : (r.zip ? 'ZIP' : '');
@@ -294,10 +350,13 @@ function addFiles(list, fromShare) {
     }));
   }).then(function () { autoMonth(); if (S.sel) renderSheet(); });
 }
+function ticked() { return S.pend.filter(function (p) { return !p.off; }); }   // ticked files = what will be sent
+function setOff(i, off) { S.pend[i].off = off; autoMonth(); renderSheet(); }
+function removePend(i) { var p = S.pend[i]; S.pend.splice(i, 1); if (p.share) takeOut([p.file.k]); autoMonth(); renderSheet(); }
 // all files belong to one other month/quarter → move the picker there (like the client app does)
 function autoMonth() {
   var c = cl(S.sel); if (!c) return;
-  var ms = []; S.pend.forEach(function (p) { p.months.forEach(function (m) { if (ms.indexOf(m) < 0) ms.push(m); }); });
+  var ms = []; ticked().forEach(function (p) { p.months.forEach(function (m) { if (ms.indexOf(m) < 0) ms.push(m); }); });
   if (!ms.length) { S.monthNote = ''; return; }
   var pids = {}; ms.forEach(function (m) { pids[Core.pidFor(c.f, m)] = 1; });
   var keys = Object.keys(pids);
@@ -321,18 +380,23 @@ function renderSheet() {
   if (S.monthNote && S.pend.length) h += '<div class="banner info">' + S.monthNote + '</div>';
 
   // files waiting to be sent
+  var go = ticked(), bar = '';
   if (S.pend.length) {
-    h += '<div class="lbl">भेजनी हैं (' + S.pend.length + ')</div><div class="card">';
+    if (s.files.length) h += '<div class="banner info">इस क्लाइंट की ' + Core.periodLabel(pid) + ' की ' + s.files.length + ' फ़ाइल पहले से भेजी हुई है – ये उसी में जुड़ेंगी।' + (s.done ? ' "डेटा पूरा" का टिक हटेगा, नीचे फिर से लगा दें।' : '') + '</div>';
+    h += '<div class="lbl">भेजनी हैं (' + go.length + ')</div><div class="card">';
     S.pend.forEach(function (p, i) {
-      h += '<div class="f"><span>' + (p.label ? '📊' : '📄') + '</span><div class="grow"><div class="ell">' + esc(p.file.name) + '</div><div class="sub" style="font-size:12px;color:var(--mute)">' +
-        (p.checking ? 'जाँच रहे हैं…' : p.label ? esc(p.label) : 'पहचान नहीं हुई – फिर भी भेज देंगे') + (p.months.length ? ' · ' + p.months.map(mLabel).join(', ') : '') + ' · ' + kb(p.file.size) + '</div></div>' +
-        '<button class="del" onclick="S.pend.splice(' + i + ',1);autoMonth();renderSheet()">✕</button></div>';
+      var late = p.share && p.off ? '<div style="font-size:12px;color:var(--warn)">⚠ ' + ago(new Date(p.file.at).toISOString()) + ' Share की थी – इसी क्लाइंट की हो तो टिक करें, वरना नहीं जाएगी</div>' : '';
+      h += '<div class="f' + (p.off ? ' off' : '') + '"><input type="checkbox" ' + (p.off ? '' : 'checked') + ' onchange="setOff(' + i + ',!this.checked)"><div class="grow"><div class="ell">' + esc(p.file.name) + '</div><div class="sub" style="font-size:12px;color:var(--mute)">' +
+        (p.checking ? 'जाँच रहे हैं…' : p.label ? esc(p.label) : 'पहचान नहीं हुई – फिर भी भेज देंगे') + (p.months.length ? ' · ' + p.months.map(mLabel).join(', ') : '') + ' · ' + kb(p.file.size) + '</div>' + late + (p.error ? '<div style="font-size:12px;color:var(--bad)">✗ ' + esc(p.error) + '</div>' : '') + '</div>' +
+        '<button class="del" onclick="removePend(' + i + ')">✕</button></div>';
     });
     h += '<label style="display:flex;gap:10px;align-items:center;margin-top:10px;font-weight:600"><input type="checkbox" style="width:22px;height:22px" ' + (S.doneAfter ? 'checked' : '') +
-      ' onchange="S.doneAfter=this.checked"> सारा डेटा आ गया – साथ में "डेटा पूरा" भी कर दो</label>';
-    h += '<div style="height:10px"></div><button class="btn pri wide" onclick="sendAll()">⬆️ ' + S.pend.length + ' फ़ाइल भेजें</button></div>';
+      ' onchange="S.doneAfter=this.checked"> सारा डेटा आ गया – साथ में "डेटा पूरा" भी कर दो</label></div>';
+    // always in sight at the bottom of the sheet, however long the list is
+    bar = '<div class="sendbar"><button class="btn ok wide" style="min-height:50px;font-size:16px" onclick="sendAll()"' + (go.length ? '' : ' disabled') + '>⬆️ ' + go.length + ' फ़ाइल <span class="ell" style="max-width:52%">' + esc(c.n) + '</span> में भेजें</button>' +
+      (S.shared.length ? '<div style="text-align:center;margin-top:6px"><a href="#" style="color:var(--bad);font-size:13.5px" onclick="cancelShared();return false">✕ रद्द करें – Share की हुई फ़ाइल हटाएँ</a></div>' : '') + '</div>';
   }
-  h += '<button class="btn wide" onclick="$(\'pick\').click()">📂 फ़ाइल चुनें (Excel / ZIP / PDF)</button>';
+  h += '<button class="btn' + (S.pend.length ? '' : ' pri') + ' wide" onclick="$(\'pick\').click()">📂 फ़ाइल चुनें (Excel / ZIP / PDF)</button>';
 
   // sent files
   h += '<div class="lbl">फ़ोन से भेजी गईं (' + s.files.length + ')</div><div class="card">';
@@ -358,15 +422,14 @@ function renderSheet() {
   ];
   h += '<div class="lbl">काम कहाँ तक</div><div class="card"><ul class="steps">' + steps.map(function (x) { return '<li class="' + (x[0] ? 'done' : '') + '"><span class="d">' + (x[0] ? x[1] : '○') + '</span><span>' + x[2] + '</span></li>'; }).join('') + '</ul>';
   if (st && (st.st === 'ERR' || st.st === 'SKIP' || st.st === 'NOCLIENT')) h += '<div class="banner bad" style="margin:8px 0 0">' + esc(st.msg || 'गलती – मुंशी का log देखें') + '</div>';
-  h += '</div>';
+  h += '</div>' + bar;
   $('sheetIn').innerHTML = h;
 }
 // v1.11.1: all files (+ the tick) go in ONE request (several only above ~12 MB) instead of one request per file
 function sendAll() {
-  var c = cl(S.sel), pid = pidOf(c), list = S.pend.slice(), sent = 0, bad = [], undone = false, wantDone = S.doneAfter;
+  var c = cl(S.sel), pid = pidOf(c), list = ticked(), sent = 0, dup = 0, bad = [], undone = false, wantDone = S.doneAfter;
   if (!list.length) return;
   busy(true, 'फ़ाइल तैयार कर रहे हैं…');
-  try { localStorage.setItem('vas_office_last', JSON.stringify({ g: c.g, at: Date.now() })); } catch (e) {}
   (S.checking || Promise.resolve()).then(function () {   // the month check finishes first (it can move the period)
     pid = pidOf(c);
     return Promise.all(list.map(function (p) { return API.fileToB64(p.file).then(function (b64) { return { p: p, x: { name: p.file.name, mime: p.file.type, b64: b64, ftype: p.type } }; }); }));
@@ -380,16 +443,26 @@ function sendAll() {
       var grp = groups[gi++], last = gi === groups.length;
       busy(true, 'भेज रहे हैं' + (groups.length > 1 ? ' (' + gi + '/' + groups.length + ')' : '') + '… ' + all.length + ' फ़ाइल');
       return A('aOfficeUpload', { gstin: c.g, pid: pid, files: grp.map(function (a) { return a.x; }), done: last && wantDone }).then(function (r) {
-        sent += r.saved.length; bad = bad.concat(r.errors); if (r.undone) undone = true;
-        grp.forEach(function (a) { if (!r.errors.some(function (e) { return e.name === a.x.name; })) S.pend.splice(S.pend.indexOf(a.p), 1); });
+        sent += r.saved.length; if (r.undone) undone = true;
+        // the server has answered: sent / already-there files leave the basket now; refused ones stay on this screen with the reason
+        var out = [];
+        grp.forEach(function (a) {
+          var e = r.errors.filter(function (x) { return x.name === a.x.name; })[0], again = e && /पहले से डाली/.test(e.error);
+          if (again) dup++; else if (e) { bad.push(e); a.p.error = e.error; }
+          if (!e || again) S.pend.splice(S.pend.indexOf(a.p), 1);
+          if (a.p.share && !(e && /^Server error/.test(e.error))) out.push(a.p.file.k);
+        });
+        takeOut(out);
         mergePair(c.g, pid, r.files, r.done);
       }).then(next);
     }
     return next();
   }).then(function () {
-    if (sent && S.shared.length && list.some(function (p) { return p.share; })) dropShared();
+    // unticked older files do not wait for the next client either: after a clean send the basket is empty
+    if (!bad.length) { S.pend = S.pend.filter(function (p) { return !p.share; }); if (S.shared.length) dropShared(); }
+    $('q').value = S.q = ''; typing(); renderList();
     if (bad.length) toast('⚠ ' + bad.map(function (e) { return e.name + ': ' + e.error; }).join(' • '), 7000);
-    else toast('✓ ' + sent + ' फ़ाइल भेजीं' + (wantDone ? ' + डेटा पूरा' : undone ? ' – "डेटा पूरा" फिर से टिक करें' : ''), 4000);
+    else toast('✓ ' + sent + ' फ़ाइल भेजीं' + (dup ? ' (' + dup + ' पहले से थी)' : '') + (wantDone ? ' + डेटा पूरा' : undone ? ' – "डेटा पूरा" फिर से टिक करें' : ''), 4000);
     S.doneAfter = false; renderSheet();
   }).catch(err).then(function () { busy(false); });
 }
@@ -401,7 +474,7 @@ function delFile(id) {
 }
 function toggleDone() {
   var c = cl(S.sel), s = stateOf(c);
-  if (S.pend.length && !s.done) { toast('पहले "फ़ाइल भेजें" दबाएँ'); return; }
+  if (ticked().length && !s.done) { toast('पहले "फ़ाइल भेजें" दबाएँ'); return; }
   var on = !s.done, force = false;
   if (on && !s.files.length) {
     if (!confirm('फ़ोन से इस अवधि की कोई फ़ाइल नहीं भेजी। क्या डेटा पहले से फ़ोल्डर में है और मुंशी शीट बना दे?')) return;
@@ -417,8 +490,13 @@ function toggleDone() {
 /* ---------- start ---------- */
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
 try { S.key = localStorage.getItem('vas_admin_key') || ''; } catch (e) {}
-(/[?&]share=1/.test(location.search) ? readShared() : Promise.resolve([])).then(function (files) {
+try { localStorage.removeItem('vas_office_last'); } catch (e) {}   // v1.11.1's "last client" – no longer used
+var came = /[?&]share=1/.test(location.search), n0 = /[?&]n=0(&|$)/.test(location.search);
+history.replaceState(null, '', 'office.html');
+readShared().then(function (files) {
   S.shared = files;
+  if (n0) files.forEach(function (f) { f.stale = true; });   // this share brought nothing: what lies here is from earlier
+  if (came && (n0 || !files.length)) toast('⚠ Share में फ़ाइल नहीं मिली – WhatsApp में फ़ाइल को ही दबाकर Share करें', 7000);
   if (!S.key) { $('login').classList.remove('hide'); return; }
   // saved list first (instant), fresh data right after
   var cached = readCache();
@@ -426,6 +504,8 @@ try { S.key = localStorage.getItem('vas_admin_key') || ''; } catch (e) {}
   return A('aOffice', { mid: S.mid }).then(function (d) { setFlag(true); S.d = d; saveCache(); if (cached && cached.clients) { render(); if (S.sel) renderSheet(); } else showApp(); })
     .catch(function (e) { if (!(cached && cached.clients)) $('login').classList.remove('hide'); err(e); }).then(function () { busy(false); });
 });
+document.addEventListener('visibilitychange', function () { if (!document.hidden) refreshShared(); });
+window.addEventListener('pageshow', function (e) { if (e.persisted) refreshShared(); });
 setInterval(function () { if (S.d && !document.hidden && $('busy').classList.contains('hide')) load(true); }, 60000);
 </script>
 </body>
